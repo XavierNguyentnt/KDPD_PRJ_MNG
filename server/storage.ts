@@ -1,10 +1,12 @@
-import { Task, InsertTask, UpdateTaskRequest, SHEET_CONFIG } from "@shared/schema";
-import { parse } from "csv-parse/sync"; // We will need to install csv-parse
+import { Task, InsertTask, UpdateTaskRequest } from "@shared/schema";
+import { googleSheetsService } from "./google-sheets";
 
 export interface IStorage {
   getTasks(): Promise<Task[]>;
   getTask(id: string): Promise<Task | undefined>;
+  createTask(task: Omit<Task, 'id'>): Promise<Task>;
   updateTask(id: string, updates: UpdateTaskRequest): Promise<Task>;
+  deleteTask(id: string): Promise<void>;
   refreshTasks(): Promise<void>;
 }
 
@@ -13,77 +15,13 @@ export class GoogleSheetStorage implements IStorage {
   private lastFetch: number = 0;
   private readonly CACHE_TTL = 60 * 1000; // 1 minute cache
 
-  private async fetchFromSheet(): Promise<Map<string, Task>> {
-    // Construct public CSV URL
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_CONFIG.sheetId}/export?format=csv&gid=${SHEET_CONFIG.gid}`;
-    
-    try {
-      console.log(`Fetching Google Sheet from: ${url}`);
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch sheet: ${response.statusText}`);
-      }
-      
-      const csvText = await response.text();
-      
-      // Parse CSV
-      // We assume headers: Task ID, Task Name, Description, Assignee, Role, Status, Priority, Start Date, Due Date, Progress, Notes
-      const records = parse(csvText, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true
-      });
-
-      const newTasks = new Map<string, Task>();
-      
-      records.forEach((record: any) => {
-        // Map CSV columns to our schema
-        // Keys in 'record' depend on the actual header names in the sheet. 
-        // We'll normalize them.
-        
-        // Helper to find key case-insensitively
-        const getVal = (keys: string[]) => {
-          for (const key of keys) {
-            const foundKey = Object.keys(record).find(k => k.toLowerCase() === key.toLowerCase());
-            if (foundKey) return record[foundKey];
-          }
-          return null;
-        };
-
-        const id = getVal(['Task ID', 'ID', 'TaskId']) || `generated-${Math.random().toString(36).substr(2, 9)}`;
-        const title = getVal(['Task Name', 'Task', 'Title', 'Name']) || 'Untitled Task';
-        
-        const task: Task = {
-          id: String(id),
-          title: String(title),
-          description: getVal(['Description', 'Desc']),
-          assignee: getVal(['Assignee', 'Assigned To', 'Owner']),
-          role: getVal(['Role', 'Team']),
-          status: getVal(['Status', 'State']) || 'Not Started',
-          priority: getVal(['Priority']) || 'Medium',
-          startDate: getVal(['Start Date', 'Start']),
-          dueDate: getVal(['Due Date', 'Due', 'Deadline']),
-          progress: parseInt(getVal(['Progress', '%']) || '0', 10),
-          notes: getVal(['Notes', 'Comments'])
-        };
-        
-        newTasks.set(task.id, task);
-      });
-      
-      console.log(`Fetched ${newTasks.size} tasks from Google Sheet.`);
-      return newTasks;
-    } catch (error) {
-      console.error("Error fetching/parsing Google Sheet:", error);
-      // Return existing cache if fetch fails, or empty map
-      return this.tasks.size > 0 ? this.tasks : new Map();
-    }
-  }
-
   async getTasks(): Promise<Task[]> {
     const now = Date.now();
     if (now - this.lastFetch > this.CACHE_TTL || this.tasks.size === 0) {
-      this.tasks = await this.fetchFromSheet();
+      const fetchedTasks = await googleSheetsService.readTasks();
+      this.tasks = new Map(fetchedTasks.map(task => [task.id, task]));
       this.lastFetch = now;
+      console.log(`Fetched ${this.tasks.size} tasks from Google Sheet.`);
     }
     return Array.from(this.tasks.values());
   }
@@ -93,21 +31,60 @@ export class GoogleSheetStorage implements IStorage {
     return this.tasks.get(id);
   }
 
-  async updateTask(id: string, updates: UpdateTaskRequest): Promise<Task> {
-    const task = await this.getTask(id);
-    if (!task) throw new Error(`Task ${id} not found`);
+  async createTask(task: Omit<Task, 'id'>): Promise<Task> {
+    try {
+      const newTask = await googleSheetsService.createTask(task);
+      this.tasks.set(newTask.id, newTask);
+      this.lastFetch = Date.now(); // Invalidate cache
+      return newTask;
+    } catch (error: any) {
+      console.error("Error creating task:", error);
+      throw error;
+    }
+  }
 
-    const updatedTask = { ...task, ...updates };
-    this.tasks.set(id, updatedTask);
-    // Note: This is an in-memory update simulation. 
-    // We CANNOT write back to the public Google Sheet CSV endpoint.
-    // In a real app, we'd use the Google Sheets API with OAuth credentials to write back.
-    
-    return updatedTask;
+  async updateTask(id: string, updates: UpdateTaskRequest): Promise<Task> {
+    try {
+      const updatedTask = await googleSheetsService.updateTask(id, updates);
+      this.tasks.set(id, updatedTask);
+      this.lastFetch = Date.now(); // Invalidate cache
+      return updatedTask;
+    } catch (error: any) {
+      console.error("Error updating task:", error);
+      // If update fails due to auth, try in-memory update as fallback
+      const task = await this.getTask(id);
+      if (!task) throw new Error(`Task ${id} not found`);
+      
+      if (error.message?.includes('authentication')) {
+        console.warn('Write-back not available, using in-memory update only');
+        const updatedTask = { ...task, ...updates };
+        this.tasks.set(id, updatedTask);
+        return updatedTask;
+      }
+      
+      throw error;
+    }
+  }
+
+  async deleteTask(id: string): Promise<void> {
+    try {
+      await googleSheetsService.deleteTask(id);
+      this.tasks.delete(id);
+      this.lastFetch = Date.now(); // Invalidate cache
+    } catch (error: any) {
+      console.error("Error deleting task:", error);
+      if (error.message?.includes('authentication')) {
+        console.warn('Delete not available, removing from cache only');
+        this.tasks.delete(id);
+        return;
+      }
+      throw error;
+    }
   }
 
   async refreshTasks(): Promise<void> {
-    this.tasks = await this.fetchFromSheet();
+    const fetchedTasks = await googleSheetsService.readTasks();
+    this.tasks = new Map(fetchedTasks.map(task => [task.id, task]));
     this.lastFetch = Date.now();
   }
 }

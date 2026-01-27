@@ -31,13 +31,29 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
-    // Simulation endpoints (since we can't write to the actual public sheet)
+    create: {
+      method: 'POST' as const,
+      path: '/api/tasks',
+      input: insertTaskSchema.omit({ id: true }),
+      responses: {
+        200: z.custom<typeof tasks.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
     update: {
       method: 'PATCH' as const,
       path: '/api/tasks/:id',
       input: insertTaskSchema.partial(),
       responses: {
         200: z.custom<typeof tasks.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/tasks/:id',
+      responses: {
+        200: z.object({ message: z.string() }),
         404: errorSchemas.notFound,
       },
     },

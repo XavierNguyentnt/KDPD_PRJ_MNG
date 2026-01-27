@@ -4,3 +4,23 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Replit files
+.local/
+.replit
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Google Service Account credentials
+server/credentials.json
+zeta-courage-*.json
+*-credentials.json
+*-service-account.json
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!components.json

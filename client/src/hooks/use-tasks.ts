@@ -59,6 +59,47 @@ export function useUpdateTask() {
   });
 }
 
+export function useCreateTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (task: z.infer<typeof api.tasks.create.input>) => {
+      const res = await fetch(api.tasks.create.path, {
+        method: api.tasks.create.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(task),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: "Failed to create task" }));
+        throw new Error(error.message || "Failed to create task");
+      }
+      return api.tasks.create.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
+    },
+  });
+}
+
+export function useDeleteTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const url = buildUrl(api.tasks.delete.path, { id });
+      const res = await fetch(url, {
+        method: api.tasks.delete.method,
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: "Failed to delete task" }));
+        throw new Error(error.message || "Failed to delete task");
+      }
+      return api.tasks.delete.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
+    },
+  });
+}
+
 export function useRefreshTasks() {
   const queryClient = useQueryClient();
   return useMutation({

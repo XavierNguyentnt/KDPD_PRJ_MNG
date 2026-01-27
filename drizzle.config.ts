@@ -1,7 +1,10 @@
+// Database is optional - this project uses Google Sheets as the primary data source
+// This config is only needed if you want to use database features
+
 import { defineConfig } from "drizzle-kit";
 
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL, ensure the database is provisioned");
+  console.warn("DATABASE_URL not set - database features disabled (using Google Sheets)");
 }
 
 export default defineConfig({
@@ -9,6 +12,6 @@ export default defineConfig({
   schema: "./shared/schema.ts",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    url: process.env.DATABASE_URL || "postgresql://localhost:5432/dummy", // Dummy URL if not set
   },
 });
