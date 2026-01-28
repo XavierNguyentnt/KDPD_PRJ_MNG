@@ -3,18 +3,22 @@ import { Task } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, AlertCircle, Clock, BarChart3 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
+import { useI18n } from "@/hooks/use-i18n";
 
 interface TaskStatsProps {
   tasks: Task[];
 }
 
 export function TaskStats({ tasks }: TaskStatsProps) {
+  const { t } = useI18n();
+  
   const stats = useMemo(() => {
     const total = tasks.length;
-    const completed = tasks.filter(t => t.status === "Completed").length;
+    const isCompleted = (t: Task) => t.status === "Completed" || t.actualCompletedAt != null;
+    const completed = tasks.filter(t => isCompleted(t)).length;
     const inProgress = tasks.filter(t => t.status === "In Progress").length;
     const overdue = tasks.filter(t => {
-      if (!t.dueDate || t.status === "Completed") return false;
+      if (!t.dueDate || isCompleted(t)) return false;
       return new Date(t.dueDate) < new Date();
     }).length;
 
@@ -25,19 +29,37 @@ export function TaskStats({ tasks }: TaskStatsProps) {
 
   const statusData = useMemo(() => {
     const counts: Record<string, number> = {};
-    tasks.forEach(t => {
-      counts[t.status] = (counts[t.status] || 0) + 1;
+    const statusLabels: Record<string, string> = {
+      'Not Started': t.status.notStarted,
+      'In Progress': t.status.inProgress,
+      'Completed': t.status.completed,
+      'Blocked': t.status.blocked,
+    };
+    tasks.forEach(task => {
+      counts[task.status] = (counts[task.status] || 0) + 1;
     });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [tasks]);
+    return Object.entries(counts).map(([name, value]) => ({ 
+      name: statusLabels[name] || name, 
+      value 
+    }));
+  }, [tasks, t]);
 
   const priorityData = useMemo(() => {
     const counts: Record<string, number> = {};
-    tasks.forEach(t => {
-      counts[t.priority] = (counts[t.priority] || 0) + 1;
+    const priorityLabels: Record<string, string> = {
+      'Low': t.priority.low,
+      'Medium': t.priority.medium,
+      'High': t.priority.high,
+      'Critical': t.priority.critical,
+    };
+    tasks.forEach(task => {
+      counts[task.priority] = (counts[task.priority] || 0) + 1;
     });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [tasks]);
+    return Object.entries(counts).map(([name, value]) => ({ 
+      name: priorityLabels[name] || name, 
+      value 
+    }));
+  }, [tasks, t]);
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -51,7 +73,7 @@ export function TaskStats({ tasks }: TaskStatsProps) {
               <BarChart3 className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
+              <p className="text-sm font-medium text-muted-foreground">{t.stats.totalTasks}</p>
               <h3 className="text-2xl font-bold font-display">{stats.total}</h3>
             </div>
           </CardContent>
@@ -63,7 +85,7 @@ export function TaskStats({ tasks }: TaskStatsProps) {
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Completed</p>
+              <p className="text-sm font-medium text-muted-foreground">{t.stats.completed}</p>
               <h3 className="text-2xl font-bold font-display">{stats.completed}</h3>
             </div>
           </CardContent>
@@ -75,7 +97,7 @@ export function TaskStats({ tasks }: TaskStatsProps) {
               <Clock className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">In Progress</p>
+              <p className="text-sm font-medium text-muted-foreground">{t.stats.inProgress}</p>
               <h3 className="text-2xl font-bold font-display">{stats.inProgress}</h3>
             </div>
           </CardContent>
@@ -87,7 +109,7 @@ export function TaskStats({ tasks }: TaskStatsProps) {
               <AlertCircle className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Overdue</p>
+              <p className="text-sm font-medium text-muted-foreground">{t.stats.overdue}</p>
               <h3 className="text-2xl font-bold font-display">{stats.overdue}</h3>
             </div>
           </CardContent>
@@ -98,7 +120,7 @@ export function TaskStats({ tasks }: TaskStatsProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="shadow-sm border-border/50">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Status Distribution</CardTitle>
+            <CardTitle className="text-base font-semibold">{t.stats.statusDistribution}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[250px] w-full">
@@ -136,7 +158,7 @@ export function TaskStats({ tasks }: TaskStatsProps) {
 
         <Card className="shadow-sm border-border/50">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Tasks by Priority</CardTitle>
+            <CardTitle className="text-base font-semibold">{t.stats.tasksByPriority}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[250px] w-full">

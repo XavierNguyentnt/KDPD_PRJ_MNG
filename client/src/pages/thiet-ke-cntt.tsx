@@ -14,7 +14,7 @@ import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus } from "lucide-
 import { Task } from "@shared/schema";
 import { format } from "date-fns";
 
-export default function Dashboard() {
+export default function ThietKeCNTTPage() {
   const { data: tasks, isLoading, isError } = useTasks();
   const { mutate: refresh, isPending: isRefreshing } = useRefreshTasks();
   const { mutate: createTask, isPending: isCreating } = useCreateTask();
@@ -28,70 +28,55 @@ export default function Dashboard() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  // Get unique groups from tasks
+  // Groups included in this page
+  const includedGroups = ['Thiết kế + CNTT', 'Thiết kế_Dàn trang', 'CNTT', 'Quét trùng lặp'];
+
+  // Get unique groups from filtered tasks
   const availableGroups = useMemo(() => {
     if (!tasks) return [];
-    const groups = new Set(tasks.map(t => t.group).filter(Boolean));
+    const groups = new Set(
+      tasks
+        .filter(t => includedGroups.includes(t.group || ''))
+        .map(t => t.group)
+        .filter(Boolean)
+    );
     return Array.from(groups).sort();
   }, [tasks]);
 
-  // Filter tasks based on role and search criteria
+  // Filter tasks for included groups
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
     
-    let filtered = tasks;
+    let filtered = tasks.filter(t => includedGroups.includes(t.group || ''));
 
-    // Role-based filtering
-    if (role === UserRole.EMPLOYEE) {
-      // Simple name matching simulation
-      filtered = filtered.filter(t => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
-    } else if (role === UserRole.MANAGER) {
-      // Simulate team view (e.g., specific assignees or roles)
-      // For demo: Show everything but highlight ability to see broader view
-      filtered = filtered; 
-    }
-
-    // Group Filter
+    // Group filter
     if (groupFilter !== "all") {
       filtered = filtered.filter(t => t.group === groupFilter);
     }
 
-    // Search
-    if (search) {
-      const lower = search.toLowerCase();
-      filtered = filtered.filter(t => 
-        t.title.toLowerCase().includes(lower) || 
-        t.description?.toLowerCase().includes(lower) ||
-        t.assignee?.toLowerCase().includes(lower) ||
-        t.group?.toLowerCase().includes(lower)
+    // Role-based filtering
+    if (role === UserRole.EMPLOYEE) {
+      filtered = filtered.filter(t => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
+    }
+
+    // Search filter
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(t =>
+        t.title?.toLowerCase().includes(searchLower) ||
+        t.description?.toLowerCase().includes(searchLower) ||
+        t.assignee?.toLowerCase().includes(searchLower) ||
+        t.id?.toLowerCase().includes(searchLower)
       );
     }
 
-    // Status Filter
+    // Status filter
     if (statusFilter !== "all") {
       filtered = filtered.filter(t => t.status === statusFilter);
     }
 
     return filtered;
-  }, [tasks, role, search, statusFilter, groupFilter, user?.displayName]);
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "High": return "bg-orange-100 text-orange-700 hover:bg-orange-100/80";
-      case "Critical": return "bg-red-100 text-red-700 hover:bg-red-100/80";
-      case "Medium": return "bg-blue-100 text-blue-700 hover:bg-blue-100/80";
-      default: return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Completed": return "bg-green-100 text-green-700 hover:bg-green-100/80";
-      case "In Progress": return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
-      case "Blocked": return "bg-red-50 text-red-700 hover:bg-red-50/80 border-red-200";
-      default: return "bg-gray-100 text-gray-700 hover:bg-gray-100/80";
-    }
-  };
+  }, [tasks, role, user?.displayName, search, statusFilter, groupFilter]);
 
   if (isLoading) {
     return (
@@ -125,7 +110,10 @@ export default function Dashboard() {
       {/* Overview Stats */}
       <section>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold tracking-tight">{t.dashboard.overview}</h2>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">Thiết kế / CNTT / Quét trùng lặp</h2>
+            <p className="text-sm text-muted-foreground mt-1">Quản lý công việc thiết kế, dàn trang, CNTT và quét trùng lặp</p>
+          </div>
           <div className="text-sm text-muted-foreground flex items-center gap-2">
             {t.dashboard.lastSynced}: {format(new Date(), 'h:mm a')}
             <Button 
@@ -143,7 +131,7 @@ export default function Dashboard() {
       </section>
 
       {/* Task List */}
-      <section className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
+      <section className="bg-card rounded-xl border border-border/50 shadow-sm">
         <div className="p-4 border-b border-border/50 flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
@@ -162,8 +150,8 @@ export default function Dashboard() {
               </Button>
             )}
           </div>
-          
-          <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -208,8 +196,16 @@ export default function Dashboard() {
         <TaskTable 
           tasks={filteredTasks}
           onTaskClick={setSelectedTask}
-          getPriorityColor={getPriorityColor}
-          getStatusColor={getStatusColor}
+          columns={{
+            id: true,
+            title: true,
+            group: true, // Hiển thị group vì có nhiều groups trong page này
+            assignee: true,
+            priority: true,
+            status: true,
+            dueDate: true,
+            progress: true,
+          }}
         />
       </section>
 
@@ -224,7 +220,9 @@ export default function Dashboard() {
         onOpenChange={(open) => setIsCreateDialogOpen(open)} 
         task={null}
         onCreate={(taskData) => {
-          createTask(taskData, {
+          // Default to first available group if not specified
+          const defaultGroup = availableGroups[0] || 'Thiết kế + CNTT';
+          createTask({ ...taskData, group: taskData.group || defaultGroup }, {
             onSuccess: () => {
               toast({
                 title: t.common.success,

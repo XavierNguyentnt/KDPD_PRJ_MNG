@@ -1,0 +1,44 @@
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Language, getTranslations, Translations } from '@/lib/i18n';
+
+interface I18nContextType {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  t: Translations;
+}
+
+const I18nContext = createContext<I18nContextType | undefined>(undefined);
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(() => {
+    // Load from localStorage or default to 'vi'
+    const saved = localStorage.getItem('language') as Language;
+    return saved && (saved === 'vi' || saved === 'en') ? saved : 'vi';
+  });
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem('language', lang);
+  };
+
+  useEffect(() => {
+    // Save to localStorage whenever language changes
+    localStorage.setItem('language', language);
+  }, [language]);
+
+  const value: I18nContextType = {
+    language,
+    setLanguage,
+    t: getTranslations(language),
+  };
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+export function useI18n() {
+  const context = useContext(I18nContext);
+  if (context === undefined) {
+    throw new Error('useI18n must be used within an I18nProvider');
+  }
+  return context;
+}
