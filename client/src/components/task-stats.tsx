@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { Task } from "@shared/schema";
+import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, AlertCircle, Clock, BarChart3 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { useI18n } from "@/hooks/use-i18n";
 
 interface TaskStatsProps {
-  tasks: Task[];
+  tasks: TaskWithAssignmentDetails[];
 }
 
 export function TaskStats({ tasks }: TaskStatsProps) {
@@ -14,7 +14,7 @@ export function TaskStats({ tasks }: TaskStatsProps) {
   
   const stats = useMemo(() => {
     const total = tasks.length;
-    const isCompleted = (t: Task) => t.status === "Completed" || t.actualCompletedAt != null;
+    const isCompleted = (t: TaskWithAssignmentDetails) => t.status === "Completed" || t.actualCompletedAt != null;
     const completed = tasks.filter(t => isCompleted(t)).length;
     const inProgress = tasks.filter(t => t.status === "In Progress").length;
     const overdue = tasks.filter(t => {

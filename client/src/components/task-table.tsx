@@ -1,13 +1,14 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Task } from "@shared/schema";
+import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { useI18n } from "@/hooks/use-i18n";
+import { formatDateDDMMYYYY } from "@/lib/utils";
 import { Workflow, BienTapWorkflowHelpers, BienTapStageType, StageStatus } from "@shared/workflow";
 
 interface TaskTableProps {
-  tasks: Task[];
-  onTaskClick: (task: Task) => void;
+  tasks: TaskWithAssignmentDetails[];
+  onTaskClick: (task: TaskWithAssignmentDetails) => void;
   columns?: {
     id?: boolean;
     title?: boolean;
@@ -20,7 +21,7 @@ interface TaskTableProps {
     customColumns?: Array<{
       key: string;
       label: string;
-      render: (task: Task) => React.ReactNode;
+      render: (task: TaskWithAssignmentDetails) => React.ReactNode;
     }>;
   };
   getPriorityColor?: (priority: string) => string;
@@ -79,7 +80,7 @@ export function TaskTable({
   };
 
   // Helper function to render assignee cell
-  const renderAssigneeCell = (task: Task) => {
+  const renderAssigneeCell = (task: TaskWithAssignmentDetails) => {
     // For "Biên tập" tasks, show workflow assignees with status colors
     if (task.group === 'Biên tập' && task.workflow) {
       try {
@@ -140,7 +141,7 @@ export function TaskTable({
   };
   
   // Helper function to render progress cell
-  const renderProgressCell = (task: Task) => {
+  const renderProgressCell = (task: TaskWithAssignmentDetails) => {
     // For "Biên tập" tasks, calculate progress from workflow
     if (task.group === 'Biên tập' && task.workflow) {
       try {
@@ -340,7 +341,7 @@ export function TaskTable({
                 )}
                 {defaultColumns.dueDate && (
                   <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
-                    {task.dueDate || "-"}
+                    {formatDateDDMMYYYY(task.dueDate) || "-"}
                   </td>
                 )}
                 {defaultColumns.progress && renderProgressCell(task)}

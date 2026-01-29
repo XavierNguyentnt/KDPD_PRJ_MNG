@@ -1,5 +1,26 @@
 import type { Request, Response, NextFunction } from "express";
 import type { UserRoleType, EmployeeGroupType } from "@shared/schema";
+import type { UserWithRolesAndGroups } from "@shared/schema";
+
+type ReqUser = UserWithRolesAndGroups | ({ role?: string | null; employeeGroup?: string | null } & { roles?: { code: string; name: string }[]; groups?: { code: string }[] });
+
+function userHasRole(u: ReqUser, allowed: UserRoleType[]): boolean {
+  const roles = (u as UserWithRolesAndGroups).roles;
+  if (Array.isArray(roles) && roles.length) {
+    return roles.some((r) => allowed.includes(r.name as UserRoleType) || allowed.some((a) => a.toLowerCase() === r.code));
+  }
+  const leg = (u as { role?: string | null }).role;
+  return !!leg && allowed.includes(leg as UserRoleType);
+}
+
+function userHasGroup(u: ReqUser, allowed: EmployeeGroupType[]): boolean {
+  const groups = (u as UserWithRolesAndGroups).groups;
+  if (Array.isArray(groups) && groups.length) {
+    return groups.some((g) => allowed.includes(g.code as EmployeeGroupType));
+  }
+  const leg = (u as { employeeGroup?: string | null }).employeeGroup;
+  return !!leg && allowed.includes(leg as EmployeeGroupType);
+}
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   if (!req.isAuthenticated || !req.isAuthenticated()) {
@@ -19,8 +40,7 @@ export function requireRole(...allowedRoles: UserRoleType[]): (req: Request, res
       res.status(401).json({ message: "Unauthorized. Please log in." });
       return;
     }
-    const role = (req.user as { role?: string | null }).role;
-    if (!role || !allowedRoles.includes(role as UserRoleType)) {
+    if (!userHasRole(req.user as ReqUser, allowedRoles)) {
       res.status(403).json({
         message: "Forbidden. Required role: " + allowedRoles.join(" or "),
         requiredRoles: allowedRoles,
@@ -37,8 +57,7 @@ export function requireEmployeeGroup(...allowedGroups: EmployeeGroupType[]): (re
       res.status(401).json({ message: "Unauthorized. Please log in." });
       return;
     }
-    const group = (req.user as { employeeGroup?: string | null }).employeeGroup;
-    if (!group || !allowedGroups.includes(group as EmployeeGroupType)) {
+    if (!userHasGroup(req.user as ReqUser, allowedGroups)) {
       res.status(403).json({
         message: "Forbidden. Required employee group: " + allowedGroups.join(" or "),
         requiredGroups: allowedGroups,
@@ -60,9 +79,9 @@ export function requireRoleOrGroup(options: {
       res.status(401).json({ message: "Unauthorized. Please log in." });
       return;
     }
-    const u = req.user as { role?: string | null; employeeGroup?: string | null };
-    const hasRole = roles.length === 0 || (u.role && roles.includes(u.role as UserRoleType));
-    const hasGroup = groups.length === 0 || (u.employeeGroup && groups.includes(u.employeeGroup as EmployeeGroupType));
+    const u = req.user as ReqUser;
+    const hasRole = roles.length === 0 || userHasRole(u, roles);
+    const hasGroup = groups.length === 0 || userHasGroup(u, groups);
     if (hasRole || hasGroup) {
       next();
       return;

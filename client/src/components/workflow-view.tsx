@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, Clock, XCircle, AlertCircle, User } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
+import { formatDateDDMMYYYY } from "@/lib/utils";
 
 interface WorkflowViewProps {
   workflow: Workflow | null;
@@ -55,6 +56,8 @@ export function WorkflowView({ workflow, compact = false }: WorkflowViewProps) {
         return <Clock className="w-4 h-4 text-blue-600" />;
       case StageStatus.BLOCKED:
         return <XCircle className="w-4 h-4 text-red-600" />;
+      case StageStatus.CANCELLED:
+        return <XCircle className="w-4 h-4 text-amber-600" />;
       default:
         return <AlertCircle className="w-4 h-4 text-gray-400" />;
     }
@@ -68,8 +71,25 @@ export function WorkflowView({ workflow, compact = false }: WorkflowViewProps) {
         return 'bg-blue-100 text-blue-700 border-blue-300';
       case StageStatus.BLOCKED:
         return 'bg-red-100 text-red-700 border-red-300';
+      case StageStatus.CANCELLED:
+        return 'bg-amber-100 text-amber-700 border-amber-300';
       default:
         return 'bg-gray-100 text-gray-700 border-gray-300';
+    }
+  };
+
+  const getStatusLabel = (status: StageStatus): string => {
+    switch (status) {
+      case StageStatus.COMPLETED:
+        return language === 'vi' ? 'Hoàn thành' : 'Completed';
+      case StageStatus.IN_PROGRESS:
+        return language === 'vi' ? 'Đang tiến hành' : 'In Progress';
+      case StageStatus.BLOCKED:
+        return language === 'vi' ? 'Bị chặn' : 'Blocked';
+      case StageStatus.CANCELLED:
+        return language === 'vi' ? 'Đã hủy' : 'Cancelled';
+      default:
+        return language === 'vi' ? 'Chưa bắt đầu' : 'Not Started';
     }
   };
 
@@ -116,15 +136,7 @@ export function WorkflowView({ workflow, compact = false }: WorkflowViewProps) {
               </CardTitle>
               <Badge variant="outline" className={getStatusColor(round.status)}>
                 {getStatusIcon(round.status)}
-                <span className="ml-1">
-                  {round.status === StageStatus.COMPLETED 
-                    ? (language === 'vi' ? 'Hoàn thành' : 'Completed')
-                    : round.status === StageStatus.IN_PROGRESS
-                    ? (language === 'vi' ? 'Đang tiến hành' : 'In Progress')
-                    : round.status === StageStatus.BLOCKED
-                    ? (language === 'vi' ? 'Bị chặn' : 'Blocked')
-                    : (language === 'vi' ? 'Chưa bắt đầu' : 'Not Started')}
-                </span>
+                <span className="ml-1">{getStatusLabel(round.status)}</span>
               </Badge>
             </div>
           </CardHeader>
@@ -137,13 +149,7 @@ export function WorkflowView({ workflow, compact = false }: WorkflowViewProps) {
                     <span className="font-medium text-sm">{getStageLabel(stage.type)}</span>
                   </div>
                   <Badge variant="outline" className={getStatusColor(stage.status)}>
-                    {stage.status === StageStatus.COMPLETED 
-                      ? (language === 'vi' ? 'Hoàn thành' : 'Completed')
-                      : stage.status === StageStatus.IN_PROGRESS
-                      ? (language === 'vi' ? 'Đang tiến hành' : 'In Progress')
-                      : stage.status === StageStatus.BLOCKED
-                      ? (language === 'vi' ? 'Bị chặn' : 'Blocked')
-                      : (language === 'vi' ? 'Chưa bắt đầu' : 'Not Started')}
+                    {getStatusLabel(stage.status)}
                   </Badge>
                 </div>
                 
@@ -159,14 +165,22 @@ export function WorkflowView({ workflow, compact = false }: WorkflowViewProps) {
                     </div>
                   )}
                   
-                  {/* Start Date and End Date */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  {/* Ngày nhận, Ngày hoàn thành dự kiến, Ngày hoàn thành thực tế (dd/mm/yyyy) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                     <div className="flex flex-col">
                       <span className="text-muted-foreground font-medium mb-0.5">
                         {language === 'vi' ? 'Ngày nhận công việc' : 'Receive Date'}:
                       </span>
                       <span className={stage.startDate ? 'text-foreground' : 'text-muted-foreground italic'}>
-                        {stage.startDate || (language === 'vi' ? 'Chưa có' : 'Not set')}
+                        {formatDateDDMMYYYY(stage.startDate) || (language === 'vi' ? 'Chưa có' : 'Not set')}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground font-medium mb-0.5">
+                        {t.task.dueDate}:
+                      </span>
+                      <span className={stage.dueDate ? 'text-foreground' : 'text-muted-foreground italic'}>
+                        {formatDateDDMMYYYY(stage.dueDate) || (language === 'vi' ? 'Chưa có' : 'Not set')}
                       </span>
                     </div>
                     <div className="flex flex-col">
@@ -174,10 +188,16 @@ export function WorkflowView({ workflow, compact = false }: WorkflowViewProps) {
                         {t.task.actualCompletedAt}:
                       </span>
                       <span className={stage.completedDate ? 'text-foreground' : 'text-muted-foreground italic'}>
-                        {stage.completedDate || (language === 'vi' ? 'Chưa có' : 'Not set')}
+                        {formatDateDDMMYYYY(stage.completedDate) || (language === 'vi' ? 'Chưa có' : 'Not set')}
                       </span>
                     </div>
                   </div>
+                  {stage.cancelReason && (
+                    <div className="text-xs bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 p-2 rounded border border-amber-200 dark:border-amber-800">
+                      <span className="font-medium">{t.task.cancelReason}: </span>
+                      {stage.cancelReason}
+                    </div>
+                  )}
                   
                   <div className="flex items-center gap-2">
                     <Progress value={stage.progress} className="h-1.5 flex-1" />

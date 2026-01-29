@@ -7,7 +7,7 @@ import connectPgSimple from "connect-pg-simple";
 import memorystore from "memorystore";
 import { pool } from "./db";
 import * as dbStorage from "./db-storage";
-import type { User } from "@shared/schema";
+import type { UserWithRolesAndGroups } from "@shared/schema";
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "kdpd-session-secret-change-in-production";
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -26,6 +26,7 @@ passport.use(
       try {
         const normalizedEmail = email.toLowerCase().trim();
         const user = await dbStorage.getUserByEmail(email);
+        const userWithRg = user ? await dbStorage.getUserByIdWithRolesAndGroups(user.id) : undefined;
         if (!user) {
           if (process.env.NODE_ENV === "development") {
             console.log("[auth] Login failed: no user for email", normalizedEmail, "- run KDPD_DB_seed_admin.sql on Neon?");
@@ -49,7 +50,7 @@ passport.use(
           }
           return done(null, false, { message: "Invalid email or password" });
         }
-        return done(null, user);
+        return done(null, userWithRg ?? user);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "";
         if (msg.includes("Database not configured")) {
@@ -61,13 +62,13 @@ passport.use(
   )
 );
 
-passport.serializeUser((user: User, done) => {
+passport.serializeUser((user: UserWithRolesAndGroups, done) => {
   done(null, user.id);
 });
 
 passport.deserializeUser(async (id: string, done) => {
   try {
-    const user = await dbStorage.getUserById(id);
+    const user = await dbStorage.getUserByIdWithRolesAndGroups(id);
     done(null, user ?? null);
   } catch (err) {
     done(err);

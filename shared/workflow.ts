@@ -11,6 +11,7 @@ export enum StageStatus {
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
   BLOCKED = 'blocked',
+  CANCELLED = 'cancelled',
 }
 
 // Stage types for Biên tập
@@ -26,7 +27,9 @@ export const stageSchema = z.object({
   assignee: z.string().nullable(),
   status: z.nativeEnum(StageStatus),
   startDate: z.string().nullable(),
+  dueDate: z.string().nullable().default(null),
   completedDate: z.string().nullable(),
+  cancelReason: z.string().nullable().default(null),
   notes: z.string().nullable(),
   progress: z.number().min(0).max(100).default(0),
 });
@@ -74,29 +77,35 @@ export class BienTapWorkflowHelpers {
         completedDate: null,
         stages: [
           {
-            type: BienTapStageType.BTV2, // BTV2: Đọc lần 1, chỉnh sửa hình thức
+            type: BienTapStageType.BTV2,
             assignee: null,
             status: StageStatus.NOT_STARTED,
             startDate: null,
+            dueDate: null,
             completedDate: null,
+            cancelReason: null,
             notes: null,
             progress: 0,
           },
           {
-            type: BienTapStageType.BTV1, // BTV1: Chỉnh sửa dựa trên bản của BTV2
+            type: BienTapStageType.BTV1,
             assignee: null,
             status: StageStatus.NOT_STARTED,
             startDate: null,
+            dueDate: null,
             completedDate: null,
+            cancelReason: null,
             notes: null,
             progress: 0,
           },
           {
-            type: BienTapStageType.DOC_DUYET, // Người đọc duyệt: Đọc duyệt bản thảo sau cùng
+            type: BienTapStageType.DOC_DUYET,
             assignee: null,
             status: StageStatus.NOT_STARTED,
             startDate: null,
+            dueDate: null,
             completedDate: null,
+            cancelReason: null,
             notes: null,
             progress: 0,
           },
@@ -211,8 +220,7 @@ export class BienTapWorkflowHelpers {
       round.roundType = data.bong.trim();
     }
     
-    // Update BTV2 stage (stage[0] - first stage: Đọc lần 1, chỉnh sửa hình thức)
-    // Progress: 33.33% when completed
+    // BTV2 stage (dueDate, cancelReason remain null when parsing from sheet)
     if (data.btv2 || data.btv2ReceiveDate || data.btv2CompleteDate) {
       round.stages[0].assignee = data.btv2 || null;
       round.stages[0].startDate = data.btv2ReceiveDate || null;
@@ -220,12 +228,9 @@ export class BienTapWorkflowHelpers {
       round.stages[0].status = data.btv2CompleteDate 
         ? StageStatus.COMPLETED 
         : (data.btv2ReceiveDate ? StageStatus.IN_PROGRESS : StageStatus.NOT_STARTED);
-      // Progress is 33.33% when completed, 0 otherwise (will be calculated by calculateProgress)
       round.stages[0].progress = data.btv2CompleteDate ? 100 : 0;
     }
-    
-    // Update BTV1 stage (stage[1] - second stage: Chỉnh sửa dựa trên bản của BTV2)
-    // Progress: 33.33% when completed
+    // BTV1 stage
     if (data.btv1 || data.btv1ReceiveDate || data.btv1CompleteDate) {
       round.stages[1].assignee = data.btv1 || null;
       round.stages[1].startDate = data.btv1ReceiveDate || null;
@@ -233,12 +238,9 @@ export class BienTapWorkflowHelpers {
       round.stages[1].status = data.btv1CompleteDate 
         ? StageStatus.COMPLETED 
         : (data.btv1ReceiveDate ? StageStatus.IN_PROGRESS : StageStatus.NOT_STARTED);
-      // Progress is 33.33% when completed, 0 otherwise (will be calculated by calculateProgress)
       round.stages[1].progress = data.btv1CompleteDate ? 100 : 0;
     }
-    
-    // Update Người đọc duyệt stage (stage[2] - third stage: Đọc duyệt bản thảo sau cùng)
-    // Progress: 33.33% when completed
+    // Người đọc duyệt stage
     if (data.docDuyet || data.docDuyetReceiveDate || data.docDuyetCompleteDate) {
       round.stages[2].assignee = data.docDuyet || null;
       round.stages[2].startDate = data.docDuyetReceiveDate || null;
@@ -246,7 +248,6 @@ export class BienTapWorkflowHelpers {
       round.stages[2].status = data.docDuyetCompleteDate 
         ? StageStatus.COMPLETED 
         : (data.docDuyetReceiveDate ? StageStatus.IN_PROGRESS : StageStatus.NOT_STARTED);
-      // Progress is 33.33% when completed, 0 otherwise (will be calculated by calculateProgress)
       round.stages[2].progress = data.docDuyetCompleteDate ? 100 : 0;
     }
     

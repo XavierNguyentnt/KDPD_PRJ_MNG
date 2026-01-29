@@ -1,20 +1,21 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { UserRole, UserRoleType } from "./use-tasks";
 
-export interface ApiUser {
+/** User từ /api/auth/me (có thể có roles, groups từ user_roles, user_groups). */
+export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
   firstName?: string | null;
   lastName?: string | null;
   department?: string | null;
-  role?: string | null;
-  employeeGroup?: string | null;
   isActive: boolean;
+  roles?: { id: string; code: string; name: string }[];
+  groups?: { id: string; code: string; name: string }[];
 }
 
 interface AuthContextType {
-  user: ApiUser | null;
+  user: AuthUser | null;
   loading: boolean;
   role: UserRoleType;
   setRole: (role: UserRoleType) => void;
@@ -26,17 +27,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function deriveRole(user: AuthUser | null): UserRoleType {
+  const roles = user?.roles;
+  if (Array.isArray(roles) && roles.length) {
+    if (roles.some((r) => r.name === UserRole.ADMIN || r.code === "admin")) return UserRole.ADMIN;
+    if (roles.some((r) => r.name === UserRole.MANAGER || r.code === "manager")) return UserRole.MANAGER;
+  }
+  return UserRole.EMPLOYEE;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<ApiUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [simulatedRole, setSimulatedRole] = useState<UserRoleType | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const roleRaw = simulatedRole ?? user?.role;
-  const role: UserRoleType =
-    roleRaw === UserRole.ADMIN || roleRaw === UserRole.MANAGER || roleRaw === UserRole.EMPLOYEE
-      ? roleRaw
-      : UserRole.EMPLOYEE;
+  const role: UserRoleType = simulatedRole ?? deriveRole(user);
   const setRole = setSimulatedRole;
 
   useEffect(() => {
@@ -75,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(data.message ?? "Đăng nhập thất bại");
       throw new Error(data.message ?? "Đăng nhập thất bại");
     }
-    setUser(data as ApiUser);
+    setUser(data as AuthUser);
   }
 
   async function logout() {

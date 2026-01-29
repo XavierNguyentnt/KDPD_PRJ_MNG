@@ -32,7 +32,7 @@ export default function AdminPage() {
           </div>
           {user && (
             <p className="text-sm text-muted-foreground">
-              Đăng nhập với tài khoản: <strong>{user.displayName}</strong> ({user.email}), role: <strong>{user.role ?? "—"}</strong>.
+              Đăng nhập với tài khoản: <strong>{user.displayName}</strong> ({user.email}), vai trò: <strong>{(user as { roles?: { name: string }[] }).roles?.map((r) => r.name).join(", ") ?? "—"}</strong>.
             </p>
           )}
         </CardContent>

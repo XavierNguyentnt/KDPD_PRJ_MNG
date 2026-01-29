@@ -25,12 +25,14 @@ export function useTasks() {
   });
 }
 
-export function useTask(id: string) {
+export function useTask(id: string, options?: { includeAssignments?: boolean }) {
+  const includeAssignments = options?.includeAssignments ?? false;
   return useQuery({
-    queryKey: [api.tasks.get.path, id],
+    queryKey: [api.tasks.get.path, id, includeAssignments],
     queryFn: async () => {
       if (!id) return null;
-      const url = buildUrl(api.tasks.get.path, { id });
+      let url = buildUrl(api.tasks.get.path, { id });
+      if (includeAssignments) url += "?include=assignments";
       const res = await fetch(url, { credentials: "include" });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error("Failed to fetch task");
@@ -54,8 +56,12 @@ export function useUpdateTask() {
       if (!res.ok) throw new Error("Failed to update task");
       return api.tasks.update.responses[200].parse(await res.json());
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
+      // Invalidate task detail (get-by-id) để UI cập nhật ngay round/workflow/assignments khi mở lại dialog
+      if (variables.id) {
+        queryClient.invalidateQueries({ queryKey: [api.tasks.get.path, variables.id] });
+      }
     },
   });
 }

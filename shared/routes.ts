@@ -4,10 +4,27 @@ import {
   insertUserSchema,
   insertContractSchema,
   insertDocumentSchema,
+  insertTaskAssignmentSchema,
+  insertContractMemberSchema,
+  insertDocumentTaskSchema,
+  insertDocumentContractSchema,
+  insertGroupSchema,
+  insertUserGroupSchema,
+  insertRoleSchema,
+  insertUserRoleSchema,
   tasks,
   users,
   contracts,
   documents,
+  taskAssignments,
+  contractMembers,
+  documentTasks,
+  documentContracts,
+  groups,
+  userGroups,
+  roles,
+  userRoles,
+  type TaskWithAssignmentDetails,
 } from "./schema";
 
 export const errorSchemas = {
@@ -62,14 +79,14 @@ export const api = {
       method: "GET" as const,
       path: "/api/tasks",
       responses: {
-        200: z.array(z.custom<typeof tasks.$inferSelect>()),
+        200: z.array(z.custom<TaskWithAssignmentDetails>()),
       },
     },
     get: {
       method: "GET" as const,
       path: "/api/tasks/:id",
       responses: {
-        200: z.custom<typeof tasks.$inferSelect>(),
+        200: z.custom<TaskWithAssignmentDetails>(),
         404: errorSchemas.notFound,
       },
     },
@@ -238,6 +255,73 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+  },
+
+  taskAssignments: {
+    list: { method: "GET" as const, path: "/api/task-assignments", responses: { 200: z.array(z.custom<typeof taskAssignments.$inferSelect>()) } },
+    listByTask: { method: "GET" as const, path: "/api/tasks/:taskId/assignments", responses: { 200: z.array(z.custom<typeof taskAssignments.$inferSelect>()) } },
+    listByUser: { method: "GET" as const, path: "/api/users/:userId/assignments", responses: { 200: z.array(z.custom<typeof taskAssignments.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/task-assignments/:id", responses: { 200: z.custom<typeof taskAssignments.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/task-assignments", input: insertTaskAssignmentSchema.omit({ id: true }), responses: { 200: z.custom<typeof taskAssignments.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/task-assignments/:id", input: insertTaskAssignmentSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof taskAssignments.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/task-assignments/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  contractMembers: {
+    list: { method: "GET" as const, path: "/api/contract-members", responses: { 200: z.array(z.custom<typeof contractMembers.$inferSelect>()) } },
+    listByContract: { method: "GET" as const, path: "/api/contracts/:contractId/members", responses: { 200: z.array(z.custom<typeof contractMembers.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/contract-members/:id", responses: { 200: z.custom<typeof contractMembers.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/contract-members", input: insertContractMemberSchema.omit({ id: true }), responses: { 200: z.custom<typeof contractMembers.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/contract-members/:id", input: insertContractMemberSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof contractMembers.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/contract-members/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  documentTasks: {
+    list: { method: "GET" as const, path: "/api/document-tasks", responses: { 200: z.array(z.custom<typeof documentTasks.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/document-tasks/:id", responses: { 200: z.custom<typeof documentTasks.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/document-tasks", input: insertDocumentTaskSchema.omit({ id: true }), responses: { 200: z.custom<typeof documentTasks.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/document-tasks/:id", input: insertDocumentTaskSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof documentTasks.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/document-tasks/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  documentContracts: {
+    list: { method: "GET" as const, path: "/api/document-contracts", responses: { 200: z.array(z.custom<typeof documentContracts.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/document-contracts/:id", responses: { 200: z.custom<typeof documentContracts.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/document-contracts", input: insertDocumentContractSchema.omit({ id: true }), responses: { 200: z.custom<typeof documentContracts.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/document-contracts/:id", input: insertDocumentContractSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof documentContracts.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/document-contracts/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  groups: {
+    list: { method: "GET" as const, path: "/api/groups/list", responses: { 200: z.array(z.custom<typeof groups.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/groups/list/:id", responses: { 200: z.custom<typeof groups.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/groups/list", input: insertGroupSchema.omit({ id: true }), responses: { 200: z.custom<typeof groups.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/groups/list/:id", input: insertGroupSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof groups.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/groups/list/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  userGroups: {
+    list: { method: "GET" as const, path: "/api/user-groups", responses: { 200: z.array(z.custom<typeof userGroups.$inferSelect>()) } },
+    listByUser: { method: "GET" as const, path: "/api/users/:userId/groups", responses: { 200: z.array(z.custom<typeof userGroups.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/user-groups/:id", responses: { 200: z.custom<typeof userGroups.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/user-groups", input: insertUserGroupSchema.omit({ id: true }), responses: { 200: z.custom<typeof userGroups.$inferSelect>(), 400: errorSchemas.validation } },
+    delete: { method: "DELETE" as const, path: "/api/user-groups/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  roles: {
+    list: { method: "GET" as const, path: "/api/roles/list", responses: { 200: z.array(z.custom<typeof roles.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/roles/list/:id", responses: { 200: z.custom<typeof roles.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/roles/list", input: insertRoleSchema.omit({ id: true }), responses: { 200: z.custom<typeof roles.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/roles/list/:id", input: insertRoleSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof roles.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/roles/list/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  userRoles: {
+    list: { method: "GET" as const, path: "/api/user-roles", responses: { 200: z.array(z.custom<typeof userRoles.$inferSelect>()) } },
+    listByUser: { method: "GET" as const, path: "/api/users/:userId/roles", responses: { 200: z.array(z.custom<typeof userRoles.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/user-roles/:id", responses: { 200: z.custom<typeof userRoles.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/user-roles", input: insertUserRoleSchema.omit({ id: true }), responses: { 200: z.custom<typeof userRoles.$inferSelect>(), 400: errorSchemas.validation } },
+    delete: { method: "DELETE" as const, path: "/api/user-roles/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
   },
 };
 

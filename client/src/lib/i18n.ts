@@ -58,6 +58,7 @@ export interface Translations {
     stage: string;
     startDate: string;
     completedDate: string;
+    cancelReason: string;
     btv1: string;
     btv2: string;
     docDuyet: string;
@@ -73,6 +74,7 @@ export interface Translations {
     inProgress: string;
     completed: string;
     blocked: string;
+    cancelled: string;
   };
   
   // Priority
@@ -157,6 +159,7 @@ const translations: Record<Language, Translations> = {
       stage: 'Giai đoạn',
       startDate: 'Ngày nhận công việc',
       completedDate: 'Ngày hoàn thành',
+      cancelReason: 'Lý do hủy',
       btv1: 'BTV 1',
       btv2: 'BTV 2',
       docDuyet: 'Người đọc duyệt',
@@ -170,6 +173,7 @@ const translations: Record<Language, Translations> = {
       inProgress: 'Đang thực hiện',
       completed: 'Hoàn thành',
       blocked: 'Bị chặn',
+      cancelled: 'Đã hủy',
     },
     priority: {
       low: 'Thấp',
@@ -246,6 +250,7 @@ const translations: Record<Language, Translations> = {
       stage: 'Stage',
       startDate: 'Receive Date',
       completedDate: 'Completion Date',
+      cancelReason: 'Cancel reason',
       btv1: 'Editor 1',
       btv2: 'Editor 2',
       docDuyet: 'Reviewer',
@@ -259,6 +264,7 @@ const translations: Record<Language, Translations> = {
       inProgress: 'In Progress',
       completed: 'Completed',
       blocked: 'Blocked',
+      cancelled: 'Cancelled',
     },
     priority: {
       low: 'Low',
