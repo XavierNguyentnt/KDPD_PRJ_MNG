@@ -13,6 +13,11 @@ import {
   userGroups,
   roles,
   userRoles,
+  components,
+  works,
+  translationContracts,
+  proofreadingContracts,
+  contractStages,
   type User,
   type InsertUser,
   type UserWithRolesAndGroups,
@@ -39,6 +44,16 @@ import {
   type InsertRole,
   type UserRoleRow,
   type InsertUserRole,
+  type Component,
+  type InsertComponent,
+  type Work,
+  type InsertWork,
+  type TranslationContract,
+  type InsertTranslationContract,
+  type ProofreadingContract,
+  type InsertProofreadingContract,
+  type ContractStage,
+  type InsertContractStage,
 } from "@shared/schema";
 
 function requireDb() {
@@ -292,6 +307,139 @@ export async function deleteDocument(id: string): Promise<void> {
   const existing = await getDocumentById(id);
   if (!existing) throw new Error(`Document ${id} not found`);
   await requireDb().delete(documents).where(eq(documents.id, id));
+}
+
+// -----------------------------------------------------------------------------
+// Components CRUD (Hợp phần dịch thuật)
+// -----------------------------------------------------------------------------
+export async function getComponentsFromDb(): Promise<Component[]> {
+  return requireDb().select().from(components).orderBy(asc(components.displayOrder), asc(components.code));
+}
+
+export async function getComponentById(id: string): Promise<Component | undefined> {
+  const rows = await requireDb().select().from(components).where(eq(components.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function createComponent(data: InsertComponent): Promise<Component> {
+  const rows = await requireDb().insert(components).values(data).returning();
+  if (!rows[0]) throw new Error("Failed to create component");
+  return rows[0];
+}
+
+export async function updateComponent(id: string, data: Partial<InsertComponent>): Promise<Component> {
+  const rows = await requireDb().update(components).set(data).where(eq(components.id, id)).returning();
+  if (!rows[0]) throw new Error(`Component ${id} not found`);
+  return rows[0];
+}
+
+// -----------------------------------------------------------------------------
+// Contract stages CRUD (giai đoạn hợp đồng)
+// -----------------------------------------------------------------------------
+export async function getContractStagesByTranslationContractId(translationContractId: string): Promise<ContractStage[]> {
+  return requireDb()
+    .select()
+    .from(contractStages)
+    .where(eq(contractStages.translationContractId, translationContractId))
+    .orderBy(asc(contractStages.stageOrder), asc(contractStages.stageCode));
+}
+
+export async function getContractStagesByProofreadingContractId(proofreadingContractId: string): Promise<ContractStage[]> {
+  return requireDb()
+    .select()
+    .from(contractStages)
+    .where(eq(contractStages.proofreadingContractId, proofreadingContractId))
+    .orderBy(asc(contractStages.stageOrder), asc(contractStages.stageCode));
+}
+
+export async function createContractStage(data: InsertContractStage): Promise<ContractStage> {
+  const rows = await requireDb().insert(contractStages).values(data).returning();
+  if (!rows[0]) throw new Error("Failed to create contract stage");
+  return rows[0];
+}
+
+export async function updateContractStage(id: string, data: Partial<InsertContractStage>): Promise<ContractStage> {
+  const rows = await requireDb().update(contractStages).set(data).where(eq(contractStages.id, id)).returning();
+  if (!rows[0]) throw new Error(`Contract stage ${id} not found`);
+  return rows[0];
+}
+
+export async function deleteContractStage(id: string): Promise<void> {
+  const rows = await requireDb().select().from(contractStages).where(eq(contractStages.id, id)).limit(1);
+  if (!rows[0]) throw new Error(`Contract stage ${id} not found`);
+  await requireDb().delete(contractStages).where(eq(contractStages.id, id));
+}
+
+// -----------------------------------------------------------------------------
+// Works CRUD (trục nghiệp vụ – Work/Contract taxonomy)
+// -----------------------------------------------------------------------------
+export async function getWorksFromDb(): Promise<Work[]> {
+  return requireDb().select().from(works).orderBy(asc(works.createdAt));
+}
+
+export async function getWorkById(id: string): Promise<Work | undefined> {
+  const rows = await requireDb().select().from(works).where(eq(works.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function createWork(data: InsertWork): Promise<Work> {
+  const rows = await requireDb().insert(works).values(data).returning();
+  if (!rows[0]) throw new Error("Failed to create work");
+  return rows[0];
+}
+
+export async function updateWork(id: string, data: Partial<InsertWork>): Promise<Work> {
+  const rows = await requireDb().update(works).set(data).where(eq(works.id, id)).returning();
+  if (!rows[0]) throw new Error(`Work ${id} not found`);
+  return rows[0];
+}
+
+// -----------------------------------------------------------------------------
+// Translation contracts CRUD
+// -----------------------------------------------------------------------------
+export async function getTranslationContractsFromDb(): Promise<TranslationContract[]> {
+  return requireDb().select().from(translationContracts).orderBy(asc(translationContracts.contractNumber));
+}
+
+export async function getTranslationContractById(id: string): Promise<TranslationContract | undefined> {
+  const rows = await requireDb().select().from(translationContracts).where(eq(translationContracts.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function createTranslationContract(data: InsertTranslationContract): Promise<TranslationContract> {
+  const rows = await requireDb().insert(translationContracts).values(data).returning();
+  if (!rows[0]) throw new Error("Failed to create translation contract");
+  return rows[0];
+}
+
+export async function updateTranslationContract(id: string, data: Partial<InsertTranslationContract>): Promise<TranslationContract> {
+  const rows = await requireDb().update(translationContracts).set(data).where(eq(translationContracts.id, id)).returning();
+  if (!rows[0]) throw new Error(`Translation contract ${id} not found`);
+  return rows[0];
+}
+
+// -----------------------------------------------------------------------------
+// Proofreading contracts CRUD
+// -----------------------------------------------------------------------------
+export async function getProofreadingContractsFromDb(): Promise<ProofreadingContract[]> {
+  return requireDb().select().from(proofreadingContracts).orderBy(asc(proofreadingContracts.contractNumber));
+}
+
+export async function getProofreadingContractById(id: string): Promise<ProofreadingContract | undefined> {
+  const rows = await requireDb().select().from(proofreadingContracts).where(eq(proofreadingContracts.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function createProofreadingContract(data: InsertProofreadingContract): Promise<ProofreadingContract> {
+  const rows = await requireDb().insert(proofreadingContracts).values(data).returning();
+  if (!rows[0]) throw new Error("Failed to create proofreading contract");
+  return rows[0];
+}
+
+export async function updateProofreadingContract(id: string, data: Partial<InsertProofreadingContract>): Promise<ProofreadingContract> {
+  const rows = await requireDb().update(proofreadingContracts).set(data).where(eq(proofreadingContracts.id, id)).returning();
+  if (!rows[0]) throw new Error(`Proofreading contract ${id} not found`);
+  return rows[0];
 }
 
 // -----------------------------------------------------------------------------

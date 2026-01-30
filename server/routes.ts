@@ -11,11 +11,29 @@ import * as dbStorage from "./db-storage";
 import { passport } from "./auth";
 import { requireAuth, requireRole } from "./middleware";
 
-/** Omit passwordHash before sending user to client. Giữ roles và groups nếu có (UserWithRolesAndGroups). */
-function sanitizeUser(u: User | UserWithRolesAndGroups) {
-  const { passwordHash: _, ...rest } = u;
+/** Feature flag: Work/Contract taxonomy (theo Docs refactor – tắt được khi rollback). */
+const FEATURE_WORK_ENABLED = process.env.FEATURE_WORK_ENABLED === "true";
+
+/** Trả về user không chứa password_hash để gửi cho client. */
+function sanitizeUser(user: User): Omit<User, "passwordHash"> & { passwordHash?: never } {
+  const { passwordHash: _, ...rest } = user;
   return rest;
 }
+
+/** Validate task_type + related_contract: nếu gắn hợp đồng thì bắt buộc work và task_type không phải GENERAL. */
+function validateTaskContractLink(payload: { taskType?: string | null; relatedWorkId?: string | null; relatedContractId?: string | null }): void {
+  if (!FEATURE_WORK_ENABLED) return;
+  const { relatedContractId, relatedWorkId, taskType } = payload;
+  if (!relatedContractId) return;
+  const type = (taskType ?? "GENERAL").trim();
+  if (type === "GENERAL" || type === "Admin") {
+    throw new Error("Task GENERAL không được gắn hợp đồng (related_contract_id). Chọn task_type TRANSLATION hoặc PROOFREADING.");
+  }
+  if (!relatedWorkId) {
+    throw new Error("Khi gắn hợp đồng (related_contract_id) bắt buộc phải có related_work_id.");
+  }
+}
+
 
 export async function registerRoutes(
   httpServer: Server,
@@ -83,6 +101,12 @@ export async function registerRoutes(
       if (db) {
         const taskIds = tasks.map((t) => t.id);
         const assignments = await dbStorage.getTaskAssignmentsByTaskIds(taskIds);
+        const assignmentsByTask = new Map<string, (typeof assignments)[0][]>();
+        for (const a of assignments) {
+          const list = assignmentsByTask.get(a.taskId) ?? [];
+          list.push(a);
+          assignmentsByTask.set(a.taskId, list);
+        }
         const firstByTask = new Map<string, (typeof assignments)[0]>();
         for (const a of assignments) {
           if (!firstByTask.has(a.taskId)) firstByTask.set(a.taskId, a);
@@ -94,15 +118,38 @@ export async function registerRoutes(
           if (u) userMap.set(id, u);
         }
         const result: TaskWithAssignmentDetails[] = tasks.map((t) => {
-          const a = firstByTask.get(t.id);
-          if (!a) return t as TaskWithAssignmentDetails;
-          const u = userMap.get(a.userId);
+          const taskAssignmentsList = assignmentsByTask.get(t.id) ?? [];
+          const first = firstByTask.get(t.id);
+          const a = first;
+          if (!a && taskAssignmentsList.length === 0) return t as TaskWithAssignmentDetails;
+          const u = a ? userMap.get(a.userId) : undefined;
+          const assignmentsWithDisplay = taskAssignmentsList
+            .sort((x, y) => (x.roundNumber - y.roundNumber) || String(x.stageType).localeCompare(String(y.stageType)))
+            .map((asn) => ({
+              ...asn,
+              displayName: userMap.get(asn.userId)?.displayName ?? null,
+            }));
+          // Ngày nhận công việc = ngày đầu tiên nhận trong số các nhân sự (min receivedAt)
+          let receivedAtMin: string | null = null;
+          let actualCompletedAtMax: Date | null = null;
+          for (const asn of taskAssignmentsList) {
+            if (asn.receivedAt) {
+              const d = typeof asn.receivedAt === "string" ? asn.receivedAt : (asn.receivedAt as Date).toISOString().slice(0, 10);
+              if (!receivedAtMin || d < receivedAtMin) receivedAtMin = d;
+            }
+            if (asn.completedAt) {
+              const d = asn.completedAt instanceof Date ? asn.completedAt : new Date(asn.completedAt);
+              if (!actualCompletedAtMax || d > actualCompletedAtMax) actualCompletedAtMax = d;
+            }
+          }
           return {
             ...t,
-            assigneeId: a.userId,
-            assignee: u?.displayName ?? null,
-            dueDate: a.dueDate ? (typeof a.dueDate === "string" ? a.dueDate : (a.dueDate as Date).toISOString().slice(0, 10)) : null,
-            actualCompletedAt: a.completedAt ?? null,
+            assigneeId: a?.userId ?? null,
+            assignee: u?.displayName ?? (taskAssignmentsList.length > 0 ? taskAssignmentsList.map((asn) => userMap.get(asn.userId)?.displayName).filter(Boolean).join(", ") : null),
+            dueDate: a?.dueDate ? (typeof a.dueDate === "string" ? a.dueDate : (a.dueDate as Date).toISOString().slice(0, 10)) : null,
+            actualCompletedAt: actualCompletedAtMax ?? a?.completedAt ?? null,
+            receivedAt: receivedAtMin ?? a?.receivedAt ?? null,
+            assignments: assignmentsWithDisplay.length > 0 ? assignmentsWithDisplay : undefined,
           } as TaskWithAssignmentDetails;
         });
         return res.json(result);
@@ -163,6 +210,15 @@ export async function registerRoutes(
       if (typeof body.notes === "string" || body.notes === null) {
         (input as Record<string, unknown>).notes = body.notes === "" ? null : body.notes;
       }
+      // Đảm bảo vote (đánh giá Người kiểm soát) luôn được truyền từ body vào input
+      if ("vote" in body) {
+        (input as Record<string, unknown>).vote = body.vote === "" || body.vote === undefined ? null : body.vote;
+      }
+      if (FEATURE_WORK_ENABLED && (input.taskType !== undefined || input.relatedWorkId !== undefined || input.relatedContractId !== undefined)) {
+        const existing = await storage.getTask(id);
+        const merged = { ...existing, ...input } as { taskType?: string | null; relatedWorkId?: string | null; relatedContractId?: string | null };
+        validateTaskContractLink(merged);
+      }
       type AssignmentInput = { userId: string; stageType: string; roundNumber?: number; receivedAt?: string; dueDate?: string; completedAt?: string; status?: string; progress?: number; notes?: string | null };
       const assignmentsInput = Array.isArray((req.body as { assignments?: unknown }).assignments)
         ? (req.body as { assignments: AssignmentInput[] }).assignments
@@ -211,6 +267,7 @@ export async function registerRoutes(
   app.post(api.tasks.create.path, requireAuth, async (req, res) => {
     try {
       const input = api.tasks.create.input.parse(req.body);
+      if (FEATURE_WORK_ENABLED) validateTaskContractLink(input);
       type AssignmentInput = { userId: string; stageType: string; roundNumber?: number; receivedAt?: string; dueDate?: string; completedAt?: string; status?: string; progress?: number; notes?: string | null };
       const assignmentsInput = Array.isArray((req.body as { assignments?: unknown }).assignments)
         ? (req.body as { assignments: AssignmentInput[] }).assignments
@@ -219,6 +276,7 @@ export async function registerRoutes(
       const now = new Date();
       const body = req.body as Record<string, unknown>;
       const notesValue = input.notes ?? (typeof body.notes === "string" ? body.notes : body.notes === null ? null : undefined);
+      const voteValue = input.vote ?? (body.vote !== undefined && body.vote !== "" ? body.vote : null);
       const taskData: Omit<Task, "id"> = {
         title: input.title,
         status: input.status,
@@ -231,6 +289,10 @@ export async function registerRoutes(
         sourceSheetId: input.sourceSheetId ?? null,
         sourceSheetName: input.sourceSheetName ?? null,
         contractId: input.contractId ?? null,
+        taskType: input.taskType ?? null,
+        relatedWorkId: input.relatedWorkId ?? null,
+        relatedContractId: input.relatedContractId ?? null,
+        vote: voteValue as string | null,
         createdAt: now,
         updatedAt: now,
       };
@@ -300,6 +362,278 @@ export async function registerRoutes(
       console.error("Error refreshing tasks:", error);
       const message = error instanceof Error ? error.message : "Failed to refresh tasks";
       res.status(500).json({ message });
+    }
+  });
+
+  // ---------- Works & Translation/Proofreading contracts (Work–Contract taxonomy) ----------
+  app.get(api.works.list.path, requireAuth, async (_req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const list = await dbStorage.getWorksFromDb();
+      res.json(list);
+    } catch (err) {
+      console.error("Error fetching works:", err);
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch works" });
+    }
+  });
+  app.get(api.works.get.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const row = await dbStorage.getWorkById(id);
+      if (!row) return res.status(404).json({ message: "Work not found" });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch work" });
+    }
+  });
+  /** Chuẩn hóa body works: pg numeric expect string, client có thể gửi number. */
+  function normalizeWorkBody(body: unknown): Record<string, unknown> {
+    const b = typeof body === "object" && body !== null ? { ...(body as Record<string, unknown>) } : {};
+    if (typeof (b as Record<string, unknown>).estimateFactor === "number") {
+      (b as Record<string, unknown>).estimateFactor = String((b as Record<string, unknown>).estimateFactor);
+    }
+    return b as Record<string, unknown>;
+  }
+
+  app.post(api.works.create.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const body = normalizeWorkBody(req.body);
+      const input = api.works.create.input.parse(body);
+      const row = await dbStorage.createWork(input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to create work" });
+    }
+  });
+  app.patch(api.works.update.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const body = normalizeWorkBody(req.body);
+      const input = api.works.update.input.parse(body);
+      const row = await dbStorage.updateWork(id, input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to update work" });
+    }
+  });
+
+  app.get(api.translationContracts.list.path, requireAuth, async (_req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const list = await dbStorage.getTranslationContractsFromDb();
+      res.json(list);
+    } catch (err) {
+      console.error("Error fetching translation contracts:", err);
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch translation contracts" });
+    }
+  });
+  app.get(api.translationContracts.get.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const row = await dbStorage.getTranslationContractById(id);
+      if (!row) return res.status(404).json({ message: "Translation contract not found" });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch translation contract" });
+    }
+  });
+  const numericKeysTc = ["unitPrice", "overviewValue", "translationValue", "contractValue", "completionRate", "settlementValue"] as const;
+  const uuidKeysTc = ["componentId", "workId"] as const;
+  const normalizeTranslationContractBody = (body: Record<string, unknown>) => {
+    const out = { ...body };
+    for (const key of numericKeysTc) {
+      const v = out[key];
+      if (v !== undefined && v !== null && v !== "") {
+        out[key] = typeof v === "number" ? String(v) : v;
+      }
+    }
+    for (const key of uuidKeysTc) {
+      if (out[key] === "") out[key] = null;
+    }
+    return out;
+  };
+
+  app.post(api.translationContracts.create.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const body = normalizeTranslationContractBody((req.body as Record<string, unknown>) || {});
+      const input = api.translationContracts.create.input.parse(body);
+      const row = await dbStorage.createTranslationContract(input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to create translation contract" });
+    }
+  });
+  app.patch(api.translationContracts.update.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const body = normalizeTranslationContractBody((req.body as Record<string, unknown>) || {});
+      const input = api.translationContracts.update.input.parse(body);
+      const row = await dbStorage.updateTranslationContract(id, input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to update translation contract" });
+    }
+  });
+
+  app.get(api.proofreadingContracts.list.path, requireAuth, async (_req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const list = await dbStorage.getProofreadingContractsFromDb();
+      res.json(list);
+    } catch (err) {
+      console.error("Error fetching proofreading contracts:", err);
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch proofreading contracts" });
+    }
+  });
+  app.get(api.proofreadingContracts.get.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const row = await dbStorage.getProofreadingContractById(id);
+      if (!row) return res.status(404).json({ message: "Proofreading contract not found" });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch proofreading contract" });
+    }
+  });
+  app.post(api.proofreadingContracts.create.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const input = api.proofreadingContracts.create.input.parse(req.body);
+      const row = await dbStorage.createProofreadingContract(input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to create proofreading contract" });
+    }
+  });
+  app.patch(api.proofreadingContracts.update.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const input = api.proofreadingContracts.update.input.parse(req.body);
+      const row = await dbStorage.updateProofreadingContract(id, input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to update proofreading contract" });
+    }
+  });
+
+  // ---------- Components (Hợp phần) ----------
+  app.get(api.components.list.path, requireAuth, async (_req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const list = await dbStorage.getComponentsFromDb();
+      res.json(list);
+    } catch (err) {
+      console.error("Error fetching components:", err);
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch components" });
+    }
+  });
+  app.get(api.components.get.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const row = await dbStorage.getComponentById(id);
+      if (!row) return res.status(404).json({ message: "Component not found" });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch component" });
+    }
+  });
+  app.post(api.components.create.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const input = api.components.create.input.parse(req.body);
+      const row = await dbStorage.createComponent(input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to create component" });
+    }
+  });
+  app.patch(api.components.update.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const input = api.components.update.input.parse(req.body);
+      const row = await dbStorage.updateComponent(id, input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to update component" });
+    }
+  });
+
+  // ---------- Contract stages (Giai đoạn hợp đồng) ----------
+  app.get("/api/translation-contracts/:contractId/stages", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const contractId = Array.isArray(req.params.contractId) ? req.params.contractId[0] : req.params.contractId;
+      const list = await dbStorage.getContractStagesByTranslationContractId(contractId);
+      res.json(list);
+    } catch (err) {
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch stages" });
+    }
+  });
+  app.get("/api/proofreading-contracts/:contractId/stages", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const contractId = Array.isArray(req.params.contractId) ? req.params.contractId[0] : req.params.contractId;
+      const list = await dbStorage.getContractStagesByProofreadingContractId(contractId);
+      res.json(list);
+    } catch (err) {
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch stages" });
+    }
+  });
+  app.post(api.contractStages.create.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const input = api.contractStages.create.input.parse(req.body);
+      const row = await dbStorage.createContractStage(input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to create contract stage" });
+    }
+  });
+  app.patch(api.contractStages.update.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const input = api.contractStages.update.input.parse(req.body);
+      const row = await dbStorage.updateContractStage(id, input);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to update contract stage" });
+    }
+  });
+  app.delete(api.contractStages.delete.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      await dbStorage.deleteContractStage(id);
+      res.json({ message: "OK" });
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to delete contract stage" });
     }
   });
 

@@ -16,14 +16,17 @@ import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus } from "lucide-
 import { Task } from "@shared/schema";
 import { format } from "date-fns";
 
-export default function ThietKeCNTTPage() {
+const INCLUDED_GROUPS = ["Thiết kế", "Thiết kế_Dàn trang"];
+const DEFAULT_GROUP = "Thiết kế";
+
+export default function ThietKePage() {
   const { data: tasks, isLoading, isError } = useTasks();
   const { mutate: refresh, isPending: isRefreshing } = useRefreshTasks();
   const { mutate: createTask, isPending: isCreating } = useCreateTask();
   const { role, user } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
-  
+
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<TaskFilterState>(getDefaultTaskFilters);
   const [groupFilter, setGroupFilter] = useState("all");
@@ -31,8 +34,6 @@ export default function ThietKeCNTTPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-
-  const includedGroups = ["Thiết kế + CNTT", "Thiết kế_Dàn trang", "CNTT", "Quét trùng lặp"];
 
   const { data: works = [] } = useWorks();
   const { data: components = [] } = useComponents();
@@ -44,7 +45,7 @@ export default function ThietKeCNTTPage() {
     if (!tasks) return [];
     const groups = new Set(
       tasks
-        .filter((t) => includedGroups.includes(t.group || ""))
+        .filter((t) => INCLUDED_GROUPS.includes(t.group || ""))
         .map((t) => t.group)
         .filter(Boolean)
     );
@@ -53,13 +54,13 @@ export default function ThietKeCNTTPage() {
 
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    let list = tasks.filter((t) => includedGroups.includes(t.group || ""));
+    let list = tasks.filter((t) => INCLUDED_GROUPS.includes(t.group || ""));
     if (groupFilter !== "all") list = list.filter((t) => t.group === groupFilter);
     if (role === UserRole.EMPLOYEE) {
       list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
     }
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = search.trim().toLowerCase();
       list = list.filter(
         (t) =>
           t.title?.toLowerCase().includes(q) ||
@@ -96,11 +97,9 @@ export default function ThietKeCNTTPage() {
           <AlertTriangle className="w-8 h-8" />
         </div>
         <h2 className="text-xl font-bold">{t.errors.failedToLoad}</h2>
-        <p className="text-muted-foreground max-w-md">
-          {t.errors.failedToLoad}
-        </p>
+        <p className="text-muted-foreground max-w-md">{t.errors.failedToLoad}</p>
         <Button onClick={() => refresh()} disabled={isRefreshing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
           {t.errors.retryConnection}
         </Button>
       </div>
@@ -109,30 +108,30 @@ export default function ThietKeCNTTPage() {
 
   return (
     <div className="space-y-8">
-      {/* Overview Stats */}
       <section>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Thiết kế / CNTT / Quét trùng lặp</h2>
-            <p className="text-sm text-muted-foreground mt-1">Quản lý công việc thiết kế, dàn trang, CNTT và quét trùng lặp</p>
+            <h2 className="text-xl font-bold tracking-tight">Thiết kế</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Quản lý công việc thiết kế, dàn trang với Kỹ thuật viên chính và Trợ lý thiết kế
+            </p>
           </div>
           <div className="text-sm text-muted-foreground flex items-center gap-2">
-            {t.dashboard.lastSynced}: {format(new Date(), 'h:mm a')}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 w-8 p-0" 
+            {t.dashboard.lastSynced}: {format(new Date(), "h:mm a")}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
               onClick={() => refresh()}
               disabled={isRefreshing}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
           </div>
         </div>
         <TaskStats tasks={filteredTasks} />
       </section>
 
-      {/* Task List */}
       <section className="bg-card rounded-xl border border-border/50 shadow-sm">
         <div className="p-4 border-b border-border/50 flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -141,18 +140,12 @@ export default function ThietKeCNTTPage() {
               {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
             </Badge>
             {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
-              <Button
-                size="sm"
-                onClick={() => setIsCreateDialogOpen(true)}
-                disabled={isCreating}
-                className="ml-2"
-              >
+              <Button size="sm" onClick={() => setIsCreateDialogOpen(true)} disabled={isCreating} className="ml-2">
                 <Plus className="w-4 h-4 mr-2" />
                 {t.dashboard.createNew}
               </Button>
             )}
           </div>
-
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -163,7 +156,6 @@ export default function ThietKeCNTTPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            
             <Select value={groupFilter} onValueChange={setGroupFilter}>
               <SelectTrigger className="w-[160px] bg-background">
                 <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
@@ -178,7 +170,6 @@ export default function ThietKeCNTTPage() {
                 ))}
               </SelectContent>
             </Select>
-            
           </div>
         </div>
 
@@ -202,45 +193,46 @@ export default function ThietKeCNTTPage() {
           columns={{
             id: true,
             title: true,
-            group: true, // Hiển thị group vì có nhiều groups trong page này
+            group: true,
             assignee: true,
             priority: true,
             status: true,
             dueDate: true,
             progress: true,
+            receivedDate: true,
+            actualCompletedAt: true,
+            vote: true,
           }}
         />
       </section>
 
-      <TaskDialog 
-        open={!!selectedTask} 
-        onOpenChange={(open) => !open && setSelectedTask(null)} 
-        task={selectedTask} 
-      />
-      
-      <TaskDialog 
-        open={isCreateDialogOpen} 
-        onOpenChange={(open) => setIsCreateDialogOpen(open)} 
+      <TaskDialog open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)} task={selectedTask} />
+
+      <TaskDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
         task={null}
+        defaultGroup={DEFAULT_GROUP}
         onCreate={(taskData) => {
-          // Default to first available group if not specified
-          const defaultGroup = availableGroups[0] || 'Thiết kế + CNTT';
-          createTask({ ...taskData, group: taskData.group || defaultGroup }, {
-            onSuccess: () => {
-              toast({
-                title: t.common.success,
-                description: t.task.createNew + " " + (language === 'vi' ? 'thành công' : 'successfully'),
-              });
-              setIsCreateDialogOpen(false);
-            },
-            onError: (error) => {
-              toast({
-                title: t.common.error,
-                description: error.message || t.errors.failedToCreate,
-                variant: "destructive",
-              });
-            },
-          });
+          createTask(
+            { ...taskData, group: taskData.group || DEFAULT_GROUP },
+            {
+              onSuccess: () => {
+                toast({
+                  title: t.common.success,
+                  description: t.task.createNew + " " + (language === "vi" ? "thành công" : "successfully"),
+                });
+                setIsCreateDialogOpen(false);
+              },
+              onError: (error) => {
+                toast({
+                  title: t.common.error,
+                  description: error.message || t.errors.failedToCreate,
+                  variant: "destructive",
+                });
+              },
+            }
+          );
         }}
         isCreating={isCreating}
       />

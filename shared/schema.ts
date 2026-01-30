@@ -62,7 +62,123 @@ export type Contract = typeof contracts.$inferSelect;
 export type InsertContract = z.infer<typeof insertContractSchema>;
 
 // -----------------------------------------------------------------------------
+// Components (Hợp phần dịch thuật – phân loại tác phẩm và hợp đồng)
+// VD: Phật tạng toàn dịch, Phật tạng tinh yếu, Phật điển, Nho tạng, Nho điển
+// -----------------------------------------------------------------------------
+export const components = pgTable("components", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertComponentSchema = createInsertSchema(components);
+export const selectComponentSchema = createSelectSchema(components);
+export type Component = typeof components.$inferSelect;
+export type InsertComponent = z.infer<typeof insertComponentSchema>;
+
+// -----------------------------------------------------------------------------
+// Works (tác phẩm / công việc nguồn – trục nghiệp vụ bền vững)
+// -----------------------------------------------------------------------------
+export const works = pgTable("works", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  componentId: uuid("component_id").references(() => components.id),
+  stage: text("stage"),
+  titleVi: text("title_vi"),
+  titleHannom: text("title_hannom"),
+  documentCode: text("document_code"),
+  baseWordCount: integer("base_word_count"),
+  basePageCount: integer("base_page_count"),
+  estimateFactor: numeric("estimate_factor", { precision: 15, scale: 4 }),
+  estimateWordCount: integer("estimate_word_count"),
+  estimatePageCount: integer("estimate_page_count"),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertWorkSchema = createInsertSchema(works);
+export const selectWorkSchema = createSelectSchema(works);
+export type Work = typeof works.$inferSelect;
+export type InsertWork = z.infer<typeof insertWorkSchema>;
+
+// -----------------------------------------------------------------------------
+// Translation contracts (hợp đồng dịch thuật)
+// -----------------------------------------------------------------------------
+export const translationContracts = pgTable("translation_contracts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  contractNumber: text("contract_number"),
+  componentId: uuid("component_id").references(() => components.id),
+  workId: uuid("work_id").references(() => works.id),
+  unitPrice: numeric("unit_price", { precision: 15, scale: 2 }),
+  overviewValue: numeric("overview_value", { precision: 15, scale: 2 }),
+  translationValue: numeric("translation_value", { precision: 15, scale: 2 }),
+  contractValue: numeric("contract_value", { precision: 15, scale: 2 }),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  extensionStartDate: date("extension_start_date"),
+  extensionEndDate: date("extension_end_date"),
+  actualCompletionDate: date("actual_completion_date"),
+  actualWordCount: integer("actual_word_count"),
+  actualPageCount: integer("actual_page_count"),
+  completionRate: numeric("completion_rate", { precision: 10, scale: 4 }),
+  settlementValue: numeric("settlement_value", { precision: 15, scale: 2 }),
+  note: text("note"),
+});
+
+export const insertTranslationContractSchema = createInsertSchema(translationContracts);
+export const selectTranslationContractSchema = createSelectSchema(translationContracts);
+export type TranslationContract = typeof translationContracts.$inferSelect;
+export type InsertTranslationContract = z.infer<typeof insertTranslationContractSchema>;
+
+// -----------------------------------------------------------------------------
+// Proofreading contracts (hợp đồng hiệu đính)
+// -----------------------------------------------------------------------------
+export const proofreadingContracts = pgTable("proofreading_contracts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  contractNumber: text("contract_number"),
+  componentId: uuid("component_id").references(() => components.id),
+  workId: uuid("work_id").references(() => works.id),
+  translationContractId: uuid("translation_contract_id").references(() => translationContracts.id),
+  proofreaderName: text("proofreader_name"),
+  pageCount: integer("page_count"),
+  rateRatio: numeric("rate_ratio", { precision: 10, scale: 4 }),
+  contractValue: numeric("contract_value", { precision: 15, scale: 2 }),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  actualCompletionDate: date("actual_completion_date"),
+  note: text("note"),
+});
+
+// -----------------------------------------------------------------------------
+// Contract stages (giai đoạn hợp đồng – 1 hợp đồng nhiều giai đoạn)
+// -----------------------------------------------------------------------------
+export const contractStages = pgTable("contract_stages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  translationContractId: uuid("translation_contract_id").references(() => translationContracts.id, { onDelete: "cascade" }),
+  proofreadingContractId: uuid("proofreading_contract_id").references(() => proofreadingContracts.id, { onDelete: "cascade" }),
+  stageCode: text("stage_code").notNull(),
+  stageOrder: integer("stage_order").notNull().default(1),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  actualCompletionDate: date("actual_completion_date"),
+  note: text("note"),
+});
+
+export const insertContractStageSchema = createInsertSchema(contractStages);
+export const selectContractStageSchema = createSelectSchema(contractStages);
+export type ContractStage = typeof contractStages.$inferSelect;
+export type InsertContractStage = z.infer<typeof insertContractStageSchema>;
+
+export const insertProofreadingContractSchema = createInsertSchema(proofreadingContracts);
+export const selectProofreadingContractSchema = createSelectSchema(proofreadingContracts);
+export type ProofreadingContract = typeof proofreadingContracts.$inferSelect;
+export type InsertProofreadingContract = z.infer<typeof insertProofreadingContractSchema>;
+
+// -----------------------------------------------------------------------------
 // Tasks (chỉ thông tin task-level; người giao / ngày nhận-hoàn thành ở task_assignments)
+// Nâng cấp: task_type, related_work_id, related_contract_id (backward-compatible)
 // -----------------------------------------------------------------------------
 export const tasks = pgTable("tasks", {
   id: text("id").primaryKey(),
@@ -77,6 +193,10 @@ export const tasks = pgTable("tasks", {
   sourceSheetId: text("source_sheet_id"),
   sourceSheetName: text("source_sheet_name"),
   contractId: uuid("contract_id"),
+  taskType: text("task_type"),
+  relatedWorkId: uuid("related_work_id").references(() => works.id),
+  relatedContractId: uuid("related_contract_id"),
+  vote: text("vote"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -94,6 +214,10 @@ export type TaskWithAssignmentDetails = Task & {
   assigneeId?: string | null;
   dueDate?: string | null;
   actualCompletedAt?: Date | null;
+  /** Tất cả assignments (list API) để hiển thị đầy đủ nhân sự + màu trạng thái */
+  assignments?: (TaskAssignment & { displayName?: string | null })[];
+  /** Ngày nhận sớm nhất trong các assignment (list API) */
+  receivedAt?: string | Date | null;
 };
 
 // -----------------------------------------------------------------------------

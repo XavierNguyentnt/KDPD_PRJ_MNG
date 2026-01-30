@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,7 +79,10 @@ async function fetchUsers(): Promise<ApiUser[]> {
   return res.json();
 }
 
-async function updateUserPassword(userId: string, newPassword: string): Promise<void> {
+async function updateUserPassword(
+  userId: string,
+  newPassword: string,
+): Promise<void> {
   const res = await fetch(`/api/users/${userId}/password`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -95,7 +104,10 @@ type UpdateUserPayload = {
   roleIds?: string[];
   groupIds?: string[];
 };
-async function updateUser(userId: string, data: UpdateUserPayload): Promise<ApiUser> {
+async function updateUser(
+  userId: string,
+  data: UpdateUserPayload,
+): Promise<ApiUser> {
   const res = await fetch(`/api/users/${userId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -113,17 +125,35 @@ export default function AdminUsersPage() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [passwordDialog, setPasswordDialog] = useState<{ user: ApiUser } | null>(null);
+  const [passwordDialog, setPasswordDialog] = useState<{
+    user: ApiUser;
+  } | null>(null);
   const [editDialog, setEditDialog] = useState<{ user: ApiUser } | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [roleComboboxOpen, setRoleComboboxOpen] = useState(false);
   const [groupComboboxOpen, setGroupComboboxOpen] = useState(false);
-  const [editForm, setEditForm] = useState<Pick<ApiUser, "displayName" | "firstName" | "lastName" | "department"> & { isActive: boolean; roleIds: string[]; groupIds: string[] }>({
-    displayName: "", firstName: "", lastName: "", department: "", isActive: true, roleIds: [], groupIds: [],
+  const [editForm, setEditForm] = useState<
+    Pick<ApiUser, "displayName" | "firstName" | "lastName" | "department"> & {
+      isActive: boolean;
+      roleIds: string[];
+      groupIds: string[];
+    }
+  >({
+    displayName: "",
+    firstName: "",
+    lastName: "",
+    department: "",
+    isActive: true,
+    roleIds: [],
+    groupIds: [],
   });
 
-  const { data: users = [], isLoading, error } = useQuery({
+  const {
+    data: users = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["users"],
     queryFn: fetchUsers,
   });
@@ -147,14 +177,22 @@ export default function AdminUsersPage() {
   });
 
   const passwordMutation = useMutation({
-    mutationFn: ({ userId, newPassword }: { userId: string; newPassword: string }) =>
-      updateUserPassword(userId, newPassword),
+    mutationFn: ({
+      userId,
+      newPassword,
+    }: {
+      userId: string;
+      newPassword: string;
+    }) => updateUserPassword(userId, newPassword),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setPasswordDialog(null);
       setNewPassword("");
       setConfirmPassword("");
-      toast({ title: "Đã đổi mật khẩu", description: "Mật khẩu đã được cập nhật." });
+      toast({
+        title: "Đã đổi mật khẩu",
+        description: "Mật khẩu đã được cập nhật.",
+      });
     },
     onError: (err: Error) => {
       toast({ variant: "destructive", title: "Lỗi", description: err.message });
@@ -162,12 +200,20 @@ export default function AdminUsersPage() {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: ({ userId, data }: { userId: string; data: Parameters<typeof updateUser>[1] }) =>
-      updateUser(userId, data),
+    mutationFn: ({
+      userId,
+      data,
+    }: {
+      userId: string;
+      data: Parameters<typeof updateUser>[1];
+    }) => updateUser(userId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setEditDialog(null);
-      toast({ title: "Đã cập nhật", description: "Thông tin người dùng đã được lưu vào DB." });
+      toast({
+        title: "Đã cập nhật",
+        description: "Thông tin người dùng đã được lưu vào DB.",
+      });
     },
     onError: (err: Error) => {
       toast({ variant: "destructive", title: "Lỗi", description: err.message });
@@ -177,11 +223,19 @@ export default function AdminUsersPage() {
   const handleSubmitPassword = () => {
     if (!passwordDialog) return;
     if (newPassword.length < 6) {
-      toast({ variant: "destructive", title: "Lỗi", description: "Mật khẩu tối thiểu 6 ký tự." });
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: "Mật khẩu tối thiểu 6 ký tự.",
+      });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast({ variant: "destructive", title: "Lỗi", description: "Hai ô mật khẩu không trùng." });
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: "Hai ô mật khẩu không trùng.",
+      });
       return;
     }
     passwordMutation.mutate({ userId: passwordDialog.user.id, newPassword });
@@ -203,7 +257,11 @@ export default function AdminUsersPage() {
   const handleSubmitEdit = () => {
     if (!editDialog) return;
     if (!editForm.displayName?.trim()) {
-      toast({ variant: "destructive", title: "Lỗi", description: "Họ tên không được để trống." });
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: "Họ tên không được để trống.",
+      });
       return;
     }
     updateUserMutation.mutate({
@@ -227,7 +285,9 @@ export default function AdminUsersPage() {
       <div className="max-w-2xl mx-auto p-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-muted-foreground">Bạn cần quyền Admin hoặc Manager để truy cập trang này.</p>
+            <p className="text-muted-foreground">
+              Bạn cần quyền Admin hoặc Manager để truy cập trang này.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -240,7 +300,8 @@ export default function AdminUsersPage() {
         <CardHeader>
           <CardTitle>Quản lý người dùng</CardTitle>
           <CardDescription>
-            Xem danh sách người dùng và đổi mật khẩu. Chỉ Admin/Manager mới thấy trang này.
+            Xem danh sách người dùng và đổi mật khẩu. Chỉ Admin/Manager mới thấy
+            trang này.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -251,9 +312,7 @@ export default function AdminUsersPage() {
             </div>
           )}
           {error && (
-            <p className="text-destructive py-4">
-              {(error as Error).message}
-            </p>
+            <p className="text-destructive py-4">{(error as Error).message}</p>
           )}
           {!isLoading && !error && (
             <Table>
@@ -274,16 +333,19 @@ export default function AdminUsersPage() {
                     <TableCell className="font-medium">{u.email}</TableCell>
                     <TableCell>{u.displayName}</TableCell>
                     <TableCell>{u.department ?? "—"}</TableCell>
-                    <TableCell>{(u.roles?.map((r) => r.name).join(", ")) || "—"}</TableCell>
-                    <TableCell>{(u.groups?.map((g) => g.name).join(", ")) || "—"}</TableCell>
+                    <TableCell>
+                      {u.roles?.map((r) => r.name).join(", ") || "—"}
+                    </TableCell>
+                    <TableCell>
+                      {u.groups?.map((g) => g.name).join(", ") || "—"}
+                    </TableCell>
                     <TableCell>{u.isActive ? "Hoạt động" : "Tắt"}</TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => openEditDialog(u)}
-                        className="gap-1"
-                      >
+                        className="gap-1">
                         <Pencil className="w-3.5 h-3.5" />
                         Sửa
                       </Button>
@@ -295,8 +357,7 @@ export default function AdminUsersPage() {
                           setNewPassword("");
                           setConfirmPassword("");
                         }}
-                        className="gap-1"
-                      >
+                        className="gap-1">
                         <KeyRound className="w-3.5 h-3.5" />
                         Đổi mật khẩu
                       </Button>
@@ -309,7 +370,9 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!passwordDialog} onOpenChange={(open) => !open && setPasswordDialog(null)}>
+      <Dialog
+        open={!!passwordDialog}
+        onOpenChange={(open) => !open && setPasswordDialog(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Đổi mật khẩu</DialogTitle>
@@ -322,7 +385,9 @@ export default function AdminUsersPage() {
           {passwordDialog && (
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="newPassword">Mật khẩu mới (tối thiểu 6 ký tự)</Label>
+                <Label htmlFor="newPassword">
+                  Mật khẩu mới (tối thiểu 6 ký tự)
+                </Label>
                 <Input
                   id="newPassword"
                   type="password"
@@ -351,8 +416,11 @@ export default function AdminUsersPage() {
             </Button>
             <Button
               onClick={handleSubmitPassword}
-              disabled={passwordMutation.isPending || !newPassword || newPassword !== confirmPassword}
-            >
+              disabled={
+                passwordMutation.isPending ||
+                !newPassword ||
+                newPassword !== confirmPassword
+              }>
               {passwordMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -366,12 +434,16 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editDialog} onOpenChange={(open) => !open && setEditDialog(null)}>
+      <Dialog
+        open={!!editDialog}
+        onOpenChange={(open) => !open && setEditDialog(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Sửa thông tin người dùng</DialogTitle>
             <DialogDescription>
-              {editDialog ? `Cập nhật thông tin cho ${editDialog.user.email}. Thay đổi sẽ được ghi vào bảng users.` : ""}
+              {editDialog
+                ? `Cập nhật thông tin cho ${editDialog.user.email}. Thay đổi sẽ được ghi vào bảng users.`
+                : ""}
             </DialogDescription>
           </DialogHeader>
           {editDialog && (
@@ -381,7 +453,9 @@ export default function AdminUsersPage() {
                 <Input
                   id="edit-displayName"
                   value={editForm.displayName ?? ""}
-                  onChange={(e) => setEditForm((f) => ({ ...f, displayName: e.target.value }))}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, displayName: e.target.value }))
+                  }
                   placeholder="Ví dụ: Nguyễn Văn A"
                 />
               </div>
@@ -391,7 +465,9 @@ export default function AdminUsersPage() {
                   <Input
                     id="edit-firstName"
                     value={editForm.firstName ?? ""}
-                    onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, firstName: e.target.value }))
+                    }
                     placeholder="Văn A"
                   />
                 </div>
@@ -400,7 +476,9 @@ export default function AdminUsersPage() {
                   <Input
                     id="edit-lastName"
                     value={editForm.lastName ?? ""}
-                    onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, lastName: e.target.value }))
+                    }
                     placeholder="Nguyễn"
                   />
                 </div>
@@ -410,27 +488,40 @@ export default function AdminUsersPage() {
                 <Input
                   id="edit-department"
                   value={editForm.department ?? ""}
-                  onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, department: e.target.value }))
+                  }
                   placeholder="Ban Thư ký"
                 />
               </div>
               <div className="grid gap-2">
                 <Label>Vai trò (nhiều)</Label>
-                <Popover open={roleComboboxOpen} onOpenChange={setRoleComboboxOpen}>
+                <Popover
+                  open={roleComboboxOpen}
+                  onOpenChange={setRoleComboboxOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
                       aria-expanded={roleComboboxOpen}
-                      className="w-full justify-between font-normal"
-                    >
-                      {editForm.roleIds.length
-                        ? editForm.roleIds.map((id) => rolesList.find((r) => r.id === id)?.name).filter(Boolean).join(", ")
-                        : "Chọn vai trò..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      className="w-full justify-between font-normal min-h-9 h-auto py-2 text-left">
+                      <span className="flex-1 min-w-0 break-words whitespace-normal mr-2">
+                        {editForm.roleIds.length
+                          ? editForm.roleIds
+                              .map(
+                                (id) =>
+                                  rolesList.find((r) => r.id === id)?.name,
+                              )
+                              .filter(Boolean)
+                              .join(", ")
+                          : "Chọn vai trò..."}
+                      </span>
+                      <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 flex-shrink-0" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start">
                     <Command>
                       <CommandInput placeholder="Tìm vai trò..." />
                       <CommandList>
@@ -445,11 +536,17 @@ export default function AdminUsersPage() {
                                 onSelect={() => {
                                   setEditForm((f) => ({
                                     ...f,
-                                    roleIds: selected ? f.roleIds.filter((id) => id !== r.id) : [...f.roleIds, r.id],
+                                    roleIds: selected
+                                      ? f.roleIds.filter((id) => id !== r.id)
+                                      : [...f.roleIds, r.id],
                                   }));
-                                }}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", selected ? "opacity-100" : "opacity-0")} />
+                                }}>
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selected ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
                                 {r.name}
                               </CommandItem>
                             );
@@ -462,21 +559,32 @@ export default function AdminUsersPage() {
               </div>
               <div className="grid gap-2">
                 <Label>Nhóm nhân sự (nhiều)</Label>
-                <Popover open={groupComboboxOpen} onOpenChange={setGroupComboboxOpen}>
+                <Popover
+                  open={groupComboboxOpen}
+                  onOpenChange={setGroupComboboxOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
                       aria-expanded={groupComboboxOpen}
-                      className="w-full justify-between font-normal"
-                    >
-                      {editForm.groupIds.length
-                        ? editForm.groupIds.map((id) => groupsList.find((g) => g.id === id)?.name).filter(Boolean).join(", ")
-                        : "Chọn nhóm nhân sự..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      className="w-full justify-between font-normal min-h-9 h-auto py-2 text-left">
+                      <span className="flex-1 min-w-0 break-words whitespace-normal mr-2">
+                        {editForm.groupIds.length
+                          ? editForm.groupIds
+                              .map(
+                                (id) =>
+                                  groupsList.find((g) => g.id === id)?.name,
+                              )
+                              .filter(Boolean)
+                              .join(", ")
+                          : "Chọn nhóm nhân sự..."}
+                      </span>
+                      <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 flex-shrink-0" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start">
                     <Command>
                       <CommandInput placeholder="Tìm nhóm nhân sự..." />
                       <CommandList>
@@ -491,11 +599,17 @@ export default function AdminUsersPage() {
                                 onSelect={() => {
                                   setEditForm((f) => ({
                                     ...f,
-                                    groupIds: selected ? f.groupIds.filter((id) => id !== g.id) : [...f.groupIds, g.id],
+                                    groupIds: selected
+                                      ? f.groupIds.filter((id) => id !== g.id)
+                                      : [...f.groupIds, g.id],
                                   }));
-                                }}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", selected ? "opacity-100" : "opacity-0")} />
+                                }}>
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selected ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
                                 {g.name}
                               </CommandItem>
                             );
@@ -511,7 +625,9 @@ export default function AdminUsersPage() {
                   type="checkbox"
                   id="edit-isActive"
                   checked={editForm.isActive}
-                  onChange={(e) => setEditForm((f) => ({ ...f, isActive: e.target.checked }))}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, isActive: e.target.checked }))
+                  }
                   className="rounded border-input"
                 />
                 <Label htmlFor="edit-isActive">Tài khoản hoạt động</Label>
@@ -524,8 +640,9 @@ export default function AdminUsersPage() {
             </Button>
             <Button
               onClick={handleSubmitEdit}
-              disabled={updateUserMutation.isPending || !editForm.displayName?.trim()}
-            >
+              disabled={
+                updateUserMutation.isPending || !editForm.displayName?.trim()
+              }>
               {updateUserMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

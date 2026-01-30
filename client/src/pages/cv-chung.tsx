@@ -3,14 +3,15 @@ import { useTasks, useRefreshTasks, useCreateTask, UserRole } from "@/hooks/use-
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
+import { useWorks, useComponents, useUsers } from "@/hooks/use-works-and-components";
 import { TaskStats } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
-import { TaskTable } from "@/components/task-table";
+import { TaskTable, sortTasks, type TaskSortColumn } from "@/components/task-table";
+import { TaskFilters, getDefaultTaskFilters, applyTaskFilters, type TaskFilterState } from "@/components/task-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus } from "lucide-react";
+import { Loader2, RefreshCw, Search, AlertTriangle, Plus } from "lucide-react";
 import { Task } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -23,39 +24,51 @@ export default function CVChungPage() {
   const { toast } = useToast();
   
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [filters, setFilters] = useState<TaskFilterState>(getDefaultTaskFilters);
+  const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  const { data: works = [] } = useWorks();
+  const { data: components = [] } = useComponents();
+  const { data: users = [] } = useUsers();
+
+  const worksForFilter = useMemo(() => works, [works]);
+  const stages = useMemo(() => Array.from(new Set(works.map((w) => w.stage).filter(Boolean))) as string[], [works]);
+  const componentOptions = useMemo(() => components.map((c) => ({ id: c.id, name: c.name })), [components]);
 
   // Filter tasks for "CV chung" group only
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    
-    let filtered = tasks.filter(t => t.group === 'CV chung');
+    let list = tasks.filter((t) => t.group === "CV chung");
 
-    // Role-based filtering
     if (role === UserRole.EMPLOYEE) {
-      filtered = filtered.filter(t => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
+      list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
     }
 
-    // Search filter
     if (search.trim()) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(t =>
-        t.title?.toLowerCase().includes(searchLower) ||
-        t.description?.toLowerCase().includes(searchLower) ||
-        t.assignee?.toLowerCase().includes(searchLower) ||
-        t.id?.toLowerCase().includes(searchLower)
+      const q = search.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.title?.toLowerCase().includes(q) ||
+          t.description?.toLowerCase().includes(q) ||
+          t.assignee?.toLowerCase().includes(q) ||
+          t.id?.toLowerCase().includes(q)
       );
     }
 
-    // Status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(t => t.status === statusFilter);
-    }
+    list = applyTaskFilters(list, filters, worksForFilter);
+    return sortTasks(list, sortBy, sortDir);
+  }, [tasks, role, user?.displayName, search, filters, worksForFilter, sortBy, sortDir]);
 
-    return filtered;
-  }, [tasks, role, user?.displayName, search, statusFilter]);
+  const handleSort = (column: TaskSortColumn) => {
+    setSortBy((prev) => {
+      if (prev === column) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      else setSortDir("asc");
+      return column;
+    });
+  };
 
   if (isLoading) {
     return (
@@ -140,26 +153,39 @@ export default function CVChungPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px] bg-background">
-                <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
-                <SelectValue placeholder={t.task.status} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.dashboard.allStatus}</SelectItem>
-                <SelectItem value="Not Started">{t.status.notStarted}</SelectItem>
-                <SelectItem value="In Progress">{t.status.inProgress}</SelectItem>
-                <SelectItem value="Completed">{t.status.completed}</SelectItem>
-                <SelectItem value="Blocked">{t.status.blocked}</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
-        <TaskTable 
+        <div className="px-4 py-3 border-b border-border/50 bg-muted/10">
+          <TaskFilters
+            users={users}
+            components={componentOptions}
+            filters={filters}
+            onFiltersChange={(f) => setFilters((prev) => ({ ...prev, ...f }))}
+            stages={stages}
+            showVoteFilter={true}
+          />
+        </div>
+
+        <TaskTable
           tasks={filteredTasks}
           onTaskClick={setSelectedTask}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={handleSort}
+          columns={{
+            id: true,
+            title: true,
+            assignee: true,
+            priority: true,
+            status: true,
+            dueDate: true,
+            progress: true,
+            receivedDate: true,
+            actualCompletedAt: true,
+            vote: true,
+            group: false,
+          }}
         />
       </section>
 
@@ -173,8 +199,9 @@ export default function CVChungPage() {
         open={isCreateDialogOpen} 
         onOpenChange={(open) => setIsCreateDialogOpen(open)} 
         task={null}
+        defaultGroup="CV chung"
         onCreate={(taskData) => {
-          createTask({ ...taskData, group: 'CV chung' }, {
+          createTask({ ...taskData, group: taskData.group || 'CV chung' }, {
             onSuccess: () => {
               setIsCreateDialogOpen(false);
             },

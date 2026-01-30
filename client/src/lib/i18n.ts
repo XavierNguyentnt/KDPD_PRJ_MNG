@@ -29,6 +29,34 @@ export interface Translations {
     createNew: string;
     allGroups: string;
     allStatus: string;
+    byStatus: string;
+    byStaff: string;
+    byGroup: string;
+    inProgressGroup: string;
+    completedGroup: string;
+    onSchedule: string;
+    behindSchedule: string;
+    trendChart: string;
+    timeRangeDay: string;
+    timeRangeWeek: string;
+    timeRangeMonth: string;
+    timeRangeQuarter: string;
+    timeRangeYear: string;
+    tasksInPeriod: string;
+    clickBadgeToFilter: string;
+  };
+  filter: {
+    staff: string;
+    component: string;
+    stage: string;
+    status: string;
+    vote: string;
+    dateFrom: string;
+    dateTo: string;
+    allStaff: string;
+    allComponents: string;
+    allStages: string;
+    allVotes: string;
   };
   
   // Task
@@ -132,6 +160,34 @@ const translations: Record<Language, Translations> = {
       createNew: 'Tạo mới',
       allGroups: 'Tất cả nhóm',
       allStatus: 'Tất cả trạng thái',
+      byStatus: 'Theo trạng thái',
+      byStaff: 'Theo nhân sự',
+      byGroup: 'Theo nhóm công việc',
+      inProgressGroup: 'Đang tiến hành',
+      completedGroup: 'Đã hoàn thành',
+      onSchedule: 'Đúng tiến độ',
+      behindSchedule: 'Chậm tiến độ',
+      trendChart: 'Xu hướng công việc theo thời gian',
+      timeRangeDay: 'Ngày',
+      timeRangeWeek: 'Tuần',
+      timeRangeMonth: 'Tháng',
+      timeRangeQuarter: 'Quý',
+      timeRangeYear: 'Năm',
+      tasksInPeriod: 'Số công việc',
+      clickBadgeToFilter: 'Bấm vào badge để xem chi tiết',
+    },
+    filter: {
+      staff: 'Nhân sự',
+      component: 'Hợp phần',
+      stage: 'Giai đoạn',
+      status: 'Trạng thái',
+      vote: 'Đánh giá',
+      dateFrom: 'Từ ngày',
+      dateTo: 'Đến ngày',
+      allStaff: 'Tất cả nhân sự',
+      allComponents: 'Tất cả hợp phần',
+      allStages: 'Tất cả giai đoạn',
+      allVotes: 'Tất cả đánh giá',
     },
     task: {
       title: 'Tiêu đề công việc',
@@ -223,6 +279,34 @@ const translations: Record<Language, Translations> = {
       createNew: 'Create New',
       allGroups: 'All Groups',
       allStatus: 'All Status',
+      byStatus: 'By status',
+      byStaff: 'By staff',
+      byGroup: 'By task group',
+      inProgressGroup: 'In progress',
+      completedGroup: 'Completed',
+      onSchedule: 'On schedule',
+      behindSchedule: 'Behind schedule',
+      trendChart: 'Task trend over time',
+      timeRangeDay: 'Day',
+      timeRangeWeek: 'Week',
+      timeRangeMonth: 'Month',
+      timeRangeQuarter: 'Quarter',
+      timeRangeYear: 'Year',
+      tasksInPeriod: 'Tasks',
+      clickBadgeToFilter: 'Click badge to filter details',
+    },
+    filter: {
+      staff: 'Staff',
+      component: 'Component',
+      stage: 'Stage',
+      status: 'Status',
+      vote: 'Evaluation',
+      dateFrom: 'From date',
+      dateTo: 'To date',
+      allStaff: 'All staff',
+      allComponents: 'All components',
+      allStages: 'All stages',
+      allVotes: 'All evaluations',
     },
     task: {
       title: 'Task Title',

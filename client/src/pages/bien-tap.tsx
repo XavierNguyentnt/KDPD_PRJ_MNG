@@ -3,15 +3,15 @@ import { useTasks, useRefreshTasks, useCreateTask, UserRole } from "@/hooks/use-
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
+import { useWorks, useComponents, useUsers } from "@/hooks/use-works-and-components";
 import { TaskStats } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
-import { TaskTable } from "@/components/task-table";
-import { WorkflowView } from "@/components/workflow-view";
+import { TaskTable, sortTasks, type TaskSortColumn } from "@/components/task-table";
+import { TaskFilters, getDefaultTaskFilters, applyTaskFilters, type TaskFilterState } from "@/components/task-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus } from "lucide-react";
+import { Loader2, RefreshCw, Search, AlertTriangle, Plus } from "lucide-react";
 import { Task } from "@shared/schema";
 import { Workflow } from "@shared/workflow";
 import { format } from "date-fns";
@@ -25,39 +25,45 @@ export default function BienTapPage() {
   const { toast } = useToast();
   
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [filters, setFilters] = useState<TaskFilterState>(getDefaultTaskFilters);
+  const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  // Filter tasks for "Biên tập" group only
+  const { data: works = [] } = useWorks();
+  const { data: components = [] } = useComponents();
+  const { data: users = [] } = useUsers();
+  const stages = useMemo(() => Array.from(new Set(works.map((w) => w.stage).filter(Boolean))) as string[], [works]);
+  const componentOptions = useMemo(() => components.map((c) => ({ id: c.id, name: c.name })), [components]);
+
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    
-    let filtered = tasks.filter(t => t.group === 'Biên tập');
-
-    // Role-based filtering
+    let list = tasks.filter((t) => t.group === "Biên tập");
     if (role === UserRole.EMPLOYEE) {
-      filtered = filtered.filter(t => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
+      list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
     }
-
-    // Search filter
     if (search.trim()) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(t =>
-        t.title?.toLowerCase().includes(searchLower) ||
-        t.description?.toLowerCase().includes(searchLower) ||
-        t.assignee?.toLowerCase().includes(searchLower) ||
-        t.id?.toLowerCase().includes(searchLower)
+      const q = search.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.title?.toLowerCase().includes(q) ||
+          t.description?.toLowerCase().includes(q) ||
+          t.assignee?.toLowerCase().includes(q) ||
+          t.id?.toLowerCase().includes(q)
       );
     }
+    list = applyTaskFilters(list, filters, works);
+    return sortTasks(list, sortBy, sortDir);
+  }, [tasks, role, user?.displayName, search, filters, works, sortBy, sortDir]);
 
-    // Status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(t => t.status === statusFilter);
-    }
-
-    return filtered;
-  }, [tasks, role, user?.displayName, search, statusFilter]);
+  const handleSort = (column: TaskSortColumn) => {
+    setSortBy((prev) => {
+      if (prev === column) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      else setSortDir("asc");
+      return column;
+    });
+  };
 
   if (isLoading) {
     return (
@@ -142,28 +148,27 @@ export default function BienTapPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px] bg-background">
-                <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
-                <SelectValue placeholder={t.task.status} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.dashboard.allStatus}</SelectItem>
-                <SelectItem value="Not Started">{t.status.notStarted}</SelectItem>
-                <SelectItem value="In Progress">{t.status.inProgress}</SelectItem>
-                <SelectItem value="Completed">{t.status.completed}</SelectItem>
-                <SelectItem value="Blocked">{t.status.blocked}</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
-        <TaskTable 
+        <div className="px-4 py-3 border-b border-border/50 bg-muted/10">
+          <TaskFilters
+            users={users}
+            components={componentOptions}
+            filters={filters}
+            onFiltersChange={(f) => setFilters((prev) => ({ ...prev, ...f }))}
+            stages={stages}
+            showVoteFilter={true}
+          />
+        </div>
+
+        <TaskTable
           tasks={filteredTasks}
           onTaskClick={setSelectedTask}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={handleSort}
           columns={{
-            // Biên tập page: hiển thị đầy đủ các cột, có thể thêm custom columns sau
             id: true,
             title: true,
             assignee: true,
@@ -171,8 +176,10 @@ export default function BienTapPage() {
             status: true,
             dueDate: true,
             progress: true,
-            group: false, // Không cần hiển thị group vì đã filter theo group rồi
-            // Workflow column removed - workflow info is now in assignee and progress columns
+            receivedDate: true,
+            actualCompletedAt: true,
+            vote: true,
+            group: false,
           }}
         />
       </section>
@@ -187,8 +194,9 @@ export default function BienTapPage() {
         open={isCreateDialogOpen} 
         onOpenChange={(open) => setIsCreateDialogOpen(open)} 
         task={null}
+        defaultGroup="Biên tập"
         onCreate={(taskData) => {
-          createTask({ ...taskData, group: 'Biên tập' }, {
+          createTask({ ...taskData, group: taskData.group || 'Biên tập' }, {
             onSuccess: () => {
               toast({
                 title: t.common.success,

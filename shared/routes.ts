@@ -12,6 +12,11 @@ import {
   insertUserGroupSchema,
   insertRoleSchema,
   insertUserRoleSchema,
+  insertWorkSchema,
+  insertTranslationContractSchema,
+  insertProofreadingContractSchema,
+  insertComponentSchema,
+  insertContractStageSchema,
   tasks,
   users,
   contracts,
@@ -24,6 +29,11 @@ import {
   userGroups,
   roles,
   userRoles,
+  works,
+  translationContracts,
+  proofreadingContracts,
+  components,
+  contractStages,
   type TaskWithAssignmentDetails,
 } from "./schema";
 
@@ -322,6 +332,58 @@ export const api = {
     get: { method: "GET" as const, path: "/api/user-roles/:id", responses: { 200: z.custom<typeof userRoles.$inferSelect>(), 404: errorSchemas.notFound } },
     create: { method: "POST" as const, path: "/api/user-roles", input: insertUserRoleSchema.omit({ id: true }), responses: { 200: z.custom<typeof userRoles.$inferSelect>(), 400: errorSchemas.validation } },
     delete: { method: "DELETE" as const, path: "/api/user-roles/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  works: {
+    list: { method: "GET" as const, path: "/api/works", responses: { 200: z.array(z.custom<typeof works.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/works/:id", responses: { 200: z.custom<typeof works.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: {
+      method: "POST" as const,
+      path: "/api/works",
+      input: insertWorkSchema
+        .omit({ id: true, createdAt: true })
+        .extend({
+          estimateFactor: z.union([z.number(), z.string()]).transform((v) => (v === null || v === undefined ? undefined : String(v))).optional().nullable(),
+        }),
+      responses: { 200: z.custom<typeof works.$inferSelect>(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: "PATCH" as const,
+      path: "/api/works/:id",
+      input: insertWorkSchema.partial().omit({ id: true }).extend({
+        estimateFactor: z.union([z.number(), z.string()]).transform((v) => (v === null || v === undefined ? undefined : String(v))).optional().nullable(),
+      }),
+      responses: { 200: z.custom<typeof works.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+  },
+
+  translationContracts: {
+    list: { method: "GET" as const, path: "/api/translation-contracts", responses: { 200: z.array(z.custom<typeof translationContracts.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/translation-contracts/:id", responses: { 200: z.custom<typeof translationContracts.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/translation-contracts", input: insertTranslationContractSchema.omit({ id: true }), responses: { 200: z.custom<typeof translationContracts.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/translation-contracts/:id", input: insertTranslationContractSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof translationContracts.$inferSelect>(), 404: errorSchemas.notFound } },
+  },
+
+  proofreadingContracts: {
+    list: { method: "GET" as const, path: "/api/proofreading-contracts", responses: { 200: z.array(z.custom<typeof proofreadingContracts.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/proofreading-contracts/:id", responses: { 200: z.custom<typeof proofreadingContracts.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/proofreading-contracts", input: insertProofreadingContractSchema.omit({ id: true }), responses: { 200: z.custom<typeof proofreadingContracts.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/proofreading-contracts/:id", input: insertProofreadingContractSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof proofreadingContracts.$inferSelect>(), 404: errorSchemas.notFound } },
+  },
+
+  components: {
+    list: { method: "GET" as const, path: "/api/components", responses: { 200: z.array(z.custom<typeof components.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/components/:id", responses: { 200: z.custom<typeof components.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/components", input: insertComponentSchema.omit({ id: true }), responses: { 200: z.custom<typeof components.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/components/:id", input: insertComponentSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof components.$inferSelect>(), 404: errorSchemas.notFound } },
+  },
+
+  contractStages: {
+    listByTranslationContract: { method: "GET" as const, path: "/api/translation-contracts/:contractId/stages", responses: { 200: z.array(z.custom<typeof contractStages.$inferSelect>()) } },
+    listByProofreadingContract: { method: "GET" as const, path: "/api/proofreading-contracts/:contractId/stages", responses: { 200: z.array(z.custom<typeof contractStages.$inferSelect>()) } },
+    create: { method: "POST" as const, path: "/api/contract-stages", input: insertContractStageSchema.omit({ id: true }), responses: { 200: z.custom<typeof contractStages.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/contract-stages/:id", input: insertContractStageSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof contractStages.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/contract-stages/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
   },
 };
 

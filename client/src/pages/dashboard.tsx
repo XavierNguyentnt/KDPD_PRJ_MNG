@@ -1,17 +1,21 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useTasks, useRefreshTasks, useCreateTask, UserRole } from "@/hooks/use-tasks";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
-import { TaskStats } from "@/components/task-stats";
+import {
+  TaskDashboard,
+  applyDashboardBadgeFilter,
+  type DashboardBadgeFilter,
+} from "@/components/task-dashboard";
 import { TaskDialog } from "@/components/task-dialog";
-import { TaskTable } from "@/components/task-table";
+import { TaskTable, sortTasks, type TaskSortColumn } from "@/components/task-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus } from "lucide-react";
-import { Task } from "@shared/schema";
+import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
 
 export default function Dashboard() {
@@ -25,8 +29,12 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [badgeFilter, setBadgeFilter] = useState<DashboardBadgeFilter>(null);
+  const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const taskListRef = useRef<HTMLDivElement>(null);
 
   // Get unique groups from tasks
   const availableGroups = useMemo(() => {
@@ -35,45 +43,55 @@ export default function Dashboard() {
     return Array.from(groups).sort();
   }, [tasks]);
 
-  // Filter tasks based on role and search criteria
-  const filteredTasks = useMemo(() => {
+  // Base filtered list (role, search, group, status) — dùng cho thống kê dashboard
+  const baseFilteredTasks = useMemo(() => {
     if (!tasks) return [];
-    
-    let filtered = tasks;
-
-    // Role-based filtering
+    let filtered: TaskWithAssignmentDetails[] = tasks;
     if (role === UserRole.EMPLOYEE) {
-      // Simple name matching simulation
-      filtered = filtered.filter(t => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
-    } else if (role === UserRole.MANAGER) {
-      // Simulate team view (e.g., specific assignees or roles)
-      // For demo: Show everything but highlight ability to see broader view
-      filtered = filtered; 
-    }
-
-    // Group Filter
-    if (groupFilter !== "all") {
-      filtered = filtered.filter(t => t.group === groupFilter);
-    }
-
-    // Search
-    if (search) {
-      const lower = search.toLowerCase();
-      filtered = filtered.filter(t => 
-        t.title.toLowerCase().includes(lower) || 
-        t.description?.toLowerCase().includes(lower) ||
-        t.assignee?.toLowerCase().includes(lower) ||
-        t.group?.toLowerCase().includes(lower)
+      filtered = filtered.filter((t) =>
+        t.assignee?.includes((user?.displayName ?? "").split(" ")[0])
       );
     }
-
-    // Status Filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(t => t.status === statusFilter);
+    if (groupFilter !== "all") {
+      filtered = filtered.filter((t) => t.group === groupFilter);
     }
-
+    if (search.trim()) {
+      const lower = search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          t.title?.toLowerCase().includes(lower) ||
+          t.description?.toLowerCase().includes(lower) ||
+          t.assignee?.toLowerCase().includes(lower) ||
+          t.group?.toLowerCase().includes(lower)
+      );
+    }
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((t) => t.status === statusFilter);
+    }
     return filtered;
   }, [tasks, role, search, statusFilter, groupFilter, user?.displayName]);
+
+  // Danh sách task sau khi áp dụng badge filter + sắp xếp (hiển thị trong bảng)
+  const filteredTasks = useMemo(() => {
+    const withBadge = applyDashboardBadgeFilter(baseFilteredTasks, badgeFilter);
+    return sortTasks(withBadge, sortBy, sortDir);
+  }, [baseFilteredTasks, badgeFilter, sortBy, sortDir]);
+
+  const handleBadgeFilter = useCallback(
+    (filter: DashboardBadgeFilter) => {
+      setBadgeFilter(filter);
+      setTimeout(() => taskListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    },
+    []
+  );
+
+  const handleSort = useCallback((column: TaskSortColumn) => {
+    setSortBy((prev) => {
+      if (prev === column) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      else setSortDir("asc");
+      return column;
+    });
+  }, []);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -122,28 +140,35 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Overview Stats */}
+      {/* Dashboard thống kê: badges + biểu đồ xu hướng */}
       <section>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold tracking-tight">{t.dashboard.overview}</h2>
           <div className="text-sm text-muted-foreground flex items-center gap-2">
-            {t.dashboard.lastSynced}: {format(new Date(), 'h:mm a')}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 w-8 p-0" 
+            {t.dashboard.lastSynced}: {format(new Date(), "h:mm a")}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
               onClick={() => refresh()}
               disabled={isRefreshing}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
           </div>
         </div>
-        <TaskStats tasks={filteredTasks} />
+        <TaskDashboard
+          tasks={baseFilteredTasks}
+          onBadgeFilter={handleBadgeFilter}
+          activeBadgeFilter={badgeFilter}
+        />
       </section>
 
-      {/* Task List */}
-      <section className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
+      {/* Task List (chi tiết theo bộ lọc / badge đã chọn) */}
+      <section
+        ref={taskListRef}
+        className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden"
+      >
         <div className="p-4 border-b border-border/50 flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
@@ -205,9 +230,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <TaskTable 
+        <TaskTable
           tasks={filteredTasks}
           onTaskClick={setSelectedTask}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={handleSort}
           getPriorityColor={getPriorityColor}
           getStatusColor={getStatusColor}
         />

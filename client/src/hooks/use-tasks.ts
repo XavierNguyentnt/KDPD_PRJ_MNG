@@ -56,11 +56,16 @@ export function useUpdateTask() {
       if (!res.ok) throw new Error("Failed to update task");
       return api.tasks.update.responses[200].parse(await res.json());
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: async (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
-      // Invalidate task detail (get-by-id) để UI cập nhật ngay round/workflow/assignments khi mở lại dialog
+      // Refetch ngay để UI cập nhật tức thì (vote, assignments, task detail)
       if (variables.id) {
         queryClient.invalidateQueries({ queryKey: [api.tasks.get.path, variables.id] });
+        queryClient.invalidateQueries({ queryKey: ["task-assignments-by-task", variables.id] });
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: [api.tasks.get.path, variables.id] }),
+          queryClient.refetchQueries({ queryKey: ["task-assignments-by-task", variables.id] }),
+        ]);
       }
     },
   });

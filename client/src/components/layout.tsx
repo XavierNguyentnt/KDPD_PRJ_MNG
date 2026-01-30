@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, CheckSquare, Users, Settings, LogOut, ChevronDown, Bell, Languages, Shield, UserCog } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Users, Settings, LogOut, ChevronDown, Bell, Languages, Shield, UserCog, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { UserRole } from "@/hooks/use-tasks";
@@ -25,8 +25,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/", label: t.dashboard.title, icon: LayoutDashboard },
     { href: "/cv-chung", label: "CV chung", icon: CheckSquare },
     { href: "/bien-tap", label: "Biên tập", icon: CheckSquare },
-    { href: "/thiet-ke-cntt", label: "Thiết kế/CNTT", icon: CheckSquare },
+    { href: "/thiet-ke", label: "Thiết kế", icon: CheckSquare },
+    { href: "/cntt", label: "CNTT", icon: CheckSquare },
     { href: "/team", label: "Team", icon: Users },
+    { href: "/thu-ky-hop-phan", label: "Thư ký hợp phần", icon: FileText },
     ...(role === UserRole.ADMIN || role === UserRole.MANAGER
       ? [
           { href: "/admin", label: "Admin", icon: Shield as React.ComponentType<any> },

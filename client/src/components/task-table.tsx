@@ -5,10 +5,48 @@ import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { useI18n } from "@/hooks/use-i18n";
 import { formatDateDDMMYYYY } from "@/lib/utils";
 import { Workflow, BienTapWorkflowHelpers, BienTapStageType, StageStatus } from "@shared/workflow";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+
+export type TaskSortColumn = "id" | "title" | "group" | "assignee" | "priority" | "status" | "dueDate" | "progress" | "receivedDate" | "actualCompletedAt" | "vote";
+
+/** Sort tasks by column. Use with TaskTable sortBy/sortDir/onSort. */
+export function sortTasks(
+  tasks: TaskWithAssignmentDetails[],
+  sortBy: TaskSortColumn | null | undefined,
+  sortDir: "asc" | "desc"
+): TaskWithAssignmentDetails[] {
+  if (!sortBy) return tasks.slice();
+  const dir = sortDir === "asc" ? 1 : -1;
+  const getVal = (t: TaskWithAssignmentDetails, col: TaskSortColumn) => {
+    if (col === "receivedDate") return (t as TaskWithAssignmentDetails & { receivedAt?: string | Date | null }).receivedAt;
+    return t[col as keyof TaskWithAssignmentDetails];
+  };
+  const cmp = (a: TaskWithAssignmentDetails, b: TaskWithAssignmentDetails): number => {
+    const av = getVal(a, sortBy);
+    const bv = getVal(b, sortBy);
+    if (sortBy === "dueDate" || sortBy === "actualCompletedAt" || sortBy === "receivedDate") {
+      const ad = av ? (typeof av === "string" ? av.slice(0, 10) : (av as Date).toISOString?.()?.slice(0, 10) ?? "") : "";
+      const bd = bv ? (typeof bv === "string" ? bv.slice(0, 10) : (bv as Date).toISOString?.()?.slice(0, 10) ?? "") : "";
+      return (ad < bd ? -1 : ad > bd ? 1 : 0) * dir;
+    }
+    if (sortBy === "progress") {
+      const an = Number(av) ?? 0;
+      const bn = Number(bv) ?? 0;
+      return (an - bn) * dir;
+    }
+    const as = String(av ?? "");
+    const bs = String(bv ?? "");
+    return as.localeCompare(bs, undefined, { numeric: true }) * dir;
+  };
+  return tasks.slice().sort(cmp);
+}
 
 interface TaskTableProps {
   tasks: TaskWithAssignmentDetails[];
   onTaskClick: (task: TaskWithAssignmentDetails) => void;
+  sortBy?: TaskSortColumn | null;
+  sortDir?: "asc" | "desc";
+  onSort?: (column: TaskSortColumn) => void;
   columns?: {
     id?: boolean;
     title?: boolean;
@@ -18,6 +56,12 @@ interface TaskTableProps {
     status?: boolean;
     dueDate?: boolean;
     progress?: boolean;
+    /** Ngày nhận công việc (sớm nhất từ assignments) */
+    receivedDate?: boolean;
+    /** Ngày hoàn thành thực tế (muộn nhất từ assignments) */
+    actualCompletedAt?: boolean;
+    /** Đánh giá (vote) của Người kiểm soát */
+    vote?: boolean;
     customColumns?: Array<{
       key: string;
       label: string;
@@ -28,10 +72,52 @@ interface TaskTableProps {
   getStatusColor?: (status: string) => string;
 }
 
+function SortableHead({
+  label,
+  column,
+  sortBy,
+  sortDir,
+  onSort,
+  className,
+  style,
+  title,
+}: {
+  label: React.ReactNode;
+  column: TaskSortColumn;
+  sortBy?: TaskSortColumn | null;
+  sortDir?: "asc" | "desc";
+  onSort?: (column: TaskSortColumn) => void;
+  className?: string;
+  style?: React.CSSProperties;
+  title?: string;
+}) {
+  const active = sortBy === column;
+  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <th
+      className={className}
+      style={style}
+      title={title}
+      onClick={onSort ? () => onSort(column) : undefined}
+      role={onSort ? "button" : undefined}
+      tabIndex={onSort ? 0 : undefined}
+      onKeyDown={onSort ? (e) => e.key === "Enter" && onSort(column) : undefined}
+    >
+      <div className={`flex items-center gap-1 ${onSort ? "cursor-pointer select-none hover:opacity-80" : ""}`}>
+        {label}
+        {onSort && <Icon className="w-3.5 h-3.5 opacity-70" />}
+      </div>
+    </th>
+  );
+}
+
 export function TaskTable({ 
   tasks, 
   onTaskClick, 
   columns = {},
+  sortBy,
+  sortDir = "asc",
+  onSort,
   getPriorityColor,
   getStatusColor 
 }: TaskTableProps) {
@@ -64,7 +150,7 @@ export function TaskTable({
     }
   };
   
-  // Helper function to get status color for stage
+  // Helper function to get status color for stage (Biên tập workflow)
   const getStageStatusColor = (status: StageStatus): string => {
     switch (status) {
       case StageStatus.COMPLETED:
@@ -77,6 +163,23 @@ export function TaskTable({
       default:
         return 'text-gray-600 bg-gray-50 border-gray-200'; // Chưa tiến hành: màu xám
     }
+  };
+
+  // Màu trạng thái cho assignment (CV chung, Thiết kế, CNTT): completed | in_progress | not_started
+  const getAssignmentStatusColor = (status: string | null | undefined): string => {
+    const s = (status ?? "not_started").toLowerCase();
+    if (s === "completed") return "text-green-600 bg-green-50 border-green-200";
+    if (s === "in_progress") return "text-blue-600 bg-blue-50 border-blue-200";
+    return "text-gray-600 bg-gray-50 border-gray-200"; // not_started
+  };
+
+  const getAssignmentLabel = (stageType: string): string => {
+    if (stageType === "kiem_soat") return language === "vi" ? "Người kiểm soát" : "Controller";
+    if (stageType.startsWith("nhan_su_")) return (language === "vi" ? "Nhân sự " : "Staff ") + stageType.replace("nhan_su_", "");
+    if (stageType === "primary") return language === "vi" ? "Người thực hiện" : "Assignee";
+    if (stageType === "ktv_chinh") return language === "vi" ? "KTV chính" : "Lead";
+    if (stageType.startsWith("tro_ly_")) return (language === "vi" ? "Trợ lý " : "Assistant ") + stageType.replace("tro_ly_", "");
+    return stageType;
   };
 
   // Helper function to render assignee cell
@@ -123,6 +226,29 @@ export function TaskTable({
       }
     }
     
+    // CV chung / Thiết kế / CNTT / Quét: hiển thị đầy đủ nhân sự từ assignments với màu trạng thái
+    const assignments = (task as TaskWithAssignmentDetails & { assignments?: Array<{ stageType: string; status?: string; displayName?: string | null }> }).assignments;
+    if (assignments && assignments.length > 0) {
+      return (
+        <td className="p-4 align-middle">
+          <div className="flex flex-col gap-1.5">
+            {assignments.map((asn, idx) => {
+              const label = getAssignmentLabel(asn.stageType);
+              const name = (asn as { displayName?: string | null }).displayName ?? (language === "vi" ? "Chưa giao" : "Unassigned");
+              const statusColor = getAssignmentStatusColor(asn.status);
+              return (
+                <div key={idx} className="flex items-center">
+                  <span className={`text-xs px-2 py-0.5 rounded border ${statusColor} font-medium`}>
+                    {label}: {name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </td>
+      );
+    }
+
     // Default: show regular assignee
     return (
       <td className="p-4 align-middle">
@@ -171,6 +297,23 @@ export function TaskTable({
     );
   };
   
+  const getVoteLabel = (vote: string | null | undefined): string => {
+    if (!vote) return "—";
+    const v = vote.toLowerCase();
+    if (language === "vi") {
+      if (v === "tot") return "Hoàn thành tốt";
+      if (v === "kha") return "Hoàn thành khá";
+      if (v === "khong_tot") return "Không tốt";
+      if (v === "khong_hoan_thanh") return "Không hoàn thành";
+    } else {
+      if (v === "tot") return "Good";
+      if (v === "kha") return "Fair";
+      if (v === "khong_tot") return "Poor";
+      if (v === "khong_hoan_thanh") return "Not completed";
+    }
+    return vote;
+  };
+
   // Default columns configuration
   const defaultColumns = {
     id: true,
@@ -181,6 +324,9 @@ export function TaskTable({
     status: true,
     dueDate: true,
     progress: true,
+    receivedDate: false,
+    actualCompletedAt: false,
+    vote: false,
     ...columns,
   };
 
@@ -216,49 +362,116 @@ export function TaskTable({
         <thead className="[&_tr]:border-b sticky top-0 z-20">
           <tr className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm">
             {defaultColumns.id && (
-              <th 
+              <SortableHead
+                label="ID"
+                column="id"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
                 className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] min-w-[80px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-              >
-                ID
-              </th>
+              />
             )}
             {defaultColumns.title && (
-              <th 
+              <SortableHead
+                label={t.task.title}
+                column="title"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
                 className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[25%] min-w-[200px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
                 style={{ left: `${titleColumnLeft}px` }}
-              >
-                {t.task.title}
-              </th>
+              />
             )}
             {defaultColumns.group && (
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                {t.task.group}
-              </th>
+              <SortableHead
+                label={t.task.group}
+                column="group"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+              />
             )}
             {defaultColumns.assignee && (
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                {t.task.assignee}
-              </th>
+              <SortableHead
+                label={t.task.assignee}
+                column="assignee"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+              />
             )}
             {defaultColumns.priority && (
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                {t.task.priority}
-              </th>
+              <SortableHead
+                label={t.task.priority}
+                column="priority"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+              />
             )}
             {defaultColumns.status && (
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                {t.task.status}
-              </th>
+              <SortableHead
+                label={t.task.status}
+                column="status"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+              />
             )}
             {defaultColumns.dueDate && (
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                {t.task.dueDate}
-              </th>
+              <SortableHead
+                label={t.task.dueDate}
+                column="dueDate"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+              />
             )}
             {defaultColumns.progress && (
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[15%]">
-                {t.task.progress}
-              </th>
+              <SortableHead
+                label={t.task.progress}
+                column="progress"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[15%]"
+              />
+            )}
+            {defaultColumns.receivedDate && (
+              <SortableHead
+                label={language === "vi" ? "Ngày nhận công việc" : "Received"}
+                column="receivedDate"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
+                title={language === "vi" ? "Ngày đầu tiên nhận công việc trong số các nhân sự" : "Earliest received date among assignees"}
+              />
+            )}
+            {defaultColumns.actualCompletedAt && (
+              <SortableHead
+                label={language === "vi" ? "Ngày hoàn thành thực tế" : "Completed"}
+                column="actualCompletedAt"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
+              />
+            )}
+            {defaultColumns.vote && (
+              <SortableHead
+                label={language === "vi" ? "Đánh giá" : "Evaluation"}
+                column="vote"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+              />
             )}
             {defaultColumns.customColumns?.map((col) => (
               <th key={col.key} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
@@ -345,6 +558,21 @@ export function TaskTable({
                   </td>
                 )}
                 {defaultColumns.progress && renderProgressCell(task)}
+                {defaultColumns.receivedDate && (
+                  <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
+                    {formatDateDDMMYYYY((task as TaskWithAssignmentDetails & { receivedAt?: string | Date | null }).receivedAt) || "—"}
+                  </td>
+                )}
+                {defaultColumns.actualCompletedAt && (
+                  <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
+                    {formatDateDDMMYYYY(task.actualCompletedAt) || "—"}
+                  </td>
+                )}
+                {defaultColumns.vote && (
+                  <td className="p-4 align-middle text-sm">
+                    {getVoteLabel((task as TaskWithAssignmentDetails & { vote?: string | null }).vote)}
+                  </td>
+                )}
                 {defaultColumns.customColumns?.map((col) => (
                   <td key={col.key} className="p-4 align-middle">
                     {col.render(task)}
