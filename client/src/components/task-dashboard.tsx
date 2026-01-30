@@ -18,6 +18,9 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 import { useI18n } from "@/hooks/use-i18n";
 import {
@@ -198,6 +201,48 @@ export function TaskDashboard({
     };
   }, [tasks]);
 
+  /** Dữ liệu biểu đồ tròn: theo trạng thái */
+  const statusChartData = useMemo(
+    () => byStatus.map((s, idx) => ({ name: s.label, value: s.count, fill: COLORS[idx % COLORS.length] })),
+    [byStatus]
+  );
+
+  /** Dữ liệu biểu đồ: theo nhóm công việc (dùng màu tuần hoàn) */
+  const GROUP_CHART_COLORS = [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#8b5cf6",
+    "#ec4899",
+    "#06b6d4",
+    "#84cc16",
+    "#f97316",
+  ];
+  const groupChartData = useMemo(
+    () =>
+      byGroup.map((g, idx) => ({
+        name: g.group,
+        value: g.count,
+        fill: GROUP_CHART_COLORS[idx % GROUP_CHART_COLORS.length],
+      })),
+    [byGroup]
+  );
+
+  /** Dữ liệu biểu đồ thống kê phụ: Đang tiến hành / Đã hoàn thành (đúng tiến độ vs chậm) */
+  const scheduleChartData = useMemo(
+    () => ({
+      inProgress: [
+        { name: t.dashboard.onSchedule, value: scheduleStats.inProgressOnTime, fill: "#10b981" },
+        { name: t.dashboard.behindSchedule, value: scheduleStats.inProgressBehind, fill: "#f59e0b" },
+      ].filter((d) => d.value > 0),
+      completed: [
+        { name: t.dashboard.onSchedule, value: scheduleStats.completedOnTime, fill: "#10b981" },
+        { name: t.dashboard.behindSchedule, value: scheduleStats.completedBehind, fill: "#f59e0b" },
+      ].filter((d) => d.value > 0),
+    }),
+    [scheduleStats, t]
+  );
+
   const trendData = useMemo(() => {
     const now = new Date();
     let bucketStart: (d: Date) => Date;
@@ -345,7 +390,7 @@ export function TaskDashboard({
         </Card>
       </div>
 
-      {/* Badges: By status */}
+      {/* Thống kê theo trạng thái: biểu đồ tròn + badges */}
       <Card className="shadow-sm border-border/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -354,27 +399,63 @@ export function TaskDashboard({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-xs text-muted-foreground mb-2">{t.dashboard.clickBadgeToFilter}</p>
-          <div className="flex flex-wrap gap-2">
-            {byStatus.map(({ status, count, label }, idx) => (
-              <Badge
-                key={status}
-                variant={isActive({ type: "status", value: status }) ? "default" : "secondary"}
-                className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
-                style={
-                  !isActive({ type: "status", value: status })
-                    ? { backgroundColor: `${COLORS[idx % COLORS.length]}20`, color: COLORS[idx % COLORS.length] }
-                    : undefined
-                }
-                onClick={() =>
-                  onBadgeFilter?.(
-                    isActive({ type: "status", value: status }) ? null : { type: "status", value: status }
-                  )
-                }
-              >
-                {label} ({count})
-              </Badge>
-            ))}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {statusChartData.length > 0 && (
+              <div className="h-[240px] w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={3}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={{ strokeWidth: 1 }}
+                    >
+                      {statusChartData.map((entry, index) => (
+                        <Cell key={`status-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, name: string) => [value, name]}
+                      contentStyle={{
+                        borderRadius: "8px",
+                        border: "1px solid hsl(var(--border))",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">{t.dashboard.clickBadgeToFilter}</p>
+              <div className="flex flex-wrap gap-2">
+                {byStatus.map(({ status, count, label }, idx) => (
+                  <Badge
+                    key={status}
+                    variant={isActive({ type: "status", value: status }) ? "default" : "secondary"}
+                    className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
+                    style={
+                      !isActive({ type: "status", value: status })
+                        ? { backgroundColor: `${COLORS[idx % COLORS.length]}20`, color: COLORS[idx % COLORS.length] }
+                        : undefined
+                    }
+                    onClick={() =>
+                      onBadgeFilter?.(
+                        isActive({ type: "status", value: status }) ? null : { type: "status", value: status }
+                      )
+                    }
+                  >
+                    {label} ({count})
+                  </Badge>
+                ))}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -406,7 +487,7 @@ export function TaskDashboard({
         </CardContent>
       </Card>
 
-      {/* Badges: By group */}
+      {/* Thống kê theo nhóm công việc: biểu đồ tròn + badges */}
       <Card className="shadow-sm border-border/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -414,26 +495,63 @@ export function TaskDashboard({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {byGroup.map(({ group, count }) => (
-              <Badge
-                key={group}
-                variant={isActive({ type: "group", value: group }) ? "default" : "outline"}
-                className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
-                onClick={() =>
-                  onBadgeFilter?.(
-                    isActive({ type: "group", value: group }) ? null : { type: "group", value: group }
-                  )
-                }
-              >
-                {group} ({count})
-              </Badge>
-            ))}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {groupChartData.length > 0 && (
+              <div className="h-[240px] w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={groupChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={3}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={{ strokeWidth: 1 }}
+                    >
+                      {groupChartData.map((entry, index) => (
+                        <Cell key={`group-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, name: string) => [value, name]}
+                      contentStyle={{
+                        borderRadius: "8px",
+                        border: "1px solid hsl(var(--border))",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">{t.dashboard.clickBadgeToFilter}</p>
+              <div className="flex flex-wrap gap-2">
+                {byGroup.map(({ group, count }) => (
+                  <Badge
+                    key={group}
+                    variant={isActive({ type: "group", value: group }) ? "default" : "outline"}
+                    className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
+                    onClick={() =>
+                      onBadgeFilter?.(
+                        isActive({ type: "group", value: group }) ? null : { type: "group", value: group }
+                      )
+                    }
+                  >
+                    {group} ({count})
+                  </Badge>
+                ))}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Schedule: In progress / Completed — On time vs Behind */}
+      {/* Thống kê phụ: Đang tiến hành / Đã hoàn thành — biểu đồ tròn + badges */}
       <Card className="shadow-sm border-border/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -441,75 +559,153 @@ export function TaskDashboard({
             {t.dashboard.inProgressGroup} / {t.dashboard.completedGroup}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1.5">{t.dashboard.inProgressGroup}</p>
-            <div className="flex flex-wrap gap-2">
-              <Badge
-                variant={
-                  isActive({ type: "schedule", value: "in_progress_on_time" }) ? "default" : "secondary"
-                }
-                className="cursor-pointer font-normal bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400 hover:opacity-90"
-                onClick={() =>
-                  onBadgeFilter?.(
-                    isActive({ type: "schedule", value: "in_progress_on_time" })
-                      ? null
-                      : { type: "schedule", value: "in_progress_on_time" }
-                  )
-                }
-              >
-                {t.dashboard.onSchedule} ({scheduleStats.inProgressOnTime})
-              </Badge>
-              <Badge
-                variant={
-                  isActive({ type: "schedule", value: "in_progress_behind" }) ? "default" : "secondary"
-                }
-                className="cursor-pointer font-normal bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400 hover:opacity-90"
-                onClick={() =>
-                  onBadgeFilter?.(
-                    isActive({ type: "schedule", value: "in_progress_behind" })
-                      ? null
-                      : { type: "schedule", value: "in_progress_behind" }
-                  )
-                }
-              >
-                {t.dashboard.behindSchedule} ({scheduleStats.inProgressBehind})
-              </Badge>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Đang tiến hành: đúng tiến độ vs chậm tiến độ */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-muted-foreground">{t.dashboard.inProgressGroup}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 items-center">
+                {scheduleChartData.inProgress.length > 0 ? (
+                  <div className="h-[180px] w-full max-w-[180px] mx-auto sm:mx-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={scheduleChartData.inProgress}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={65}
+                          paddingAngle={2}
+                          dataKey="value"
+                          nameKey="name"
+                          label={({ name, value }) => `${name}: ${value}`}
+                        >
+                          {scheduleChartData.inProgress.map((entry, index) => (
+                            <Cell key={`ip-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number, name: string) => [value, name]}
+                          contentStyle={{
+                            borderRadius: "8px",
+                            border: "1px solid hsl(var(--border))",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50 max-w-[180px]">
+                    {t.dashboard.noTasksFound}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Badge
+                    variant={
+                      isActive({ type: "schedule", value: "in_progress_on_time" }) ? "default" : "secondary"
+                    }
+                    className="cursor-pointer font-normal bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400 hover:opacity-90"
+                    onClick={() =>
+                      onBadgeFilter?.(
+                        isActive({ type: "schedule", value: "in_progress_on_time" })
+                          ? null
+                          : { type: "schedule", value: "in_progress_on_time" }
+                      )
+                    }
+                  >
+                    {t.dashboard.onSchedule} ({scheduleStats.inProgressOnTime})
+                  </Badge>
+                  <Badge
+                    variant={
+                      isActive({ type: "schedule", value: "in_progress_behind" }) ? "default" : "secondary"
+                    }
+                    className="cursor-pointer font-normal bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400 hover:opacity-90"
+                    onClick={() =>
+                      onBadgeFilter?.(
+                        isActive({ type: "schedule", value: "in_progress_behind" })
+                          ? null
+                          : { type: "schedule", value: "in_progress_behind" }
+                      )
+                    }
+                  >
+                    {t.dashboard.behindSchedule} ({scheduleStats.inProgressBehind})
+                  </Badge>
+                </div>
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1.5">{t.dashboard.completedGroup}</p>
-            <div className="flex flex-wrap gap-2">
-              <Badge
-                variant={
-                  isActive({ type: "schedule", value: "completed_on_time" }) ? "default" : "secondary"
-                }
-                className="cursor-pointer font-normal bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400 hover:opacity-90"
-                onClick={() =>
-                  onBadgeFilter?.(
-                    isActive({ type: "schedule", value: "completed_on_time" })
-                      ? null
-                      : { type: "schedule", value: "completed_on_time" }
-                  )
-                }
-              >
-                {t.dashboard.onSchedule} ({scheduleStats.completedOnTime})
-              </Badge>
-              <Badge
-                variant={
-                  isActive({ type: "schedule", value: "completed_behind" }) ? "default" : "secondary"
-                }
-                className="cursor-pointer font-normal bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400 hover:opacity-90"
-                onClick={() =>
-                  onBadgeFilter?.(
-                    isActive({ type: "schedule", value: "completed_behind" })
-                      ? null
-                      : { type: "schedule", value: "completed_behind" }
-                  )
-                }
-              >
-                {t.dashboard.behindSchedule} ({scheduleStats.completedBehind})
-              </Badge>
+            {/* Đã hoàn thành: đúng tiến độ vs chậm tiến độ */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-muted-foreground">{t.dashboard.completedGroup}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 items-center">
+                {scheduleChartData.completed.length > 0 ? (
+                  <div className="h-[180px] w-full max-w-[180px] mx-auto sm:mx-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={scheduleChartData.completed}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={65}
+                          paddingAngle={2}
+                          dataKey="value"
+                          nameKey="name"
+                          label={({ name, value }) => `${name}: ${value}`}
+                        >
+                          {scheduleChartData.completed.map((entry, index) => (
+                            <Cell key={`done-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number, name: string) => [value, name]}
+                          contentStyle={{
+                            borderRadius: "8px",
+                            border: "1px solid hsl(var(--border))",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50 max-w-[180px]">
+                    {t.dashboard.noTasksFound}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Badge
+                    variant={
+                      isActive({ type: "schedule", value: "completed_on_time" }) ? "default" : "secondary"
+                    }
+                    className="cursor-pointer font-normal bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400 hover:opacity-90"
+                    onClick={() =>
+                      onBadgeFilter?.(
+                        isActive({ type: "schedule", value: "completed_on_time" })
+                          ? null
+                          : { type: "schedule", value: "completed_on_time" }
+                      )
+                    }
+                  >
+                    {t.dashboard.onSchedule} ({scheduleStats.completedOnTime})
+                  </Badge>
+                  <Badge
+                    variant={
+                      isActive({ type: "schedule", value: "completed_behind" }) ? "default" : "secondary"
+                    }
+                    className="cursor-pointer font-normal bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400 hover:opacity-90"
+                    onClick={() =>
+                      onBadgeFilter?.(
+                        isActive({ type: "schedule", value: "completed_behind" })
+                          ? null
+                          : { type: "schedule", value: "completed_behind" }
+                      )
+                    }
+                  >
+                    {t.dashboard.behindSchedule} ({scheduleStats.completedBehind})
+                  </Badge>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
