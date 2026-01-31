@@ -10,6 +10,7 @@ import { db, pool } from "./db";
 import * as dbStorage from "./db-storage";
 import { passport } from "./auth";
 import { requireAuth, requireRole } from "./middleware";
+import multer from "multer";
 
 /** Feature flag: Work/Contract taxonomy (theo Docs refactor – tắt được khi rollback). */
 const FEATURE_WORK_ENABLED = process.env.FEATURE_WORK_ENABLED === "true";
@@ -376,6 +377,116 @@ export async function registerRoutes(
       res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch works" });
     }
   });
+  
+  // Generate Excel template for works import - MUST be before /api/works/:id route
+  app.get(api.works.downloadTemplate.path, requireAuth, async (_req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      
+      // Dynamic import xlsx
+      let XLSX: any;
+      try {
+        XLSX = await import("xlsx");
+        // Handle both default and named exports
+        if (XLSX.default) {
+          XLSX = XLSX.default;
+        }
+      } catch (xlsxErr) {
+        console.error("Error importing xlsx:", xlsxErr);
+        return res.status(500).json({ 
+          message: "Failed to load xlsx library: " + (xlsxErr instanceof Error ? xlsxErr.message : "Unknown error") 
+        });
+      }
+      
+      let components: any[] = [];
+      try {
+        components = await dbStorage.getComponentsFromDb();
+      } catch (compErr) {
+        console.error("Error fetching components:", compErr);
+        // Continue with empty components array
+      }
+      
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      
+      // Create data sheet with headers and sample row
+      const headers = [
+        "Hợp phần (Component)",
+        "Giai đoạn (Stage)",
+        "Tiêu đề tiếng Việt (Title VI)",
+        "Tiêu đề Hán Nôm (Title Hán Nôm)",
+        "Mã tài liệu (Document Code)",
+        "Số từ cơ sở (Base Word Count)",
+        "Số trang cơ sở (Base Page Count)",
+        "Hệ số ước tính (Estimate Factor)",
+        "Số từ ước tính (Estimate Word Count)",
+        "Số trang ước tính (Estimate Page Count)",
+        "Ghi chú (Note)"
+      ];
+      
+      const sampleRow = [
+        components[0]?.name || "Ví dụ: Hợp phần 1",
+        "Ví dụ: Giai đoạn 1",
+        "Ví dụ: Tiêu đề tiếng Việt",
+        "Ví dụ: Tiêu đề Hán Nôm",
+        "Ví dụ: DOC001",
+        "1000",
+        "10",
+        "1.2",
+        "1200",
+        "12",
+        "Ghi chú mẫu"
+      ];
+      
+      const wsData = [headers, sampleRow];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      
+      // Set column widths
+      ws["!cols"] = [
+        { wch: 25 }, // Component
+        { wch: 20 }, // Stage
+        { wch: 30 }, // Title VI
+        { wch: 30 }, // Title Hán Nôm
+        { wch: 20 }, // Document Code
+        { wch: 18 }, // Base Word Count
+        { wch: 18 }, // Base Page Count
+        { wch: 18 }, // Estimate Factor
+        { wch: 20 }, // Estimate Word Count
+        { wch: 20 }, // Estimate Page Count
+        { wch: 30 }  // Note
+      ];
+      
+      XLSX.utils.book_append_sheet(wb, ws, "Tác phẩm");
+      
+      // Create components reference sheet
+      const componentsData = [
+        ["Tên hợp phần (Component Name)"],
+        ...(components.length > 0 ? components.map(c => [c.name || ""]) : [["Chưa có hợp phần nào"]])
+      ];
+      const componentsWs = XLSX.utils.aoa_to_sheet(componentsData);
+      componentsWs["!cols"] = [{ wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, componentsWs, "Danh sách hợp phần");
+      
+      // Generate buffer
+      let buffer: Buffer;
+      try {
+        buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+      } catch (writeErr) {
+        console.error("Error writing Excel buffer:", writeErr);
+        return res.status(500).json({ message: "Failed to generate Excel file: " + (writeErr instanceof Error ? writeErr.message : "Unknown error") });
+      }
+      
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", "attachment; filename=mau-tac-pham-tuyen-dich.xlsx");
+      res.send(buffer);
+    } catch (err) {
+      console.error("Error generating template:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to generate template";
+      console.error("Full error:", err);
+      res.status(500).json({ message: errorMessage });
+    }
+  });
+  
   app.get(api.works.get.path, requireAuth, async (req, res) => {
     try {
       if (!db) return res.status(503).json({ message: "Database not configured" });
@@ -420,6 +531,140 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
       if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
       res.status(500).json({ message: err instanceof Error ? err.message : "Failed to update work" });
+    }
+  });
+  app.delete(api.works.delete.path, requireAuth, requireRole(UserRole.ADMIN, UserRole.MANAGER), async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      await dbStorage.deleteWork(id);
+      res.json({ message: "Đã xóa tác phẩm" });
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to delete work" });
+    }
+  });
+
+  // Import works from Excel - MUST be before /api/works/:id route
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  });
+  
+  app.post(api.works.import.path, requireAuth, requireRole(UserRole.ADMIN, UserRole.MANAGER), (req, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (err) {
+        console.error("Multer error:", err);
+        return res.status(400).json({ message: "File upload error: " + (err instanceof Error ? err.message : "Unknown error") });
+      }
+      next();
+    });
+  }, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      
+      const file = (req as any).file;
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded. Please select a file." });
+      }
+      
+      try {
+          // Dynamic import xlsx
+          let XLSX: any;
+          try {
+            const xlsxModule = await import("xlsx");
+            XLSX = xlsxModule.default || xlsxModule;
+          } catch (xlsxErr) {
+            console.error("Error importing xlsx:", xlsxErr);
+            return res.status(500).json({ 
+              message: "Failed to load xlsx library: " + (xlsxErr instanceof Error ? xlsxErr.message : "Unknown error") 
+            });
+          }
+          
+          // Parse Excel file
+          const workbook = XLSX.read(file.buffer, { type: "buffer" });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as any[][];
+          
+          if (data.length < 2) {
+            return res.status(400).json({ message: "File không có dữ liệu. Cần ít nhất 1 dòng dữ liệu (không tính header)." });
+          }
+          
+          // Get components for mapping
+          const components = await dbStorage.getComponentsFromDb();
+          const componentMap = new Map(components.map(c => [c.name?.toLowerCase().trim(), c.id]));
+          
+          const errors: string[] = [];
+          let successCount = 0;
+          
+          // Process rows (skip header row)
+          for (let i = 1; i < data.length; i++) {
+            const row = data[i];
+            if (!row || row.length === 0) continue;
+            
+            try {
+              // Map Excel columns to work fields
+              const componentName = String(row[0] || "").trim();
+              const stage = String(row[1] || "").trim() || null;
+              const titleVi = String(row[2] || "").trim() || null;
+              const titleHannom = String(row[3] || "").trim() || null;
+              const documentCode = String(row[4] || "").trim() || null;
+              const baseWordCount = row[5] ? parseInt(String(row[5]), 10) : null;
+              const basePageCount = row[6] ? parseInt(String(row[6]), 10) : null;
+              const estimateFactor = row[7] ? String(row[7]) : null;
+              const estimateWordCount = row[8] ? parseInt(String(row[8]), 10) : null;
+              const estimatePageCount = row[9] ? parseInt(String(row[9]), 10) : null;
+              const note = String(row[10] || "").trim() || null;
+              
+              // Validate required fields
+              if (!componentName) {
+                errors.push(`Dòng ${i + 1}: Thiếu tên hợp phần`);
+                continue;
+              }
+              
+              if (!titleVi) {
+                errors.push(`Dòng ${i + 1}: Thiếu tiêu đề tiếng Việt`);
+                continue;
+              }
+              
+              // Find component ID
+              const componentId = componentMap.get(componentName.toLowerCase());
+              if (!componentId) {
+                errors.push(`Dòng ${i + 1}: Không tìm thấy hợp phần "${componentName}"`);
+                continue;
+              }
+              
+              // Create work
+              const workData: any = {
+                componentId,
+                stage,
+                titleVi,
+                titleHannom,
+                documentCode,
+                baseWordCount: baseWordCount && !isNaN(baseWordCount) ? baseWordCount : null,
+                basePageCount: basePageCount && !isNaN(basePageCount) ? basePageCount : null,
+                estimateFactor: estimateFactor || null,
+                estimateWordCount: estimateWordCount && !isNaN(estimateWordCount) ? estimateWordCount : null,
+                estimatePageCount: estimatePageCount && !isNaN(estimatePageCount) ? estimatePageCount : null,
+                note,
+              };
+              
+              await dbStorage.createWork(workData);
+              successCount++;
+            } catch (rowErr) {
+              errors.push(`Dòng ${i + 1}: ${rowErr instanceof Error ? rowErr.message : "Lỗi không xác định"}`);
+            }
+          }
+          
+          res.json({ success: successCount, errors });
+        } catch (parseErr) {
+          console.error("Error parsing Excel:", parseErr);
+          res.status(400).json({ message: "Lỗi đọc file Excel: " + (parseErr instanceof Error ? parseErr.message : "Unknown error") });
+        }
+    } catch (err) {
+      console.error("Error importing works:", err);
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to import works" });
     }
   });
 

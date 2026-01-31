@@ -355,6 +355,21 @@ export const api = {
       }),
       responses: { 200: z.custom<typeof works.$inferSelect>(), 404: errorSchemas.notFound },
     },
+    delete: {
+      method: "DELETE" as const,
+      path: "/api/works/:id",
+      responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound },
+    },
+    downloadTemplate: {
+      method: "GET" as const,
+      path: "/api/works/template",
+      responses: { 200: z.any() },
+    },
+    import: {
+      method: "POST" as const,
+      path: "/api/works/import",
+      responses: { 200: z.object({ success: z.number(), errors: z.array(z.string()) }), 400: errorSchemas.validation },
+    },
   },
 
   translationContracts: {

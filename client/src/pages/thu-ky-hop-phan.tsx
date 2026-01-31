@@ -33,22 +33,250 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
+  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Pencil, FileText, Search, Trash2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Plus, Pencil, FileText, Search, Trash2, Upload, Filter, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { WorksImport } from "@/components/works-import";
+import { DateInput } from "@/components/ui/date-input";
+import { NumberInput } from "@/components/ui/number-input";
 import { formatDateDDMMYYYY, formatNumberAccounting, formatPercent, numberToVietnameseWords } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
+
+// Sort types for each table
+export type WorkSortColumn = "component" | "titleVi" | "titleHannom" | "stage" | "documentCode" | "baseWordCount" | "basePageCount" | "estimateFactor" | "estimateWordCount" | "estimatePageCount";
+export type TranslationContractSortColumn = "contractNumber" | "component" | "unitPrice" | "overviewValue" | "translationValue" | "contractValue" | "startDate" | "endDate" | "extensionStartDate" | "extensionEndDate" | "actualCompletionDate" | "actualWordCount" | "actualPageCount" | "completionRate" | "settlementValue";
+export type ProofreadingContractSortColumn = "contractNumber" | "component" | "proofreaderName" | "contractValue" | "startDate" | "endDate" | "actualCompletionDate" | "pageCount" | "rateRatio";
+
+// Sort functions with multi-column support
+function sortWorks(works: Work[], sortColumns: Array<{ column: WorkSortColumn; dir: "asc" | "desc" }>, getComponentName: (id: string | null) => string): Work[] {
+  if (sortColumns.length === 0) return works.slice();
+  
+  const sorted = works.slice().sort((a, b) => {
+    for (const { column: sortBy, dir: sortDir } of sortColumns) {
+      const dir = sortDir === "asc" ? 1 : -1;
+      let av: any, bv: any;
+      
+      if (sortBy === "component") {
+        av = getComponentName(a.componentId);
+        bv = getComponentName(b.componentId);
+        const as = String(av ?? "");
+        const bs = String(bv ?? "");
+        const cmp = as.localeCompare(bs, undefined, { numeric: true });
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else if (sortBy === "stage") {
+        av = a.stage ?? "";
+        bv = b.stage ?? "";
+        const as = String(av ?? "");
+        const bs = String(bv ?? "");
+        const cmp = as.localeCompare(bs, undefined, { numeric: true });
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else if (sortBy === "baseWordCount" || sortBy === "basePageCount" || sortBy === "estimateWordCount" || sortBy === "estimatePageCount") {
+        av = a[sortBy] ?? null;
+        bv = b[sortBy] ?? null;
+        if (av === null && bv === null) continue;
+        if (av === null) return 1 * dir;
+        if (bv === null) return -1 * dir;
+        const cmp = Number(av) - Number(bv);
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else if (sortBy === "estimateFactor") {
+        av = a.estimateFactor ?? null;
+        bv = b.estimateFactor ?? null;
+        if (av === null && bv === null) continue;
+        if (av === null) return 1 * dir;
+        if (bv === null) return -1 * dir;
+        const cmp = Number(av) - Number(bv);
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else {
+        av = a[sortBy as keyof Work] ?? "";
+        bv = b[sortBy as keyof Work] ?? "";
+        const as = String(av ?? "");
+        const bs = String(bv ?? "");
+        const cmp = as.localeCompare(bs, undefined, { numeric: true });
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      }
+    }
+    return 0;
+  });
+  return sorted;
+}
+
+function sortTranslationContracts(contracts: TranslationContract[], sortColumns: Array<{ column: TranslationContractSortColumn; dir: "asc" | "desc" }>, getComponentName: (id: string | null) => string): TranslationContract[] {
+  if (sortColumns.length === 0) return contracts.slice();
+  
+  const sorted = contracts.slice().sort((a, b) => {
+    for (const { column: sortBy, dir: sortDir } of sortColumns) {
+      const dir = sortDir === "asc" ? 1 : -1;
+      let av: any, bv: any;
+      
+      if (sortBy === "component") {
+        av = getComponentName(a.componentId);
+        bv = getComponentName(b.componentId);
+        const as = String(av ?? "");
+        const bs = String(bv ?? "");
+        const cmp = as.localeCompare(bs, undefined, { numeric: true });
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else if (sortBy === "startDate" || sortBy === "endDate" || sortBy === "extensionStartDate" || sortBy === "extensionEndDate" || sortBy === "actualCompletionDate") {
+        av = a[sortBy] ? (typeof a[sortBy] === "string" ? a[sortBy].slice(0, 10) : (a[sortBy] as Date).toISOString().slice(0, 10)) : "";
+        bv = b[sortBy] ? (typeof b[sortBy] === "string" ? b[sortBy].slice(0, 10) : (b[sortBy] as Date).toISOString().slice(0, 10)) : "";
+        if (av === bv) continue;
+        const cmp = av < bv ? -1 : 1;
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else if (sortBy === "unitPrice" || sortBy === "overviewValue" || sortBy === "translationValue" || sortBy === "contractValue" || sortBy === "actualWordCount" || sortBy === "actualPageCount" || sortBy === "completionRate" || sortBy === "settlementValue") {
+        av = a[sortBy] ?? null;
+        bv = b[sortBy] ?? null;
+        if (av === null && bv === null) continue;
+        if (av === null) return 1 * dir;
+        if (bv === null) return -1 * dir;
+        const avNum = typeof av === "string" ? parseFloat(av) : Number(av);
+        const bvNum = typeof bv === "string" ? parseFloat(bv) : Number(bv);
+        const cmp = avNum - bvNum;
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else {
+        av = a[sortBy as keyof TranslationContract] ?? "";
+        bv = b[sortBy as keyof TranslationContract] ?? "";
+        const as = String(av ?? "");
+        const bs = String(bv ?? "");
+        const cmp = as.localeCompare(bs, undefined, { numeric: true });
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      }
+    }
+    return 0;
+  });
+  return sorted;
+}
+
+function sortProofreadingContracts(contracts: ProofreadingContract[], sortColumns: Array<{ column: ProofreadingContractSortColumn; dir: "asc" | "desc" }>, getComponentName: (id: string | null) => string): ProofreadingContract[] {
+  if (sortColumns.length === 0) return contracts.slice();
+  
+  const sorted = contracts.slice().sort((a, b) => {
+    for (const { column: sortBy, dir: sortDir } of sortColumns) {
+      const dir = sortDir === "asc" ? 1 : -1;
+      let av: any, bv: any;
+      
+      if (sortBy === "component") {
+        av = getComponentName(a.componentId);
+        bv = getComponentName(b.componentId);
+        const as = String(av ?? "");
+        const bs = String(bv ?? "");
+        const cmp = as.localeCompare(bs, undefined, { numeric: true });
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else if (sortBy === "startDate" || sortBy === "endDate" || sortBy === "actualCompletionDate") {
+        av = a[sortBy] ? (typeof a[sortBy] === "string" ? a[sortBy].slice(0, 10) : (a[sortBy] as Date).toISOString().slice(0, 10)) : "";
+        bv = b[sortBy] ? (typeof b[sortBy] === "string" ? b[sortBy].slice(0, 10) : (b[sortBy] as Date).toISOString().slice(0, 10)) : "";
+        if (av === bv) continue;
+        const cmp = av < bv ? -1 : 1;
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else if (sortBy === "contractValue" || sortBy === "pageCount" || sortBy === "rateRatio") {
+        av = a[sortBy] ?? null;
+        bv = b[sortBy] ?? null;
+        if (av === null && bv === null) continue;
+        if (av === null) return 1 * dir;
+        if (bv === null) return -1 * dir;
+        if (sortBy === "rateRatio") {
+          av = typeof av === "string" ? parseFloat(av) : Number(av);
+          bv = typeof bv === "string" ? parseFloat(bv) : Number(bv);
+        }
+        const cmp = Number(av) - Number(bv);
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      } else {
+        av = a[sortBy as keyof ProofreadingContract] ?? "";
+        bv = b[sortBy as keyof ProofreadingContract] ?? "";
+        const as = String(av ?? "");
+        const bs = String(bv ?? "");
+        const cmp = as.localeCompare(bs, undefined, { numeric: true });
+        if (cmp !== 0) return cmp * dir;
+        continue; // Equal values, try next sort column
+      }
+    }
+    return 0;
+  });
+  return sorted;
+}
+
+// Sortable header component with multi-sort support
+function SortableHead<T extends string>({
+  label,
+  column,
+  sortColumns,
+  onSort,
+  className,
+}: {
+  label: React.ReactNode;
+  column: T;
+  sortColumns?: Array<{ column: T; dir: "asc" | "desc" }>;
+  onSort?: (column: T, e?: React.MouseEvent) => void;
+  className?: string;
+}) {
+  const sortInfo = sortColumns?.find((s) => s.column === column);
+  const sortIndex = sortInfo ? sortColumns!.findIndex((s) => s.column === column) : -1;
+  const Icon = sortInfo ? (sortInfo.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  
+  return (
+    <TableHead
+      className={className}
+      onClick={onSort ? (e) => onSort(column, e) : undefined}
+      role={onSort ? "button" : undefined}
+      tabIndex={onSort ? 0 : undefined}
+      onKeyDown={onSort ? (e) => e.key === "Enter" && onSort(column) : undefined}
+      title={onSort ? "Click để thêm sắp xếp. Click lại để đổi hướng (↑→↓). Click lần 3 để xóa." : undefined}
+    >
+      <div className={`flex items-center gap-1 ${onSort ? "cursor-pointer select-none hover:opacity-80" : ""}`}>
+        {label}
+        {onSort && (
+          <div className="flex items-center gap-0.5">
+            {sortIndex >= 0 && (
+              <span className="text-xs font-medium text-primary" title={`Ưu tiên ${sortIndex + 1}`}>
+                {sortIndex + 1}
+              </span>
+            )}
+            <Icon className="w-3.5 h-3.5 opacity-70" />
+          </div>
+        )}
+      </div>
+    </TableHead>
+  );
+}
 
 /** Quy ước: 350 chữ = 1 trang cơ sở. Số trang = số chữ / 350 (làm tròn). */
 const CHARS_PER_PAGE = 350;
@@ -68,6 +296,43 @@ function parseStageNumber(stage: string | null | undefined): string {
   if (stage == null || stage === "") return "";
   const num = String(stage).replace(/\D/g, "");
   return num || String(stage);
+}
+
+// Helper function to generate pagination items with ellipsis
+function generatePaginationItems(currentPage: number, totalPages: number): (number | "ellipsis")[] {
+  if (totalPages <= 7) {
+    // Show all pages if 7 or fewer
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const items: (number | "ellipsis")[] = [];
+
+  if (currentPage <= 3) {
+    // Show first 5 pages, ellipsis, last page
+    for (let i = 1; i <= 5; i++) {
+      items.push(i);
+    }
+    items.push("ellipsis");
+    items.push(totalPages);
+  } else if (currentPage >= totalPages - 2) {
+    // Show first page, ellipsis, last 5 pages
+    items.push(1);
+    items.push("ellipsis");
+    for (let i = totalPages - 4; i <= totalPages; i++) {
+      items.push(i);
+    }
+  } else {
+    // Show first page, ellipsis, current-1, current, current+1, ellipsis, last page
+    items.push(1);
+    items.push("ellipsis");
+    items.push(currentPage - 1);
+    items.push(currentPage);
+    items.push(currentPage + 1);
+    items.push("ellipsis");
+    items.push(totalPages);
+  }
+
+  return items;
 }
 
 // --- API fetchers ---
@@ -110,12 +375,23 @@ export default function ThuKyHopPhanPage() {
   const [taskSortBy, setTaskSortBy] = useState<TaskSortColumn | null>(null);
   const [taskSortDir, setTaskSortDir] = useState<"asc" | "desc">("asc");
   const [worksSearch, setWorksSearch] = useState("");
+  const [worksComponentFilter, setWorksComponentFilter] = useState<string>("all");
+  const [worksStageFilter, setWorksStageFilter] = useState<string>("all");
+  const [worksSortColumns, setWorksSortColumns] = useState<Array<{ column: WorkSortColumn; dir: "asc" | "desc" }>>([]);
   const [tcSearch, setTcSearch] = useState("");
+  const [tcComponentFilter, setTcComponentFilter] = useState<string>("all");
+  const [tcStageFilter, setTcStageFilter] = useState<string>("all");
+  const [tcSortColumns, setTcSortColumns] = useState<Array<{ column: TranslationContractSortColumn; dir: "asc" | "desc" }>>([]);
   const [pcSearch, setPcSearch] = useState("");
+  const [pcComponentFilter, setPcComponentFilter] = useState<string>("all");
+  const [pcStageFilter, setPcStageFilter] = useState<string>("all");
+  const [pcSortColumns, setPcSortColumns] = useState<Array<{ column: ProofreadingContractSortColumn; dir: "asc" | "desc" }>>([]);
 
   const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [workDialog, setWorkDialog] = useState<{ open: boolean; work: Work | null }>({ open: false, work: null });
+  const [deleteWorkConfirmOpen, setDeleteWorkConfirmOpen] = useState(false);
+  const [worksImportOpen, setWorksImportOpen] = useState(false);
   const [tcDialog, setTcDialog] = useState<{ open: boolean; contract: TranslationContract | null }>({ open: false, contract: null });
   const [pcDialog, setPcDialog] = useState<{ open: boolean; contract: ProofreadingContract | null }>({ open: false, contract: null });
 
@@ -140,9 +416,30 @@ export default function ThuKyHopPhanPage() {
     () => componentsList.map((c) => ({ id: c.id, name: c.name })),
     [componentsList]
   );
+  
+  // Get unique stages from works for filtering
+  const worksStages = useMemo(
+    () => Array.from(new Set(works.map((w) => w.stage).filter(Boolean))).sort() as string[],
+    [works]
+  );
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setWorksPage(1);
+  }, [worksComponentFilter, worksStageFilter, worksSearch]);
+
+  useEffect(() => {
+    setTcPage(1);
+  }, [tcComponentFilter, tcStageFilter, tcSearch]);
+
+  useEffect(() => {
+    setPcPage(1);
+  }, [pcComponentFilter, pcStageFilter, pcSearch]);
 
   const filteredTasks = useMemo(() => {
-    let list = tasks;
+    if (!tasks) return [];
+    // Filter tasks for "Thư ký hợp phần" group only (similar to Biên tập, CNTT, etc.)
+    let list = tasks.filter((t) => t.group === "Thư ký hợp phần");
     if (role === UserRole.EMPLOYEE) {
       list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
     }
@@ -168,41 +465,157 @@ export default function ThuKyHopPhanPage() {
     });
   };
 
+  const handleWorksSort = (column: WorkSortColumn, e?: React.MouseEvent) => {
+    setWorksSortColumns((prev) => {
+      const existingIndex = prev.findIndex((s) => s.column === column);
+      if (existingIndex >= 0) {
+        // Column exists: toggle direction or remove
+        if (prev[existingIndex].dir === "asc") {
+          // Change to desc
+          const newCols = [...prev];
+          newCols[existingIndex] = { column, dir: "desc" };
+          return newCols;
+        } else {
+          // Remove from list
+          return prev.filter((s) => s.column !== column);
+        }
+      } else {
+        // Add new column to the list (always add, not replace)
+        return [...prev, { column, dir: "asc" }];
+      }
+    });
+  };
+
+  const handleTcSort = (column: TranslationContractSortColumn, e?: React.MouseEvent) => {
+    setTcSortColumns((prev) => {
+      const existingIndex = prev.findIndex((s) => s.column === column);
+      if (existingIndex >= 0) {
+        if (prev[existingIndex].dir === "asc") {
+          const newCols = [...prev];
+          newCols[existingIndex] = { column, dir: "desc" };
+          return newCols;
+        } else {
+          return prev.filter((s) => s.column !== column);
+        }
+      } else {
+        // Add new column to the list (always add, not replace)
+        return [...prev, { column, dir: "asc" }];
+      }
+    });
+  };
+
+  const handlePcSort = (column: ProofreadingContractSortColumn, e?: React.MouseEvent) => {
+    setPcSortColumns((prev) => {
+      const existingIndex = prev.findIndex((s) => s.column === column);
+      if (existingIndex >= 0) {
+        if (prev[existingIndex].dir === "asc") {
+          const newCols = [...prev];
+          newCols[existingIndex] = { column, dir: "desc" };
+          return newCols;
+        } else {
+          return prev.filter((s) => s.column !== column);
+        }
+      } else {
+        // Add new column to the list (always add, not replace)
+        return [...prev, { column, dir: "asc" }];
+      }
+    });
+  };
+
   const getComponentName = (id: string | null) =>
     id ? (componentsList.find((c) => c.id === id)?.name ?? "—") : "—";
 
+  // Filter and sort ALL data from DB (before pagination)
+  // Order: Filter -> Sort -> Paginate (in paginatedWorks)
   const filteredWorks = useMemo(() => {
-    if (!worksSearch.trim()) return works;
-    const q = worksSearch.toLowerCase();
-    return works.filter(
-      (w) =>
-        (w.titleVi && w.titleVi.toLowerCase().includes(q)) ||
-        (w.stage && (formatStageDisplay(w.stage).toLowerCase().includes(q) || w.stage.includes(q))) ||
-        (w.documentCode && w.documentCode.toLowerCase().includes(q)) ||
-        getComponentName(w.componentId).toLowerCase().includes(q)
-    );
-  }, [works, worksSearch, componentsList]);
+    let list = works;
+    
+    // Step 1: Filter by component
+    if (worksComponentFilter && worksComponentFilter !== "all") {
+      list = list.filter((w) => w.componentId === worksComponentFilter);
+    }
+    
+    // Step 2: Filter by stage
+    if (worksStageFilter && worksStageFilter !== "all") {
+      list = list.filter((w) => w.stage === worksStageFilter);
+    }
+    
+    // Step 3: Filter by search
+    if (worksSearch.trim()) {
+      const q = worksSearch.toLowerCase();
+      list = list.filter(
+        (w) =>
+          (w.titleVi && w.titleVi.toLowerCase().includes(q)) ||
+          (w.stage && (formatStageDisplay(w.stage).toLowerCase().includes(q) || w.stage.includes(q))) ||
+          (w.documentCode && w.documentCode.toLowerCase().includes(q)) ||
+          getComponentName(w.componentId).toLowerCase().includes(q)
+      );
+    }
+    
+    // Step 4: Apply sorting to ALL filtered data (not just current page)
+    return sortWorks(list, worksSortColumns, getComponentName);
+  }, [works, worksSearch, worksComponentFilter, worksStageFilter, worksSortColumns, componentsList]);
 
+  // Filter and sort ALL data from DB (before pagination)
+  // Order: Filter -> Sort -> Paginate (in paginatedTc)
   const filteredTc = useMemo(() => {
-    if (!tcSearch.trim()) return translationContracts;
-    const q = tcSearch.toLowerCase();
-    return translationContracts.filter(
-      (c) =>
-        (c.contractNumber && c.contractNumber.toLowerCase().includes(q)) ||
-        getComponentName(c.componentId).toLowerCase().includes(q)
-    );
-  }, [translationContracts, tcSearch, componentsList]);
+    let list = translationContracts;
+    
+    // Step 1: Filter by component
+    if (tcComponentFilter && tcComponentFilter !== "all") {
+      list = list.filter((c) => c.componentId === tcComponentFilter);
+    }
+    
+    // Step 2: Filter by stage (via work)
+    if (tcStageFilter && tcStageFilter !== "all") {
+      const workIdsWithStage = new Set(works.filter((w) => w.stage === tcStageFilter).map((w) => w.id));
+      list = list.filter((c) => c.workId && workIdsWithStage.has(c.workId));
+    }
+    
+    // Step 3: Filter by search
+    if (tcSearch.trim()) {
+      const q = tcSearch.toLowerCase();
+      list = list.filter(
+        (c) =>
+          (c.contractNumber && c.contractNumber.toLowerCase().includes(q)) ||
+          getComponentName(c.componentId).toLowerCase().includes(q)
+      );
+    }
+    
+    // Step 4: Apply sorting to ALL filtered data (not just current page)
+    return sortTranslationContracts(list, tcSortColumns, getComponentName);
+  }, [translationContracts, tcSearch, tcComponentFilter, tcStageFilter, tcSortColumns, works, componentsList]);
 
+  // Filter and sort ALL data from DB (before pagination)
+  // Order: Filter -> Sort -> Paginate (in paginatedPc)
   const filteredPc = useMemo(() => {
-    if (!pcSearch.trim()) return proofreadingContracts;
-    const q = pcSearch.toLowerCase();
-    return proofreadingContracts.filter(
-      (c) =>
-        (c.contractNumber && c.contractNumber.toLowerCase().includes(q)) ||
-        (c.proofreaderName && c.proofreaderName.toLowerCase().includes(q)) ||
-        getComponentName(c.componentId).toLowerCase().includes(q)
-    );
-  }, [proofreadingContracts, pcSearch, componentsList]);
+    let list = proofreadingContracts;
+    
+    // Step 1: Filter by component
+    if (pcComponentFilter && pcComponentFilter !== "all") {
+      list = list.filter((c) => c.componentId === pcComponentFilter);
+    }
+    
+    // Step 2: Filter by stage (via work)
+    if (pcStageFilter && pcStageFilter !== "all") {
+      const workIdsWithStage = new Set(works.filter((w) => w.stage === pcStageFilter).map((w) => w.id));
+      list = list.filter((c) => c.workId && workIdsWithStage.has(c.workId));
+    }
+    
+    // Step 3: Filter by search
+    if (pcSearch.trim()) {
+      const q = pcSearch.toLowerCase();
+      list = list.filter(
+        (c) =>
+          (c.contractNumber && c.contractNumber.toLowerCase().includes(q)) ||
+          (c.proofreaderName && c.proofreaderName.toLowerCase().includes(q)) ||
+          getComponentName(c.componentId).toLowerCase().includes(q)
+      );
+    }
+    
+    // Step 4: Apply sorting to ALL filtered data (not just current page)
+    return sortProofreadingContracts(list, pcSortColumns, getComponentName);
+  }, [proofreadingContracts, pcSearch, pcComponentFilter, pcStageFilter, pcSortColumns, works, componentsList]);
 
   const paginatedTasks = useMemo(() => {
     const start = (tasksPage - 1) * PAGE_SIZE;
@@ -210,20 +623,24 @@ export default function ThuKyHopPhanPage() {
   }, [filteredTasks, tasksPage]);
   const totalTasksPages = Math.max(1, Math.ceil(filteredTasks.length / PAGE_SIZE));
 
+  // Paginate AFTER filtering and sorting (sort is applied to ALL data, not just current page)
   const paginatedWorks = useMemo(() => {
     const start = (worksPage - 1) * PAGE_SIZE;
+    // filteredWorks is already sorted, we just slice the correct page
     return filteredWorks.slice(start, start + PAGE_SIZE);
   }, [filteredWorks, worksPage]);
   const totalWorksPages = Math.max(1, Math.ceil(filteredWorks.length / PAGE_SIZE));
 
   const paginatedTc = useMemo(() => {
     const start = (tcPage - 1) * PAGE_SIZE;
+    // filteredTc is already sorted, we just slice the correct page
     return filteredTc.slice(start, start + PAGE_SIZE);
   }, [filteredTc, tcPage]);
   const totalTcPages = Math.max(1, Math.ceil(filteredTc.length / PAGE_SIZE));
 
   const paginatedPc = useMemo(() => {
     const start = (pcPage - 1) * PAGE_SIZE;
+    // filteredPc is already sorted, we just slice the correct page
     return filteredPc.slice(start, start + PAGE_SIZE);
   }, [filteredPc, pcPage]);
   const totalPcPages = Math.max(1, Math.ceil(filteredPc.length / PAGE_SIZE));
@@ -285,6 +702,27 @@ export default function ThuKyHopPhanPage() {
       queryClient.invalidateQueries({ queryKey: ["works"] });
       setWorkDialog({ open: false, work: null });
       toast({ title: "Thành công", description: "Đã cập nhật tác phẩm." });
+    },
+    onError: (e) => toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteWorkMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(buildUrl(api.works.delete.path, { id }), {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err.message as string) || "Xóa thất bại");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["works"] });
+      setWorkDialog({ open: false, work: null });
+      setDeleteWorkConfirmOpen(false);
+      toast({ title: "Thành công", description: "Đã xóa tác phẩm." });
     },
     onError: (e) => toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
   });
@@ -484,23 +922,70 @@ export default function ThuKyHopPhanPage() {
         {/* Tab: Danh mục tác phẩm (Works) */}
         <TabsContent value="works" className="mt-6">
           <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="p-4 border-b flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Tìm tác phẩm..."
-                    className="pl-9"
-                    value={worksSearch}
-                    onChange={(e) => setWorksSearch(e.target.value)}
-                  />
+            <div className="p-4 border-b flex flex-col gap-4 bg-muted/20">
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Tìm tác phẩm..."
+                      className="pl-9"
+                      value={worksSearch}
+                      onChange={(e) => setWorksSearch(e.target.value)}
+                    />
+                  </div>
+                  <Badge variant="secondary">{filteredWorks.length} tác phẩm</Badge>
                 </div>
-                <Badge variant="secondary">{filteredWorks.length} tác phẩm</Badge>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setWorksImportOpen(true)}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Import Excel
+                  </Button>
+                  <Button size="sm" onClick={() => setWorkDialog({ open: true, work: null })}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Thêm tác phẩm
+                  </Button>
+                </div>
               </div>
-              <Button size="sm" onClick={() => setWorkDialog({ open: true, work: null })}>
-                <Plus className="w-4 h-4 mr-2" />
-                Thêm tác phẩm
-              </Button>
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+                  <Filter className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium">Lọc:</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Hợp phần</Label>
+                  <Select value={worksComponentFilter} onValueChange={setWorksComponentFilter}>
+                    <SelectTrigger className="w-[180px] h-9 bg-background">
+                      <SelectValue placeholder="Tất cả hợp phần" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả hợp phần</SelectItem>
+                      {componentsList.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Giai đoạn</Label>
+                  <Select value={worksStageFilter} onValueChange={setWorksStageFilter}>
+                    <SelectTrigger className="w-[140px] h-9 bg-background">
+                      <SelectValue placeholder="Tất cả giai đoạn" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả giai đoạn</SelectItem>
+                      {worksStages.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {formatStageDisplay(s)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
             {worksLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -512,16 +997,16 @@ export default function ThuKyHopPhanPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Hợp phần</TableHead>
-                        <TableHead>Tiêu đề (VI)</TableHead>
-                        <TableHead>Tiêu đề Hán Nôm</TableHead>
-                        <TableHead>Giai đoạn</TableHead>
-                        <TableHead>Mã tài liệu</TableHead>
-                        <TableHead className="text-right">Số chữ gốc</TableHead>
-                        <TableHead className="text-right">Số trang gốc</TableHead>
-                        <TableHead className="text-right">Hệ số ước tính</TableHead>
-                        <TableHead className="text-right">Số chữ ước tính</TableHead>
-                        <TableHead className="text-right">Số trang ước tính</TableHead>
+                        <SortableHead label="Hợp phần" column="component" sortColumns={worksSortColumns} onSort={handleWorksSort} />
+                        <SortableHead label="Tiêu đề (VI)" column="titleVi" sortColumns={worksSortColumns} onSort={handleWorksSort} />
+                        <SortableHead label="Tiêu đề Hán Nôm" column="titleHannom" sortColumns={worksSortColumns} onSort={handleWorksSort} />
+                        <SortableHead label="Giai đoạn" column="stage" sortColumns={worksSortColumns} onSort={handleWorksSort} />
+                        <SortableHead label="Mã tài liệu" column="documentCode" sortColumns={worksSortColumns} onSort={handleWorksSort} />
+                        <SortableHead label="Số chữ gốc" column="baseWordCount" sortColumns={worksSortColumns} onSort={handleWorksSort} className="text-right" />
+                        <SortableHead label="Số trang gốc" column="basePageCount" sortColumns={worksSortColumns} onSort={handleWorksSort} className="text-right" />
+                        <SortableHead label="Hệ số ước tính" column="estimateFactor" sortColumns={worksSortColumns} onSort={handleWorksSort} className="text-right" />
+                        <SortableHead label="Số chữ ước tính" column="estimateWordCount" sortColumns={worksSortColumns} onSort={handleWorksSort} className="text-right" />
+                        <SortableHead label="Số trang ước tính" column="estimatePageCount" sortColumns={worksSortColumns} onSort={handleWorksSort} className="text-right" />
                         <TableHead className="max-w-[120px] truncate">Ghi chú</TableHead>
                         <TableHead className="w-[80px]"></TableHead>
                       </TableRow>
@@ -565,11 +1050,17 @@ export default function ThuKyHopPhanPage() {
                         <PaginationItem>
                           <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setWorksPage((p) => Math.max(1, p - 1)); }} className={worksPage <= 1 ? "pointer-events-none opacity-50" : ""} />
                         </PaginationItem>
-                        {Array.from({ length: Math.min(5, totalWorksPages) }, (_, i) => {
-                          const p = i + 1;
+                        {generatePaginationItems(worksPage, totalWorksPages).map((item, idx) => {
+                          if (item === "ellipsis") {
+                            return (
+                              <PaginationItem key={`ellipsis-${idx}`}>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            );
+                          }
                           return (
-                            <PaginationItem key={p}>
-                              <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setWorksPage(p); }} isActive={worksPage === p}>{p}</PaginationLink>
+                            <PaginationItem key={item}>
+                              <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setWorksPage(item); }} isActive={worksPage === item}>{item}</PaginationLink>
                             </PaginationItem>
                           );
                         })}
@@ -588,18 +1079,59 @@ export default function ThuKyHopPhanPage() {
         {/* Tab: Hợp đồng dịch thuật */}
         <TabsContent value="translation" className="mt-6">
           <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="p-4 border-b flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Tìm số HĐ..." className="pl-9" value={tcSearch} onChange={(e) => setTcSearch(e.target.value)} />
+            <div className="p-4 border-b flex flex-col gap-4 bg-muted/20">
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Tìm số HĐ..." className="pl-9" value={tcSearch} onChange={(e) => setTcSearch(e.target.value)} />
+                  </div>
+                  <Badge variant="secondary">{filteredTc.length} hợp đồng</Badge>
                 </div>
-                <Badge variant="secondary">{filteredTc.length} hợp đồng</Badge>
+                <Button size="sm" onClick={() => setTcDialog({ open: true, contract: null })}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Thêm hợp đồng dịch thuật
+                </Button>
               </div>
-              <Button size="sm" onClick={() => setTcDialog({ open: true, contract: null })}>
-                <Plus className="w-4 h-4 mr-2" />
-                Thêm hợp đồng dịch thuật
-              </Button>
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+                  <Filter className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium">Lọc:</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Hợp phần</Label>
+                  <Select value={tcComponentFilter} onValueChange={setTcComponentFilter}>
+                    <SelectTrigger className="w-[180px] h-9 bg-background">
+                      <SelectValue placeholder="Tất cả hợp phần" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả hợp phần</SelectItem>
+                      {componentsList.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Giai đoạn</Label>
+                  <Select value={tcStageFilter} onValueChange={setTcStageFilter}>
+                    <SelectTrigger className="w-[140px] h-9 bg-background">
+                      <SelectValue placeholder="Tất cả giai đoạn" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả giai đoạn</SelectItem>
+                      {worksStages.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {formatStageDisplay(s)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
             {tcLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -611,21 +1143,21 @@ export default function ThuKyHopPhanPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Số HĐ</TableHead>
-                        <TableHead>Hợp phần</TableHead>
-                        <TableHead className="text-right">Đơn giá</TableHead>
-                        <TableHead className="text-right">Kinh phí viết bài tổng quan</TableHead>
-                        <TableHead className="text-right">Kinh phí dịch thuật</TableHead>
-                        <TableHead className="text-right">Giá trị HĐ</TableHead>
-                        <TableHead>Bắt đầu</TableHead>
-                        <TableHead>Kết thúc</TableHead>
-                        <TableHead>Gia hạn từ</TableHead>
-                        <TableHead>Gia hạn đến</TableHead>
-                        <TableHead>Hoàn thành TT</TableHead>
-                        <TableHead className="text-right">Số chữ TT</TableHead>
-                        <TableHead className="text-right">Số trang TT</TableHead>
-                        <TableHead className="text-right">Tỷ lệ HT</TableHead>
-                        <TableHead className="text-right">Giá quyết toán</TableHead>
+                        <SortableHead label="Số HĐ" column="contractNumber" sortColumns={tcSortColumns} onSort={handleTcSort} />
+                        <SortableHead label="Hợp phần" column="component" sortColumns={tcSortColumns} onSort={handleTcSort} />
+                        <SortableHead label="Đơn giá" column="unitPrice" sortColumns={tcSortColumns} onSort={handleTcSort} className="text-right" />
+                        <SortableHead label="Kinh phí viết bài tổng quan" column="overviewValue" sortColumns={tcSortColumns} onSort={handleTcSort} className="text-right" />
+                        <SortableHead label="Kinh phí dịch thuật" column="translationValue" sortColumns={tcSortColumns} onSort={handleTcSort} className="text-right" />
+                        <SortableHead label="Giá trị HĐ" column="contractValue" sortColumns={tcSortColumns} onSort={handleTcSort} className="text-right" />
+                        <SortableHead label="Bắt đầu" column="startDate" sortColumns={tcSortColumns} onSort={handleTcSort} />
+                        <SortableHead label="Kết thúc" column="endDate" sortColumns={tcSortColumns} onSort={handleTcSort} />
+                        <SortableHead label="Gia hạn từ" column="extensionStartDate" sortColumns={tcSortColumns} onSort={handleTcSort} />
+                        <SortableHead label="Gia hạn đến" column="extensionEndDate" sortColumns={tcSortColumns} onSort={handleTcSort} />
+                        <SortableHead label="Hoàn thành TT" column="actualCompletionDate" sortColumns={tcSortColumns} onSort={handleTcSort} />
+                        <SortableHead label="Số chữ TT" column="actualWordCount" sortColumns={tcSortColumns} onSort={handleTcSort} className="text-right" />
+                        <SortableHead label="Số trang TT" column="actualPageCount" sortColumns={tcSortColumns} onSort={handleTcSort} className="text-right" />
+                        <SortableHead label="Tỷ lệ HT" column="completionRate" sortColumns={tcSortColumns} onSort={handleTcSort} className="text-right" />
+                        <SortableHead label="Giá quyết toán" column="settlementValue" sortColumns={tcSortColumns} onSort={handleTcSort} className="text-right" />
                         <TableHead className="max-w-[100px] truncate">Ghi chú</TableHead>
                         <TableHead className="w-[80px]"></TableHead>
                       </TableRow>
@@ -699,11 +1231,17 @@ export default function ThuKyHopPhanPage() {
                         <PaginationItem>
                           <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setTcPage((p) => Math.max(1, p - 1)); }} className={tcPage <= 1 ? "pointer-events-none opacity-50" : ""} />
                         </PaginationItem>
-                        {Array.from({ length: Math.min(5, totalTcPages) }, (_, i) => {
-                          const p = i + 1;
+                        {generatePaginationItems(tcPage, totalTcPages).map((item, idx) => {
+                          if (item === "ellipsis") {
+                            return (
+                              <PaginationItem key={`ellipsis-${idx}`}>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            );
+                          }
                           return (
-                            <PaginationItem key={p}>
-                              <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setTcPage(p); }} isActive={tcPage === p}>{p}</PaginationLink>
+                            <PaginationItem key={item}>
+                              <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setTcPage(item); }} isActive={tcPage === item}>{item}</PaginationLink>
                             </PaginationItem>
                           );
                         })}
@@ -722,18 +1260,59 @@ export default function ThuKyHopPhanPage() {
         {/* Tab: Hợp đồng hiệu đính */}
         <TabsContent value="proofreading" className="mt-6">
           <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="p-4 border-b flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Tìm số HĐ / biên tập viên..." className="pl-9" value={pcSearch} onChange={(e) => setPcSearch(e.target.value)} />
+            <div className="p-4 border-b flex flex-col gap-4 bg-muted/20">
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Tìm số HĐ / biên tập viên..." className="pl-9" value={pcSearch} onChange={(e) => setPcSearch(e.target.value)} />
+                  </div>
+                  <Badge variant="secondary">{filteredPc.length} hợp đồng</Badge>
                 </div>
-                <Badge variant="secondary">{filteredPc.length} hợp đồng</Badge>
+                <Button size="sm" onClick={() => setPcDialog({ open: true, contract: null })}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Thêm hợp đồng hiệu đính
+                </Button>
               </div>
-              <Button size="sm" onClick={() => setPcDialog({ open: true, contract: null })}>
-                <Plus className="w-4 h-4 mr-2" />
-                Thêm hợp đồng hiệu đính
-              </Button>
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+                  <Filter className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium">Lọc:</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Hợp phần</Label>
+                  <Select value={pcComponentFilter} onValueChange={setPcComponentFilter}>
+                    <SelectTrigger className="w-[180px] h-9 bg-background">
+                      <SelectValue placeholder="Tất cả hợp phần" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả hợp phần</SelectItem>
+                      {componentsList.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Giai đoạn</Label>
+                  <Select value={pcStageFilter} onValueChange={setPcStageFilter}>
+                    <SelectTrigger className="w-[140px] h-9 bg-background">
+                      <SelectValue placeholder="Tất cả giai đoạn" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả giai đoạn</SelectItem>
+                      {worksStages.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {formatStageDisplay(s)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
             {pcLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -745,15 +1324,15 @@ export default function ThuKyHopPhanPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Số HĐ</TableHead>
-                        <TableHead>Hợp phần</TableHead>
-                        <TableHead>Biên tập viên</TableHead>
-                        <TableHead className="text-right">Số trang</TableHead>
-                        <TableHead className="text-right">Tỷ lệ</TableHead>
-                        <TableHead className="text-right">Giá trị HĐ</TableHead>
-                        <TableHead>Bắt đầu</TableHead>
-                        <TableHead>Kết thúc</TableHead>
-                        <TableHead>Hoàn thành TT</TableHead>
+                        <SortableHead label="Số HĐ" column="contractNumber" sortColumns={pcSortColumns} onSort={handlePcSort} />
+                        <SortableHead label="Hợp phần" column="component" sortColumns={pcSortColumns} onSort={handlePcSort} />
+                        <SortableHead label="Biên tập viên" column="proofreaderName" sortColumns={pcSortColumns} onSort={handlePcSort} />
+                        <SortableHead label="Số trang" column="pageCount" sortColumns={pcSortColumns} onSort={handlePcSort} className="text-right" />
+                        <SortableHead label="Tỷ lệ" column="rateRatio" sortColumns={pcSortColumns} onSort={handlePcSort} className="text-right" />
+                        <SortableHead label="Giá trị HĐ" column="contractValue" sortColumns={pcSortColumns} onSort={handlePcSort} className="text-right" />
+                        <SortableHead label="Bắt đầu" column="startDate" sortColumns={pcSortColumns} onSort={handlePcSort} />
+                        <SortableHead label="Kết thúc" column="endDate" sortColumns={pcSortColumns} onSort={handlePcSort} />
+                        <SortableHead label="Hoàn thành TT" column="actualCompletionDate" sortColumns={pcSortColumns} onSort={handlePcSort} />
                         <TableHead className="max-w-[100px] truncate">Ghi chú</TableHead>
                         <TableHead className="w-[80px]"></TableHead>
                       </TableRow>
@@ -801,11 +1380,17 @@ export default function ThuKyHopPhanPage() {
                         <PaginationItem>
                           <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setPcPage((p) => Math.max(1, p - 1)); }} className={pcPage <= 1 ? "pointer-events-none opacity-50" : ""} />
                         </PaginationItem>
-                        {Array.from({ length: Math.min(5, totalPcPages) }, (_, i) => {
-                          const p = i + 1;
+                        {generatePaginationItems(pcPage, totalPcPages).map((item, idx) => {
+                          if (item === "ellipsis") {
+                            return (
+                              <PaginationItem key={`ellipsis-${idx}`}>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            );
+                          }
                           return (
-                            <PaginationItem key={p}>
-                              <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setPcPage(p); }} isActive={pcPage === p}>{p}</PaginationLink>
+                            <PaginationItem key={item}>
+                              <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setPcPage(item); }} isActive={pcPage === item}>{item}</PaginationLink>
                             </PaginationItem>
                           );
                         })}
@@ -854,8 +1439,34 @@ export default function ThuKyHopPhanPage() {
               if (workDialog.work) updateWorkMutation.mutate({ id: workDialog.work.id, data });
               else createWorkMutation.mutate(data);
             }}
+            onDelete={workDialog.work ? () => setDeleteWorkConfirmOpen(true) : undefined}
             isPending={createWorkMutation.isPending || updateWorkMutation.isPending}
+            isDeleting={deleteWorkMutation.isPending}
           />
+          <AlertDialog open={deleteWorkConfirmOpen} onOpenChange={setDeleteWorkConfirmOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Xác nhận xóa tác phẩm</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Bạn có chắc chắn muốn xóa tác phẩm "{workDialog.work?.titleVi || workDialog.work?.id}"? 
+                  Hành động này không thể hoàn tác.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Hủy</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (workDialog.work) {
+                      deleteWorkMutation.mutate(workDialog.work.id);
+                    }
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Xóa
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </DialogContent>
       </Dialog>
 
@@ -903,6 +1514,9 @@ export default function ThuKyHopPhanPage() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Works Import Dialog */}
+      <WorksImport open={worksImportOpen} onOpenChange={setWorksImportOpen} />
     </div>
   );
 }
@@ -1121,9 +1735,9 @@ function ContractStagesSection({
             >
               <Input type="number" min={1} placeholder="1, 2, 3..." value={form.stageCode} onChange={(e) => setForm((f) => ({ ...f, stageCode: e.target.value.replace(/\D/g, "") }))} />
               <Input type="number" placeholder="Thứ tự" value={form.stageOrder} onChange={(e) => setForm((f) => ({ ...f, stageOrder: e.target.value }))} />
-              <Input type="date" placeholder="Bắt đầu" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} />
-              <Input type="date" placeholder="Kết thúc" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} />
-              <Input type="date" placeholder="HT thực tế" value={form.actualCompletionDate} onChange={(e) => setForm((f) => ({ ...f, actualCompletionDate: e.target.value }))} className="sm:col-span-2" />
+              <DateInput value={form.startDate || null} onChange={(v) => setForm((f) => ({ ...f, startDate: v || "" }))} placeholder="Bắt đầu" />
+              <DateInput value={form.endDate || null} onChange={(v) => setForm((f) => ({ ...f, endDate: v || "" }))} placeholder="Kết thúc" />
+              <DateInput value={form.actualCompletionDate || null} onChange={(v) => setForm((f) => ({ ...f, actualCompletionDate: v || "" }))} placeholder="HT thực tế" className="sm:col-span-2" />
               <Input placeholder="Ghi chú" value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} className="sm:col-span-2" />
               <div className="col-span-2 flex gap-2">
                 <Button type="submit" size="sm" disabled={createMutation.isPending || updateMutation.isPending}>
@@ -1145,12 +1759,16 @@ function WorkForm({
   work,
   componentsList,
   onSubmit,
+  onDelete,
   isPending,
+  isDeleting,
 }: {
   work: Work | null;
   componentsList: Component[];
   onSubmit: (data: Record<string, unknown>) => void;
+  onDelete?: () => void;
   isPending: boolean;
+  isDeleting?: boolean;
 }) {
   const [componentId, setComponentId] = useState(work?.componentId ?? "");
   const [titleVi, setTitleVi] = useState(work?.titleVi ?? "");
@@ -1219,11 +1837,9 @@ function WorkForm({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="grid gap-2">
           <Label>Số chữ gốc</Label>
-          <Input
-            type="number"
+          <NumberInput
             value={baseWordCount}
-            onChange={(e) => {
-              const v = e.target.value;
+            onChange={(v) => {
               setBaseWordCount(v);
               const n = v ? parseInt(v, 10) : NaN;
               setBasePageCount(!isNaN(n) ? String(charsToPages(n)) : "");
@@ -1233,12 +1849,13 @@ function WorkForm({
                 setEstimatePageCount(String(charsToPages(Math.round(n * f))));
               }
             }}
+            decimals={0}
             placeholder="0"
           />
         </div>
         <div className="grid gap-2">
           <Label>Số trang gốc <span className="text-muted-foreground font-normal">(350 chữ/trang)</span></Label>
-          <Input type="number" value={basePageCount} onChange={(e) => setBasePageCount(e.target.value)} placeholder="0" />
+          <NumberInput value={basePageCount} onChange={setBasePageCount} decimals={0} placeholder="0" />
         </div>
         <div className="grid gap-2">
           <Label>Hệ số ước tính</Label>
@@ -1262,29 +1879,40 @@ function WorkForm({
         </div>
         <div className="grid gap-2">
           <Label>Số chữ ước tính <span className="text-muted-foreground font-normal">(số chữ gốc × hệ số)</span></Label>
-          <Input
-            type="number"
+          <NumberInput
             value={estimateWordCount}
-            onChange={(e) => {
-              const v = e.target.value;
+            onChange={(v) => {
               setEstimateWordCount(v);
               const n = v ? parseInt(v, 10) : NaN;
               setEstimatePageCount(!isNaN(n) ? String(charsToPages(n)) : "");
             }}
+            decimals={0}
             placeholder="0"
           />
         </div>
         <div className="grid gap-2">
           <Label>Số trang ước tính <span className="text-muted-foreground font-normal">(350 chữ/trang)</span></Label>
-          <Input type="number" value={estimatePageCount} onChange={(e) => setEstimatePageCount(e.target.value)} placeholder="0" />
+          <NumberInput value={estimatePageCount} onChange={setEstimatePageCount} decimals={0} placeholder="0" />
         </div>
       </div>
       <div className="grid gap-2">
         <Label>Ghi chú</Label>
         <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú" />
       </div>
-      <DialogFooter>
-        <Button type="submit" disabled={isPending}>
+      <DialogFooter className="flex justify-between">
+        {work && onDelete && (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onDelete}
+            disabled={isPending || isDeleting}
+          >
+            {isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            <Trash2 className="w-4 h-4 mr-2" />
+            Xóa
+          </Button>
+        )}
+        <Button type="submit" disabled={isPending || isDeleting} className={work && onDelete ? "ml-auto" : ""}>
           {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           {work ? "Cập nhật" : "Thêm"}
         </Button>
@@ -1397,125 +2025,179 @@ function TranslationContractForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto pr-2 flex-1 min-h-0">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 gap-4">
-        <div className="grid gap-2">
-          <Label>Số hợp đồng</Label>
-          <Input value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} placeholder="Số HĐ" />
-        </div>
-        <div className="grid gap-2">
-          <Label>Hợp phần</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={componentId}
-            onChange={(e) => setComponentId(e.target.value)}
-          >
-            <option value="">— Chọn hợp phần —</option>
-            {componentsList.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-2 sm:col-span-2">
-          <Label>Tác phẩm</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={workId}
-            onChange={(e) => setWorkId(e.target.value)}
-          >
-            <option value="">— Chọn tác phẩm —</option>
-            {works.map((w) => (
-              <option key={w.id} value={w.id}>{w.titleVi ?? w.documentCode ?? w.id.slice(0, 8)}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-4">
-        <div className="grid gap-2">
-          <Label>Đơn giá</Label>
-          <Input type="number" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} placeholder="0" />
-          {unitPrice.trim() !== "" && !Number.isNaN(parseFloat(unitPrice)) && (
-            <p className="text-xs text-muted-foreground">{numberToVietnameseWords(unitPrice)}</p>
-          )}
-        </div>
-        <div className="grid gap-2">
-          <Label>Kinh phí viết bài tổng quan</Label>
-          <Input type="number" step="0.01" value={overviewValue} onChange={(e) => setOverviewValue(e.target.value)} placeholder="0" />
-          {overviewValue.trim() !== "" && !Number.isNaN(parseFloat(overviewValue)) && (
-            <p className="text-xs text-muted-foreground">{numberToVietnameseWords(overviewValue)}</p>
-          )}
-        </div>
-        <div className="grid gap-2">
-          <Label>Kinh phí dịch thuật <span className="text-muted-foreground font-normal">(đơn giá × số trang dự tính)</span></Label>
-          <Input type="number" step="0.01" readOnly value={translationValue} placeholder="0" className="bg-muted" />
-          {translationValue.trim() !== "" && !Number.isNaN(parseFloat(translationValue)) && (
-            <p className="text-xs text-muted-foreground">{numberToVietnameseWords(translationValue)}</p>
-          )}
-        </div>
-        <div className="grid gap-2">
-          <Label>Giá trị hợp đồng <span className="text-muted-foreground font-normal">(kinh phí dịch thuật + kinh phí tổng quan)</span></Label>
-          <Input type="number" step="0.01" readOnly value={contractValue} placeholder="0" className="bg-muted" />
-          {contractValue.trim() !== "" && !Number.isNaN(parseFloat(contractValue)) && (
-            <p className="text-xs text-muted-foreground">{numberToVietnameseWords(contractValue)}</p>
-          )}
+    <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto pr-2 flex-1 min-h-0 max-h-[80vh]">
+      {/* Thông tin cơ bản */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground">Thông tin cơ bản</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid gap-2">
+            <Label>Số hợp đồng</Label>
+            <Input value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} placeholder="Số HĐ" />
+          </div>
+          <div className="grid gap-2">
+            <Label>Hợp phần</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={componentId}
+              onChange={(e) => setComponentId(e.target.value)}
+            >
+              <option value="">— Chọn hợp phần —</option>
+              {componentsList.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Tác phẩm</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={workId}
+              onChange={(e) => setWorkId(e.target.value)}
+            >
+              <option value="">— Chọn tác phẩm —</option>
+              {works.map((w) => (
+                <option key={w.id} value={w.id}>{w.titleVi ?? w.documentCode ?? w.id.slice(0, 8)}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-4">
-        <div className="grid gap-2">
-          <Label>Ngày bắt đầu</Label>
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Ngày kết thúc</Label>
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Hoàn thành thực tế</Label>
-          <Input type="date" value={actualCompletionDate} onChange={(e) => setActualCompletionDate(e.target.value)} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Gia hạn từ</Label>
-          <Input type="date" value={extensionStartDate} onChange={(e) => setExtensionStartDate(e.target.value)} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Gia hạn đến</Label>
-          <Input type="date" value={extensionEndDate} onChange={(e) => setExtensionEndDate(e.target.value)} />
+
+      {/* Giá trị hợp đồng */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground">Giá trị hợp đồng</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid gap-2">
+            <Label>Đơn giá (VNĐ/trang)</Label>
+            <NumberInput
+              value={unitPrice}
+              onChange={setUnitPrice}
+              decimals={2}
+              showFormatted={true}
+              placeholder="0"
+            />
+            {unitPrice.trim() !== "" && !Number.isNaN(parseFloat(unitPrice)) && (
+              <p className="text-xs text-muted-foreground">{numberToVietnameseWords(unitPrice)}</p>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label>Kinh phí viết bài tổng quan (VNĐ)</Label>
+            <NumberInput
+              value={overviewValue}
+              onChange={setOverviewValue}
+              decimals={2}
+              showFormatted={true}
+              placeholder="0"
+            />
+            {overviewValue.trim() !== "" && !Number.isNaN(parseFloat(overviewValue)) && (
+              <p className="text-xs text-muted-foreground">{numberToVietnameseWords(overviewValue)}</p>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label>Kinh phí dịch thuật (VNĐ) <span className="text-muted-foreground font-normal text-xs">(đơn giá × số trang dự tính)</span></Label>
+            <NumberInput
+              value={translationValue}
+              onChange={setTranslationValue}
+              decimals={2}
+              showFormatted={true}
+              placeholder="0"
+              className="bg-muted"
+              readOnly
+            />
+            {translationValue.trim() !== "" && !Number.isNaN(parseFloat(translationValue)) && (
+              <p className="text-xs text-muted-foreground">{numberToVietnameseWords(translationValue)}</p>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label>Giá trị hợp đồng (VNĐ) <span className="text-muted-foreground font-normal text-xs">(kinh phí dịch thuật + kinh phí tổng quan)</span></Label>
+            <NumberInput
+              value={contractValue}
+              onChange={setContractValue}
+              decimals={2}
+              showFormatted={true}
+              placeholder="0"
+              className="bg-muted"
+              readOnly
+            />
+            {contractValue.trim() !== "" && !Number.isNaN(parseFloat(contractValue)) && (
+              <p className="text-xs text-muted-foreground">{numberToVietnameseWords(contractValue)}</p>
+            )}
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-4">
-        <div className="grid gap-2">
-          <Label>Số chữ thực tế</Label>
-          <Input
-            type="number"
-            value={actualWordCount}
-            onChange={(e) => {
-              const v = e.target.value;
-              setActualWordCount(v);
-              const n = v ? parseInt(v, 10) : NaN;
-              setActualPageCount(!isNaN(n) ? String(charsToPages(n)) : "");
-            }}
-            placeholder="0"
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>Số trang thực tế <span className="text-muted-foreground font-normal">(350 chữ/trang)</span></Label>
-          <Input type="number" value={actualPageCount} onChange={(e) => setActualPageCount(e.target.value)} placeholder="0" />
-        </div>
-        <div className="grid gap-2">
-          <Label>Tỷ lệ hoàn thành (%)</Label>
-          <Input type="number" step="0.01" value={completionRate} onChange={(e) => setCompletionRate(e.target.value)} placeholder="0" />
-        </div>
-        <div className="grid gap-2">
-          <Label>Giá quyết toán</Label>
-          <Input type="number" step="0.01" value={settlementValue} onChange={(e) => setSettlementValue(e.target.value)} placeholder="0" />
-          {settlementValue.trim() !== "" && !Number.isNaN(parseFloat(settlementValue)) && (
-            <p className="text-xs text-muted-foreground">{numberToVietnameseWords(settlementValue)}</p>
-          )}
+
+      {/* Thời gian */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground">Thời gian</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid gap-2">
+            <Label>Ngày bắt đầu</Label>
+            <DateInput value={startDate || null} onChange={(v) => setStartDate(v || "")} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Ngày kết thúc</Label>
+            <DateInput value={endDate || null} onChange={(v) => setEndDate(v || "")} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Hoàn thành thực tế</Label>
+            <DateInput value={actualCompletionDate || null} onChange={(v) => setActualCompletionDate(v || "")} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Gia hạn từ</Label>
+            <DateInput value={extensionStartDate || null} onChange={(v) => setExtensionStartDate(v || "")} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Gia hạn đến</Label>
+            <DateInput value={extensionEndDate || null} onChange={(v) => setExtensionEndDate(v || "")} />
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 gap-4">
-        <div className="grid gap-2 sm:col-span-2">
-          <Label>Ghi chú</Label>
+
+      {/* Thực tế và quyết toán */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground">Thực tế và quyết toán</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid gap-2">
+            <Label>Số chữ thực tế</Label>
+            <NumberInput
+              value={actualWordCount}
+              onChange={(v) => {
+                setActualWordCount(v);
+                const n = v ? parseInt(v, 10) : NaN;
+                setActualPageCount(!isNaN(n) ? String(charsToPages(n)) : "");
+              }}
+              decimals={0}
+              placeholder="0"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Số trang thực tế <span className="text-muted-foreground font-normal text-xs">(350 chữ/trang)</span></Label>
+            <NumberInput value={actualPageCount} onChange={setActualPageCount} decimals={0} placeholder="0" />
+          </div>
+          <div className="grid gap-2">
+            <Label>Tỷ lệ hoàn thành (%)</Label>
+            <Input type="number" step="0.01" value={completionRate} onChange={(e) => setCompletionRate(e.target.value)} placeholder="0" />
+          </div>
+          <div className="grid gap-2">
+            <Label>Giá quyết toán (VNĐ)</Label>
+            <NumberInput
+              value={settlementValue}
+              onChange={setSettlementValue}
+              decimals={2}
+              showFormatted={true}
+              placeholder="0"
+            />
+            {settlementValue.trim() !== "" && !Number.isNaN(parseFloat(settlementValue)) && (
+              <p className="text-xs text-muted-foreground">{numberToVietnameseWords(settlementValue)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Ghi chú */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground">Ghi chú</h3>
+        <div className="grid gap-2">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú" />
         </div>
       </div>
@@ -1608,24 +2290,24 @@ function ProofreadingContractForm({
           <Input value={proofreaderName} onChange={(e) => setProofreaderName(e.target.value)} placeholder="Họ tên" />
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="grid gap-2">
           <Label>Số trang</Label>
-          <Input type="number" value={pageCount} onChange={(e) => setPageCount(e.target.value)} placeholder="0" />
+          <NumberInput value={pageCount} onChange={setPageCount} decimals={0} placeholder="0" />
         </div>
         <div className="grid gap-2">
           <Label>Tỷ lệ (%)</Label>
           <Input type="number" step="0.01" value={rateRatio} onChange={(e) => setRateRatio(e.target.value)} placeholder="0" />
         </div>
         <div className="grid gap-2">
-          <Label>Giá trị hợp đồng</Label>
-          <Input type="number" step="0.01" value={contractValue} onChange={(e) => setContractValue(e.target.value)} placeholder="0" />
+          <Label>Giá trị hợp đồng (VNĐ)</Label>
+          <NumberInput value={contractValue} onChange={setContractValue} decimals={2} showFormatted={true} placeholder="0" />
           {contractValue.trim() !== "" && !Number.isNaN(parseFloat(contractValue)) && (
             <p className="text-xs text-muted-foreground">{numberToVietnameseWords(contractValue)}</p>
           )}
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="grid gap-2">
           <Label>Tác phẩm</Label>
           <select
@@ -1653,18 +2335,18 @@ function ProofreadingContractForm({
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="grid gap-2">
           <Label>Ngày bắt đầu</Label>
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <DateInput value={startDate || null} onChange={(v) => setStartDate(v || "")} />
         </div>
         <div className="grid gap-2">
           <Label>Ngày kết thúc</Label>
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <DateInput value={endDate || null} onChange={(v) => setEndDate(v || "")} />
         </div>
         <div className="grid gap-2">
           <Label>Hoàn thành thực tế</Label>
-          <Input type="date" value={actualCompletionDate} onChange={(e) => setActualCompletionDate(e.target.value)} />
+          <DateInput value={actualCompletionDate || null} onChange={(v) => setActualCompletionDate(v || "")} />
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 gap-4">

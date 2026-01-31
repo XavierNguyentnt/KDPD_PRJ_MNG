@@ -13,27 +13,57 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
+  const hasDropdown = (props as { captionLayout?: string }).captionLayout === "dropdown";
+  
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
-        nav: "space-x-1 flex items-center",
+        month: "space-y-3",
+        caption: hasDropdown 
+          ? "flex justify-center pt-2 pb-2 relative items-center mb-1" 
+          : "flex justify-center pt-1 relative items-center",
+        caption_label: "text-sm font-medium hidden",
+        caption_dropdowns: "flex justify-center items-center gap-2.5 pb-1",
+        dropdown: cn(
+          "h-8 px-3 pr-8 text-sm font-medium",
+          "border border-input bg-background rounded-md",
+          "hover:bg-accent hover:text-accent-foreground",
+          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+          "transition-colors cursor-pointer",
+          "shadow-sm"
+        ),
+        dropdown_month: cn(
+          "h-8 px-3 pr-8 text-sm font-medium min-w-[130px]",
+          "border border-input bg-background rounded-md",
+          "hover:bg-accent hover:text-accent-foreground",
+          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+          "transition-colors cursor-pointer",
+          "shadow-sm"
+        ),
+        dropdown_year: cn(
+          "h-8 px-3 pr-8 text-sm font-medium min-w-[100px]",
+          "border border-input bg-background rounded-md",
+          "hover:bg-accent hover:text-accent-foreground",
+          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+          "transition-colors cursor-pointer",
+          "shadow-sm"
+        ),
+        dropdown_icon: "hidden",
+        nav: hasDropdown ? "hidden" : "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
           "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
-        table: "w-full border-collapse space-y-1",
-        head_row: "flex",
+        table: "w-full border-collapse space-y-1 mt-1",
+        head_row: "flex mb-1",
         head_cell:
-          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
-        row: "flex w-full mt-2",
+          "text-muted-foreground rounded-md w-9 font-medium text-[0.75rem] uppercase tracking-wider",
+        row: "flex w-full mt-1",
         cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
         day: cn(
           buttonVariants({ variant: "ghost" }),

@@ -7,7 +7,19 @@ type ReqUser = UserWithRolesAndGroups | ({ role?: string | null; employeeGroup?:
 function userHasRole(u: ReqUser, allowed: UserRoleType[]): boolean {
   const roles = (u as UserWithRolesAndGroups).roles;
   if (Array.isArray(roles) && roles.length) {
-    return roles.some((r) => allowed.includes(r.name as UserRoleType) || allowed.some((a) => a.toLowerCase() === r.code));
+    return roles.some((r) => {
+      const roleName = r.name as UserRoleType;
+      if (allowed.includes(roleName)) {
+        return true;
+      }
+      // Compare by code (case-insensitive)
+      const roleCode = (r.code && typeof r.code === "string") ? r.code : String(r.code || "");
+      return allowed.some((a) => {
+        if (a == null) return false;
+        const aStr = typeof a === "string" ? a : String(a);
+        return aStr.toLowerCase() === roleCode.toLowerCase();
+      });
+    });
   }
   const leg = (u as { role?: string | null }).role;
   return !!leg && allowed.includes(leg as UserRoleType);

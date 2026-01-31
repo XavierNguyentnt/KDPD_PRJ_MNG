@@ -394,6 +394,12 @@ export async function updateWork(id: string, data: Partial<InsertWork>): Promise
   return rows[0];
 }
 
+export async function deleteWork(id: string): Promise<void> {
+  const existing = await getWorkById(id);
+  if (!existing) throw new Error(`Work ${id} not found`);
+  await requireDb().delete(works).where(eq(works.id, id));
+}
+
 // -----------------------------------------------------------------------------
 // Translation contracts CRUD
 // -----------------------------------------------------------------------------

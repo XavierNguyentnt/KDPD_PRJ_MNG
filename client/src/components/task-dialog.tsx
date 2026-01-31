@@ -838,7 +838,12 @@ export function TaskDialog({
         payload.actualCompletedAt = maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
         const nMulti = staffMulti.length;
         const mMulti = staffMulti.filter((s) => !!s.completedAt || s.status === "completed").length;
-        payload.progress = nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
+        const calculatedProgress = nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
+        payload.progress = calculatedProgress;
+        // Tự động cập nhật status = "Completed" khi progress đạt 100%
+        if (calculatedProgress >= 100 && selectedGroup === "CV chung") {
+          payload.status = "Completed";
+        }
       }
       // Nhóm khác (fallback): một người thực hiện — tiến độ = (100%/1)*M (M = 1 nếu hoàn thành, 0 nếu chưa)
       else if (selectedGroup !== "Biên tập" && data.assigneeId) {
@@ -1114,7 +1119,12 @@ export function TaskDialog({
       (payload as Record<string, unknown>).actualCompletedAt = maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
       const nMulti = staffMulti.length;
       const mMulti = staffMulti.filter((s) => !!s.completedAt || s.status === "completed").length;
-      (payload as Record<string, unknown>).progress = nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
+      const calculatedProgress = nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
+      (payload as Record<string, unknown>).progress = calculatedProgress;
+      // Tự động cập nhật status = "Completed" khi progress đạt 100%
+      if (calculatedProgress >= 100 && task.group === "CV chung") {
+        (payload as Record<string, unknown>).status = "Completed";
+      }
     }
     // Nhóm khác (fallback): một người thực hiện — tiến độ = (100%/1)*M (M = 1 nếu hoàn thành, 0 nếu chưa)
     else if (canEditMeta && task.group !== "Biên tập") {

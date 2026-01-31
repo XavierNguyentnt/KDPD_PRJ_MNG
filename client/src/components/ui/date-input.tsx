@@ -49,7 +49,32 @@ const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
     }, [value]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setDisplay(e.target.value);
+      let inputValue = e.target.value;
+      
+      // Loại bỏ tất cả ký tự không phải số để kiểm tra
+      const numbersOnly = inputValue.replace(/\D/g, "");
+      
+      // Nếu người dùng nhập đúng 8 chữ số (ddmmyyyy), tự động format thành dd/mm/yyyy
+      if (numbersOnly.length === 8) {
+        const day = numbersOnly.slice(0, 2);
+        const month = numbersOnly.slice(2, 4);
+        const year = numbersOnly.slice(4, 8);
+        inputValue = `${day}/${month}/${year}`;
+        // Tự động validate và cập nhật nếu hợp lệ
+        const yyyyMmDd = parseDDMMYYYYToYYYYMMDD(inputValue);
+        if (yyyyMmDd) {
+          onChange(yyyyMmDd);
+          lastValueRef.current = yyyyMmDd;
+        }
+      }
+      // Nếu đang nhập số liền (không có dấu /) và chưa đủ 8 chữ số
+      else if (numbersOnly.length > 0 && numbersOnly.length < 8 && !inputValue.includes("/")) {
+        // Cho phép nhập số liền, không format cho đến khi đủ 8 chữ số
+        inputValue = numbersOnly;
+      }
+      // Nếu có dấu / hoặc đang format thủ công, giữ nguyên
+      
+      setDisplay(inputValue);
     };
 
     const handleBlur = () => {
@@ -106,12 +131,15 @@ const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
               <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
+          <PopoverContent className="w-auto p-0 shadow-lg" align="end">
             <Calendar
               mode="single"
               selected={selectedDate}
               onSelect={handleSelect}
               initialFocus
+              captionLayout="dropdown"
+              fromYear={1900}
+              toYear={2100}
             />
           </PopoverContent>
         </Popover>
