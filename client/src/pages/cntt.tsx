@@ -112,8 +112,7 @@ export default function CNTTPage() {
       <section>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Công nghệ thông tin / Quét trùng lặp</h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground">
               Quản lý công việc CNTT và quét trùng lặp với nhiều nhân sự thực hiện
             </p>
           </div>

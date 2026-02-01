@@ -33,7 +33,8 @@ export function TaskStats({ tasks }: TaskStatsProps) {
       'Not Started': t.status.notStarted,
       'In Progress': t.status.inProgress,
       'Completed': t.status.completed,
-      'Blocked': t.status.blocked,
+      'Pending': t.status.pending,
+      'Cancelled': t.status.cancelled,
     };
     tasks.forEach(task => {
       counts[task.status] = (counts[task.status] || 0) + 1;

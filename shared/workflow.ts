@@ -10,7 +10,7 @@ export enum StageStatus {
   NOT_STARTED = 'not_started',
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
-  BLOCKED = 'blocked',
+  PENDING = 'pending',
   CANCELLED = 'cancelled',
 }
 
@@ -187,10 +187,10 @@ export class BienTapWorkflowHelpers {
     );
     if (anyRoundInProgress) return StageStatus.IN_PROGRESS;
     
-    const anyRoundBlocked = workflow.rounds.some(round => 
-      round.status === StageStatus.BLOCKED
+    const anyRoundPending = workflow.rounds.some(round => 
+      round.status === StageStatus.PENDING
     );
-    if (anyRoundBlocked) return StageStatus.BLOCKED;
+    if (anyRoundPending) return StageStatus.PENDING;
     
     return StageStatus.NOT_STARTED;
   }

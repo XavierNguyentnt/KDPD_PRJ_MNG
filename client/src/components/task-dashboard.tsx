@@ -57,7 +57,7 @@ interface TaskDashboardProps {
   activeBadgeFilter?: DashboardBadgeFilter | null;
 }
 
-const STATUS_ORDER = ["Not Started", "In Progress", "Completed", "Blocked", "Cancelled"];
+const STATUS_ORDER = ["Not Started", "In Progress", "Completed", "Pending", "Cancelled"];
 const COLORS = ["#64748b", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 
 function getStatusLabel(status: string, t: ReturnType<typeof useI18n>["t"]): string {
@@ -65,7 +65,7 @@ function getStatusLabel(status: string, t: ReturnType<typeof useI18n>["t"]): str
     "Not Started": t.status.notStarted,
     "In Progress": t.status.inProgress,
     Completed: t.status.completed,
-    Blocked: t.status.blocked,
+    Pending: t.status.pending,
     Cancelled: t.status.cancelled,
   };
   return map[status] ?? status;

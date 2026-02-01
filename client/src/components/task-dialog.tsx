@@ -59,7 +59,7 @@ interface TaskDialogProps {
   task: TaskWithAssignmentDetails | null;
   onCreate?: (task: any) => void;
   isCreating?: boolean;
-  /** Nhóm mặc định khi tạo mới (theo trang đang mở: CV chung, Biên tập, Thiết kế, CNTT) */
+  /** Nhóm mặc định khi tạo mới (theo trang đang mở: Công việc chung, Biên tập, Thiết kế, CNTT) */
   defaultGroup?: string;
 }
 
@@ -103,7 +103,7 @@ const updateSchema = z.object({
   relatedWorkId: z.string().uuid().nullable().optional(),
   relatedContractId: z.string().uuid().nullable().optional(),
   taskType: z.string().optional(),
-  // Đánh giá của Người kiểm soát (CV chung / CNTT / Quét): tot | kha | khong_tot | khong_hoan_thanh
+  // Đánh giá của Người kiểm soát (Công việc chung / CNTT / Quét): tot | kha | khong_tot | khong_hoan_thanh
   vote: z.string().nullable().optional(),
 });
 
@@ -226,9 +226,10 @@ export function TaskDialog({
       !!task &&
       (task.group === "Biên tập" ||
         task.group === "Thiết kế" ||
-        task.group === "CV chung" ||
+        task.group === "Công việc chung" ||
         task.group === "CNTT" ||
-        task.group === "Quét trùng lặp"),
+        task.group === "Quét trùng lặp" ||
+        task.group === "Thư ký hợp phần"),
   });
   const updateMutation = useUpdateTask();
   const deleteMutation = useDeleteTask();
@@ -236,9 +237,10 @@ export function TaskDialog({
   const effectiveTask = (
     task?.group === "Biên tập" ||
     task?.group === "Thiết kế" ||
-    task?.group === "CV chung" ||
+    task?.group === "Công việc chung" ||
     task?.group === "CNTT" ||
-    task?.group === "Quét trùng lặp"
+    task?.group === "Quét trùng lặp" ||
+    task?.group === "Thư ký hợp phần"
       ? taskWithAssignments ?? task
       : task
   ) as TaskWithAssignmentDetails | null;
@@ -246,11 +248,11 @@ export function TaskDialog({
   // Get available groups from all tasks
   const availableGroups = useMemo(() => {
     if (!allTasks)
-      return ["CV chung", "Biên tập", "Thiết kế", "CNTT", "Quét trùng lặp"];
+      return ["Công việc chung", "Biên tập", "Thiết kế", "CNTT", "Quét trùng lặp", "Thư ký hợp phần"];
     const groups = new Set(allTasks.map((t) => t.group).filter(Boolean));
     return Array.from(groups).length > 0
       ? Array.from(groups)
-      : ["CV chung", "Biên tập", "Thiết kế", "CNTT", "Quét trùng lặp"];
+      : ["Công việc chung", "Biên tập", "Thiết kế", "CNTT", "Quét trùng lặp", "Thư ký hợp phần"];
   }, [allTasks]);
 
   const formatDateForInput = (v: string | Date | null | undefined): string => {
@@ -268,7 +270,7 @@ export function TaskDialog({
       priority: task?.priority || "Medium",
       assignee: task?.assignee ?? "",
       assigneeId: task?.assigneeId ?? null,
-      group: task?.group || "CV chung",
+      group: task?.group || "Công việc chung",
       progress: task?.progress || 0,
       notes: task?.notes || "",
       dueDate: task?.dueDate
@@ -296,16 +298,18 @@ export function TaskDialog({
 
   const isBienTapGroup =
     form.watch("group") === "Biên tập" || effectiveTask?.group === "Biên tập";
-  /** Nhóm có thể liên kết tài liệu dịch thuật: Biên tập, CV chung, Thiết kế, CNTT */
+  /** Nhóm có thể liên kết tài liệu dịch thuật: Biên tập, Công việc chung, Thiết kế, CNTT, Thư ký hợp phần */
   const isWorkLinkGroup =
     form.watch("group") === "Biên tập" ||
-    form.watch("group") === "CV chung" ||
+    form.watch("group") === "Công việc chung" ||
     form.watch("group") === "Thiết kế" ||
     form.watch("group") === "CNTT" ||
+    form.watch("group") === "Thư ký hợp phần" ||
     effectiveTask?.group === "Biên tập" ||
-    effectiveTask?.group === "CV chung" ||
+    effectiveTask?.group === "Công việc chung" ||
     effectiveTask?.group === "Thiết kế" ||
-    effectiveTask?.group === "CNTT";
+    effectiveTask?.group === "CNTT" ||
+    effectiveTask?.group === "Thư ký hợp phần";
   const { data: worksList = [] } = useQuery({
     queryKey: ["works"],
     queryFn: async () => {
@@ -338,14 +342,15 @@ export function TaskDialog({
     enabled: open && isBienTapGroup,
   });
 
-  // Assignments theo task (CV chung / CNTT / Quét) để hiển thị nhân sự khi mở chi tiết
+  // Assignments theo task (Công việc chung / CNTT / Quét / Thư ký hợp phần) để hiển thị nhân sự khi mở chi tiết
   const needTaskAssignments =
     open &&
     !!task?.id &&
-    (task.group === "CV chung" ||
+    (task.group === "Công việc chung" ||
       task.group === "CNTT" ||
       task.group === "Quét trùng lặp" ||
-      task.group === "Thiết kế");
+      task.group === "Thiết kế" ||
+      task.group === "Thư ký hợp phần");
   const { data: taskAssignmentsList = [] } = useQuery({
     queryKey: ["task-assignments-by-task", task?.id],
     queryFn: async () => {
@@ -414,7 +419,7 @@ export function TaskDialog({
   });
   const [thietKeTroLyList, setThietKeTroLyList] = useState<ThietKeSlot[]>([]);
 
-  // CV chung / CNTT: nhiều nhân sự (Nhân sự 1, 2, ... Người kiểm soát) — mỗi người có ngày nhận, hạn, ngày hoàn thành thực tế, trạng thái, tiến độ
+  // Công việc chung / CNTT: nhiều nhân sự (Nhân sự 1, 2, ... Người kiểm soát) — mỗi người có ngày nhận, hạn, ngày hoàn thành thực tế, trạng thái, tiến độ
   type MultiAssigneeSlot = {
     id: string;
     label: string;
@@ -430,11 +435,11 @@ export function TaskDialog({
     { id: "1", label: "Nhân sự 1", displayName: "", userId: null, receivedAt: null, dueDate: null, completedAt: null, status: "not_started", progress: 0 },
   ]);
 
-  // Khi mở task CV chung / CNTT / Quét: điền multiAssigneesList từ assignments + users
+  // Khi mở task Công việc chung / CNTT / Quét / Thư ký hợp phần: điền multiAssigneesList từ assignments + users
   useEffect(() => {
     if (
       !task?.id ||
-      !(task.group === "CV chung" || task.group === "CNTT" || task.group === "Quét trùng lặp")
+      !(task.group === "Công việc chung" || task.group === "CNTT" || task.group === "Quét trùng lặp" || task.group === "Thư ký hợp phần")
     )
       return;
     if (!Array.isArray(taskAssignmentsList)) return;
@@ -570,6 +575,20 @@ export function TaskDialog({
     if (hasComplete) form.setValue("status", "Completed");
   }, [form, thietKeKtvChinh.completeDate, thietKeTroLyList]);
 
+  // Tự động cập nhật status = "Completed" khi tất cả nhân sự đã nhập ngày hoàn thành (Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần)
+  useEffect(() => {
+    const group = form.watch("group");
+    if (group !== "Công việc chung" && group !== "CNTT" && group !== "Quét trùng lặp" && group !== "Thư ký hợp phần") return;
+    
+    const staffMulti = multiAssigneesList.filter((s) => s.label !== "Người kiểm soát" && s.userId);
+    if (staffMulti.length === 0) return;
+    
+    const allCompleted = staffMulti.every((s) => !!s.completedAt);
+    if (allCompleted) {
+      form.setValue("status", "Completed");
+    }
+  }, [form, multiAssigneesList]);
+
   // Reset form when task changes; for Biên tập tasks populate workflow stage fields (use effectiveTask to get assignments when available)
   useEffect(() => {
     if (effectiveTask) {
@@ -579,7 +598,7 @@ export function TaskDialog({
         priority: effectiveTask.priority,
         assignee: effectiveTask.assignee ?? "",
         assigneeId: effectiveTask.assigneeId ?? null,
-        group: effectiveTask.group || "CV chung",
+        group: effectiveTask.group || "Công việc chung",
         progress: effectiveTask.progress || 0,
         notes: effectiveTask.notes || "",
         dueDate: effectiveTask.dueDate
@@ -666,7 +685,7 @@ export function TaskDialog({
         priority: "Medium",
         assignee: "",
         assigneeId: null,
-        group: defaultGroup || "CV chung",
+        group: defaultGroup || "Công việc chung",
         progress: 0,
         notes: "",
         dueDate: null,
@@ -732,7 +751,7 @@ export function TaskDialog({
         form.setError("title", { message: t.task.titleRequired });
         return;
       }
-      const selectedGroup = data.group || "CV chung";
+      const selectedGroup = data.group || "Công việc chung";
       const hasActualCompletedAtCreate =
         data.actualCompletedAt != null &&
         String(data.actualCompletedAt).trim() !== "";
@@ -808,11 +827,12 @@ export function TaskDialog({
         const mTc = thietKeAssignments.filter((a) => !!a.completedAt).length;
         payload.progress = nTc === 0 ? 0 : Math.round((100 / nTc) * mTc);
       }
-      // CV chung / CNTT / Quét trùng lặp: gửi assignments từ danh sách nhiều nhân sự
+      // Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần: gửi assignments từ danh sách nhiều nhân sự
       else if (
-        (selectedGroup === "CV chung" ||
+        (selectedGroup === "Công việc chung" ||
           selectedGroup === "CNTT" ||
-          selectedGroup === "Quét trùng lặp") &&
+          selectedGroup === "Quét trùng lặp" ||
+          selectedGroup === "Thư ký hợp phần") &&
         multiAssigneesList.some((s) => s.userId)
       ) {
         let nhanSuIndex = 0;
@@ -841,7 +861,7 @@ export function TaskDialog({
         const calculatedProgress = nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
         payload.progress = calculatedProgress;
         // Tự động cập nhật status = "Completed" khi progress đạt 100%
-        if (calculatedProgress >= 100 && selectedGroup === "CV chung") {
+        if (calculatedProgress >= 100 && (selectedGroup === "Công việc chung" || selectedGroup === "Thư ký hợp phần")) {
           payload.status = "Completed";
         }
       }
@@ -874,7 +894,7 @@ export function TaskDialog({
         payload.taskType = "PROOFREADING";
         payload.relatedWorkId = data.relatedWorkId || null;
         payload.relatedContractId = data.relatedContractId || null;
-      } else if (selectedGroup === "CV chung") {
+      } else if (selectedGroup === "Công việc chung") {
         payload.taskType = "GENERAL";
         payload.relatedWorkId = data.relatedWorkId || null;
       } else if (selectedGroup === "Thiết kế") {
@@ -882,6 +902,9 @@ export function TaskDialog({
         payload.relatedWorkId = data.relatedWorkId || null;
       } else if (selectedGroup === "CNTT") {
         payload.taskType = "IT";
+        payload.relatedWorkId = data.relatedWorkId || null;
+      } else if (selectedGroup === "Thư ký hợp phần") {
+        payload.taskType = "GENERAL";
         payload.relatedWorkId = data.relatedWorkId || null;
       }
       if (selectedGroup === "Biên tập") {
@@ -1019,9 +1042,10 @@ export function TaskDialog({
             data.notes != null && String(data.notes).trim() !== ""
               ? String(data.notes).trim()
               : null,
-          ...((task.group === "CV chung" ||
+          ...((task.group === "Công việc chung" ||
             task.group === "CNTT" ||
-            task.group === "Quét trùng lặp") && { vote: data.vote ?? null }),
+            task.group === "Quét trùng lặp" ||
+            task.group === "Thư ký hợp phần") && { vote: data.vote ?? null }),
         }
       : {
           progress: data.progress,
@@ -1029,9 +1053,10 @@ export function TaskDialog({
             data.notes != null && String(data.notes).trim() !== ""
               ? String(data.notes).trim()
               : null,
-          ...((task.group === "CV chung" ||
+          ...((task.group === "Công việc chung" ||
             task.group === "CNTT" ||
-            task.group === "Quét trùng lặp") && { vote: data.vote ?? null }),
+            task.group === "Quét trùng lặp" ||
+            task.group === "Thư ký hợp phần") && { vote: data.vote ?? null }),
         };
 
     // Thiết kế: gửi assignments từ KTV chính + Trợ lý thiết kế
@@ -1089,12 +1114,13 @@ export function TaskDialog({
       const mTc = thietKeAssignments.filter((a) => !!a.completedAt).length;
       (payload as Record<string, unknown>).progress = nTc === 0 ? 0 : Math.round((100 / nTc) * mTc);
     }
-    // CV chung / CNTT / Quét trùng lặp: gửi assignments từ danh sách nhiều nhân sự
+    // Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần: gửi assignments từ danh sách nhiều nhân sự
     else if (
       canEditMeta &&
-      (task.group === "CV chung" ||
+      (task.group === "Công việc chung" ||
         task.group === "CNTT" ||
-        task.group === "Quét trùng lặp")
+        task.group === "Quét trùng lặp" ||
+        task.group === "Thư ký hợp phần")
     ) {
       let nhanSuIndex = 0;
       (payload as Record<string, unknown>).assignments = multiAssigneesList
@@ -1122,7 +1148,7 @@ export function TaskDialog({
       const calculatedProgress = nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
       (payload as Record<string, unknown>).progress = calculatedProgress;
       // Tự động cập nhật status = "Completed" khi progress đạt 100%
-      if (calculatedProgress >= 100 && task.group === "CV chung") {
+      if (calculatedProgress >= 100 && (task.group === "Công việc chung" || task.group === "Thư ký hợp phần")) {
         (payload as Record<string, unknown>).status = "Completed";
       }
     }
@@ -1130,9 +1156,10 @@ export function TaskDialog({
     else if (canEditMeta && task.group !== "Biên tập") {
       const isOtherGroup =
         task.group !== "Thiết kế" &&
-        task.group !== "CV chung" &&
+        task.group !== "Công việc chung" &&
         task.group !== "CNTT" &&
-        task.group !== "Quét trùng lặp";
+        task.group !== "Quét trùng lặp" &&
+        task.group !== "Thư ký hợp phần";
       const singleCompleted = hasActualCompletedAt ? 1 : 0;
       if (isOtherGroup) {
         (payload as Record<string, unknown>).progress =
@@ -1267,7 +1294,7 @@ export function TaskDialog({
           progress: number;
         }>;
       }
-    } else if (canEditMeta && task.group === "CV chung") {
+    } else if (canEditMeta && task.group === "Công việc chung") {
       (payload as Record<string, unknown>).taskType = "GENERAL";
       (payload as Record<string, unknown>).relatedWorkId =
         data.relatedWorkId || null;
@@ -1277,6 +1304,10 @@ export function TaskDialog({
         data.relatedWorkId || null;
     } else if (canEditMeta && task.group === "CNTT") {
       (payload as Record<string, unknown>).taskType = "IT";
+      (payload as Record<string, unknown>).relatedWorkId =
+        data.relatedWorkId || null;
+    } else if (canEditMeta && task.group === "Thư ký hợp phần") {
+      (payload as Record<string, unknown>).taskType = "GENERAL";
       (payload as Record<string, unknown>).relatedWorkId =
         data.relatedWorkId || null;
     }
@@ -1370,7 +1401,8 @@ export function TaskDialog({
                     <SelectItem value="In Progress">
                       {t.status.inProgress}
                     </SelectItem>
-                    <SelectItem value="Blocked">{t.status.blocked}</SelectItem>
+                    <SelectItem value="Pending">{t.status.pending}</SelectItem>
+                    <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
                     <SelectItem value="Completed">
                       {t.status.completed}
                     </SelectItem>
@@ -1401,9 +1433,10 @@ export function TaskDialog({
               {/* Ẩn ô Người thực hiện đơn khi nhóm dùng workflow / Thiết kế / nhiều nhân sự */}
               {form.watch("group") !== "Biên tập" &&
                 form.watch("group") !== "Thiết kế" &&
-                form.watch("group") !== "CV chung" &&
+                form.watch("group") !== "Công việc chung" &&
                 form.watch("group") !== "CNTT" &&
-                form.watch("group") !== "Quét trùng lặp" && (
+                form.watch("group") !== "Quét trùng lặp" &&
+                form.watch("group") !== "Thư ký hợp phần" && (
                   <AssigneePicker
                     label={t.task.assignee as string}
                     value={form.watch("assignee") ?? ""}
@@ -1441,7 +1474,7 @@ export function TaskDialog({
               </div>
             </div>
 
-            {/* Liên kết tài liệu dịch thuật: Biên tập, CV chung, Thiết kế, CNTT */}
+            {/* Liên kết tài liệu dịch thuật: Biên tập, Công việc chung, Thiết kế, CNTT */}
             {isWorkLinkGroup && (
               <div className="space-y-4 pt-4 border-t border-border/50">
                 <h3 className="text-base font-semibold">
@@ -1505,10 +1538,11 @@ export function TaskDialog({
               </div>
             )}
 
-            {/* CV chung / CNTT / Quét trùng lặp: nhiều nhân sự (Nhân sự 1, 2, ... Người kiểm soát) */}
-            {(form.watch("group") === "CV chung" ||
+            {/* Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần: nhiều nhân sự (Nhân sự 1, 2, ... Người kiểm soát) */}
+            {(form.watch("group") === "Công việc chung" ||
               form.watch("group") === "CNTT" ||
-              form.watch("group") === "Quét trùng lặp") && (
+              form.watch("group") === "Quét trùng lặp" ||
+              form.watch("group") === "Thư ký hợp phần") && (
               <div className="space-y-4 pt-4 border-t border-border/50">
                 <h3 className="text-base font-semibold">
                   {language === "vi" ? "Phân công nhân sự" : "Assign staff"}
@@ -1609,13 +1643,22 @@ export function TaskDialog({
                                 </Label>
                                 <DateInput
                                   value={slot.completedAt || null}
-                                  onChange={(v) =>
+                                  onChange={(v) => {
                                     setMultiAssigneesList((prev) =>
                                       prev.map((s) =>
-                                        s.id === slot.id ? { ...s, completedAt: v || null } : s
+                                        s.id === slot.id ? { ...s, completedAt: v || null, status: v ? "completed" : s.status } : s
                                       )
-                                    )
-                                  }
+                                    );
+                                    // Tự động cập nhật status của task khi tất cả nhân sự đã hoàn thành
+                                    const updatedList = multiAssigneesList.map((s) =>
+                                      s.id === slot.id ? { ...s, completedAt: v || null, status: v ? "completed" : s.status } : s
+                                    );
+                                    const staffMulti = updatedList.filter((s) => s.label !== "Người kiểm soát" && s.userId);
+                                    const allCompleted = staffMulti.length > 0 && staffMulti.every((s) => !!s.completedAt);
+                                    if (allCompleted && (form.watch("group") === "Công việc chung" || form.watch("group") === "CNTT" || form.watch("group") === "Quét trùng lặp" || form.watch("group") === "Thư ký hợp phần")) {
+                                      form.setValue("status", "Completed");
+                                    }
+                                  }}
                                   placeholder="dd/mm/yyyy"
                                   className="bg-background w-32"
                                   disabled={!canEditMeta && !isNewTask}
@@ -2360,7 +2403,7 @@ export function TaskDialog({
                       ...thietKeTroLyList.map((s) => s.dueDate),
                     ),
                   );
-                if (g === "CV chung" || g === "CNTT" || g === "Quét trùng lặp") {
+                if (g === "Công việc chung" || g === "CNTT" || g === "Quét trùng lặp" || g === "Thư ký hợp phần") {
                   const staff = multiAssigneesList.filter((s) => s.label !== "Người kiểm soát");
                   return formatDateDDMMYYYY(maxDateString(...staff.map((s) => s.dueDate)));
                 }
@@ -2377,7 +2420,7 @@ export function TaskDialog({
                       ...thietKeTroLyList.map((s) => s.completeDate),
                     ),
                   );
-                if (g === "CV chung" || g === "CNTT" || g === "Quét trùng lặp") {
+                if (g === "Công việc chung" || g === "CNTT" || g === "Quét trùng lặp" || g === "Thư ký hợp phần") {
                   const staff = multiAssigneesList.filter((s) => s.label !== "Người kiểm soát");
                   return formatDateDDMMYYYY(maxDateString(...staff.map((s) => s.completedAt)));
                 }
@@ -2442,7 +2485,7 @@ export function TaskDialog({
                     (s) => s.completeDate != null && String(s.completeDate).trim() !== ""
                   ).length;
                   value = n === 0 ? 0 : Math.round((100 / n) * m);
-                } else if (group === "CV chung" || group === "CNTT" || group === "Quét trùng lặp") {
+                } else if (group === "Công việc chung" || group === "CNTT" || group === "Quét trùng lặp" || group === "Thư ký hợp phần") {
                   const staff = multiAssigneesList.filter(
                     (s) => s.label !== "Người kiểm soát" && s.userId
                   );

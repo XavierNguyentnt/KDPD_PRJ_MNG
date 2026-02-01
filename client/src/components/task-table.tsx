@@ -157,8 +157,8 @@ export function TaskTable({
         return 'text-green-600 bg-green-50 border-green-200'; // Đã hoàn thành: màu xanh lá
       case StageStatus.IN_PROGRESS:
         return 'text-blue-600 bg-blue-50 border-blue-200'; // Đang tiến hành: màu xanh dương
-      case StageStatus.BLOCKED:
-        return 'text-red-600 bg-red-50 border-red-200'; // Chậm tiến độ: màu đỏ
+      case StageStatus.PENDING:
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200'; // Tạm dừng: màu vàng
       case StageStatus.NOT_STARTED:
       default:
         return 'text-gray-600 bg-gray-50 border-gray-200'; // Chưa tiến hành: màu xám
@@ -344,7 +344,8 @@ export function TaskTable({
     switch (status) {
       case 'Completed': return 'bg-green-100 text-green-700 border-green-300';
       case 'In Progress': return 'bg-blue-100 text-blue-700 border-blue-300';
-      case 'Blocked': return 'bg-red-100 text-red-700 border-red-300';
+      case 'Pending': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
+      case 'Cancelled': return 'bg-gray-100 text-gray-700 border-gray-300';
       case 'Not Started': return 'bg-gray-100 text-gray-700 border-gray-300';
       default: return 'bg-gray-100 text-gray-700 border-gray-300';
     }
@@ -548,7 +549,8 @@ export function TaskTable({
                       {task.status === 'Not Started' ? t.status.notStarted :
                        task.status === 'In Progress' ? t.status.inProgress :
                        task.status === 'Completed' ? t.status.completed :
-                       task.status === 'Blocked' ? t.status.blocked : task.status}
+                       task.status === 'Pending' ? t.status.pending : 
+                       task.status === 'Cancelled' ? t.status.cancelled : task.status}
                     </Badge>
                   </td>
                 )}

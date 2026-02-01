@@ -44,7 +44,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/", label: t.dashboard.title, icon: LayoutDashboard },
-    { href: "/cv-chung", label: "CV chung", icon: Clipboard },
+    { href: "/cv-chung", label: "Công việc chung", icon: Clipboard },
     { href: "/bien-tap", label: "Biên tập", icon: Edit },
     { href: "/thiet-ke", label: "Thiết kế", icon: Palette },
     { href: "/cntt", label: "CNTT", icon: Code },

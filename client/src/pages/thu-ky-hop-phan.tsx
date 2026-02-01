@@ -657,7 +657,8 @@ export default function ThuKyHopPhanPage() {
     switch (status) {
       case "Completed": return "bg-green-100 text-green-700";
       case "In Progress": return "bg-blue-50 text-blue-700";
-      case "Blocked": return "bg-red-50 text-red-700";
+      case "Pending": return "bg-yellow-50 text-yellow-700";
+      case "Cancelled": return "bg-gray-50 text-gray-700";
       default: return "bg-gray-100 text-gray-700";
     }
   };
@@ -819,10 +820,6 @@ export default function ThuKyHopPhanPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold tracking-tight">Thư ký hợp phần</h2>
-      </div>
-
       <Tabs defaultValue="tasks" className="w-full">
         <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
           <TabsTrigger value="tasks">Công việc</TabsTrigger>
@@ -1413,14 +1410,18 @@ export default function ThuKyHopPhanPage() {
         open={isCreateTaskOpen}
         onOpenChange={setIsCreateTaskOpen}
         task={null}
+        defaultGroup="Thư ký hợp phần"
         onCreate={(taskData) => {
-          createTask(taskData, {
-            onSuccess: () => {
-              toast({ title: "Thành công", description: "Đã thêm công việc." });
-              setIsCreateTaskOpen(false);
-            },
-            onError: (e) => toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
-          });
+          createTask(
+            { ...taskData, group: taskData.group || "Thư ký hợp phần" },
+            {
+              onSuccess: () => {
+                toast({ title: "Thành công", description: "Đã thêm công việc." });
+                setIsCreateTaskOpen(false);
+              },
+              onError: (e) => toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
+            }
+          );
         }}
       />
 

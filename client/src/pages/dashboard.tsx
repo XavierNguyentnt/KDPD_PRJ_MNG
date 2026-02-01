@@ -106,7 +106,8 @@ export default function Dashboard() {
     switch (status) {
       case "Completed": return "bg-green-100 text-green-700 hover:bg-green-100/80";
       case "In Progress": return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
-      case "Blocked": return "bg-red-50 text-red-700 hover:bg-red-50/80 border-red-200";
+      case "Pending": return "bg-yellow-50 text-yellow-700 hover:bg-yellow-50/80 border-yellow-200";
+      case "Cancelled": return "bg-gray-50 text-gray-700 hover:bg-gray-50/80 border-gray-200";
       default: return "bg-gray-100 text-gray-700 hover:bg-gray-100/80";
     }
   };
@@ -224,7 +225,8 @@ export default function Dashboard() {
                 <SelectItem value="Not Started">{t.status.notStarted}</SelectItem>
                 <SelectItem value="In Progress">{t.status.inProgress}</SelectItem>
                 <SelectItem value="Completed">{t.status.completed}</SelectItem>
-                <SelectItem value="Blocked">{t.status.blocked}</SelectItem>
+                <SelectItem value="Pending">{t.status.pending}</SelectItem>
+                <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
               </SelectContent>
             </Select>
           </div>

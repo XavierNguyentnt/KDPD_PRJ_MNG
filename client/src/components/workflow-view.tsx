@@ -2,7 +2,7 @@ import { Workflow, Round, Stage, BienTapStageType, StageStatus, BienTapWorkflowH
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Clock, XCircle, AlertCircle, User } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, AlertCircle, User, PauseCircle } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 import { formatDateDDMMYYYY } from "@/lib/utils";
 
@@ -54,8 +54,8 @@ export function WorkflowView({ workflow, compact = false }: WorkflowViewProps) {
         return <CheckCircle2 className="w-4 h-4 text-green-600" />;
       case StageStatus.IN_PROGRESS:
         return <Clock className="w-4 h-4 text-blue-600" />;
-      case StageStatus.BLOCKED:
-        return <XCircle className="w-4 h-4 text-red-600" />;
+      case StageStatus.PENDING:
+        return <PauseCircle className="w-4 h-4 text-yellow-600" />;
       case StageStatus.CANCELLED:
         return <XCircle className="w-4 h-4 text-amber-600" />;
       default:
@@ -69,8 +69,8 @@ export function WorkflowView({ workflow, compact = false }: WorkflowViewProps) {
         return 'bg-green-100 text-green-700 border-green-300';
       case StageStatus.IN_PROGRESS:
         return 'bg-blue-100 text-blue-700 border-blue-300';
-      case StageStatus.BLOCKED:
-        return 'bg-red-100 text-red-700 border-red-300';
+      case StageStatus.PENDING:
+        return 'bg-yellow-100 text-yellow-700 border-yellow-300';
       case StageStatus.CANCELLED:
         return 'bg-amber-100 text-amber-700 border-amber-300';
       default:
@@ -84,8 +84,8 @@ export function WorkflowView({ workflow, compact = false }: WorkflowViewProps) {
         return language === 'vi' ? 'Hoàn thành' : 'Completed';
       case StageStatus.IN_PROGRESS:
         return language === 'vi' ? 'Đang tiến hành' : 'In Progress';
-      case StageStatus.BLOCKED:
-        return language === 'vi' ? 'Bị chặn' : 'Blocked';
+      case StageStatus.PENDING:
+        return language === 'vi' ? 'Tạm dừng' : 'Pending';
       case StageStatus.CANCELLED:
         return language === 'vi' ? 'Đã hủy' : 'Cancelled';
       default:

@@ -38,10 +38,10 @@ export default function CVChungPage() {
   const stages = useMemo(() => Array.from(new Set(works.map((w) => w.stage).filter(Boolean))) as string[], [works]);
   const componentOptions = useMemo(() => components.map((c) => ({ id: c.id, name: c.name })), [components]);
 
-  // Filter tasks for "CV chung" group only
+  // Filter tasks for "Công việc chung" group only
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    let list = tasks.filter((t) => t.group === "CV chung");
+    let list = tasks.filter((t) => t.group === "Công việc chung");
 
     if (role === UserRole.EMPLOYEE) {
       list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
@@ -103,8 +103,7 @@ export default function CVChungPage() {
       <section>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Công việc chung</h2>
-            <p className="text-sm text-muted-foreground mt-1">Quản lý các công việc chung của dự án</p>
+            <p className="text-sm text-muted-foreground">Quản lý các công việc chung của dự án</p>
           </div>
           <div className="text-sm text-muted-foreground flex items-center gap-2">
             {t.dashboard.lastSynced}: {format(new Date(), 'h:mm a')}
@@ -199,9 +198,9 @@ export default function CVChungPage() {
         open={isCreateDialogOpen} 
         onOpenChange={(open) => setIsCreateDialogOpen(open)} 
         task={null}
-        defaultGroup="CV chung"
+        defaultGroup="Công việc chung"
         onCreate={(taskData) => {
-          createTask({ ...taskData, group: taskData.group || 'CV chung' }, {
+          createTask({ ...taskData, group: taskData.group || 'Công việc chung' }, {
             onSuccess: () => {
               setIsCreateDialogOpen(false);
             },

@@ -101,7 +101,7 @@ export interface Translations {
     notStarted: string;
     inProgress: string;
     completed: string;
-    blocked: string;
+    pending: string;
     cancelled: string;
   };
   
@@ -228,7 +228,7 @@ const translations: Record<Language, Translations> = {
       notStarted: 'Chưa bắt đầu',
       inProgress: 'Đang thực hiện',
       completed: 'Hoàn thành',
-      blocked: 'Bị chặn',
+      pending: 'Tạm dừng',
       cancelled: 'Đã hủy',
     },
     priority: {
@@ -347,7 +347,7 @@ const translations: Record<Language, Translations> = {
       notStarted: 'Not Started',
       inProgress: 'In Progress',
       completed: 'Completed',
-      blocked: 'Blocked',
+      pending: 'Pending',
       cancelled: 'Cancelled',
     },
     priority: {

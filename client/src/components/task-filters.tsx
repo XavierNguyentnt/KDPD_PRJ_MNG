@@ -188,7 +188,8 @@ export function TaskFilters({
             <SelectItem value="Not Started">{t.status.notStarted}</SelectItem>
             <SelectItem value="In Progress">{t.status.inProgress}</SelectItem>
             <SelectItem value="Completed">{t.status.completed}</SelectItem>
-            <SelectItem value="Blocked">{t.status.blocked}</SelectItem>
+            <SelectItem value="Pending">{t.status.pending}</SelectItem>
+            <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
             <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
           </SelectContent>
         </Select>

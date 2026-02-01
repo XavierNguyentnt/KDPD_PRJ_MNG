@@ -111,8 +111,7 @@ export default function ThietKePage() {
       <section>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Thiết kế</h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground">
               Quản lý công việc thiết kế, dàn trang với Kỹ thuật viên chính và Trợ lý thiết kế
             </p>
           </div>

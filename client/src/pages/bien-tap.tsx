@@ -98,8 +98,7 @@ export default function BienTapPage() {
       <section>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Biên tập</h2>
-            <p className="text-sm text-muted-foreground mt-1">Quản lý công việc biên tập với các nhân sự: BTV 1, BTV 2, Người Đọc duyệt...</p>
+            <p className="text-sm text-muted-foreground">Quản lý công việc biên tập với các nhân sự: BTV 1, BTV 2, Người Đọc duyệt...</p>
           </div>
           <div className="text-sm text-muted-foreground flex items-center gap-2">
             {t.dashboard.lastSynced}: {format(new Date(), 'h:mm a')}
