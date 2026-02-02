@@ -44,6 +44,18 @@ export interface Translations {
     timeRangeYear: string;
     tasksInPeriod: string;
     clickBadgeToFilter: string;
+    notification: string;
+    message: string;
+    calendar: string;
+    unreadNotification: string;
+    createNewProject: string;
+    manageProjectOneTouch: string;
+    recentActivity: string;
+    seeAll: string;
+    inProgressProject: string;
+    addNewTask: string;
+    taskCompleted: string;
+    reviewCompleted: string;
   };
   filter: {
     staff: string;
@@ -175,6 +187,18 @@ const translations: Record<Language, Translations> = {
       timeRangeYear: 'Năm',
       tasksInPeriod: 'Số công việc',
       clickBadgeToFilter: 'Bấm vào badge để xem chi tiết',
+      notification: 'Thông báo',
+      message: 'Tin nhắn',
+      calendar: 'Lịch',
+      unreadNotification: 'thông báo chưa đọc',
+      createNewProject: 'Tạo dự án mới',
+      manageProjectOneTouch: 'Quản lý dự án trong tầm tay',
+      recentActivity: 'Hoạt động gần đây',
+      seeAll: 'Xem tất cả',
+      inProgressProject: 'Công việc đang thực hiện',
+      addNewTask: 'Thêm công việc mới',
+      taskCompleted: 'Hoàn thành công việc',
+      reviewCompleted: 'Đã duyệt hoàn thành',
     },
     filter: {
       staff: 'Nhân sự',
@@ -294,6 +318,18 @@ const translations: Record<Language, Translations> = {
       timeRangeYear: 'Year',
       tasksInPeriod: 'Tasks',
       clickBadgeToFilter: 'Click badge to filter details',
+      notification: 'Notification',
+      message: 'Message',
+      calendar: 'Calendar',
+      unreadNotification: 'unread notification',
+      createNewProject: 'Create New Project',
+      manageProjectOneTouch: 'Manage your project in one touch',
+      recentActivity: 'Recent Activity',
+      seeAll: 'See All',
+      inProgressProject: 'In Progress Project',
+      addNewTask: 'Add New Task',
+      taskCompleted: 'Task Completed',
+      reviewCompleted: 'Review Completed',
     },
     filter: {
       staff: 'Staff',

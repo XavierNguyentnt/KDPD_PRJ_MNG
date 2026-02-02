@@ -102,6 +102,14 @@
   @apply transition-transform duration-200 hover:-translate-y-1;
 }
 
+/* Protend-style dashboard: stat card accent, content background */
+.dashboard-page {
+  @apply min-h-full;
+}
+.stat-card-accent {
+  @apply absolute left-0 top-0 bottom-0 w-1 rounded-l-lg;
+}
+
 /* React Day Picker Dropdown Styling - Improved layout and appearance */
 select[class*="dropdown"] {
   @apply appearance-none;

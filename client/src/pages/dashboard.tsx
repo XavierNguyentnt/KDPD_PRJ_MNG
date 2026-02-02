@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useTasks, useRefreshTasks, useCreateTask, UserRole } from "@/hooks/use-tasks";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
@@ -14,9 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus } from "lucide-react";
+import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus, Bell, MessageSquare, Calendar } from "lucide-react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity, Circle, Clock } from "lucide-react";
 
 export default function Dashboard() {
   const { data: tasks, isLoading, isError } = useTasks();
@@ -35,6 +37,14 @@ export default function Dashboard() {
   const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const taskListRef = useRef<HTMLDivElement>(null);
+
+  // Open create dialog when navigating from header CTA (#create)
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window.location.hash === "#create" || window.location.search.includes("create=1"))) {
+      setIsCreateDialogOpen(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   // Get unique groups from tasks
   const availableGroups = useMemo(() => {
@@ -76,6 +86,39 @@ export default function Dashboard() {
     const withBadge = applyDashboardBadgeFilter(baseFilteredTasks, badgeFilter);
     return sortTasks(withBadge, sortBy, sortDir);
   }, [baseFilteredTasks, badgeFilter, sortBy, sortDir]);
+
+  // Falr-style: Recent Activity timeline (last 5 tasks by updatedAt/createdAt)
+  const recentActivityItems = useMemo(() => {
+    if (!baseFilteredTasks.length) return [];
+    const sorted = [...baseFilteredTasks].sort((a, b) => {
+      const da = a.updatedAt || a.createdAt ? new Date(a.updatedAt || a.createdAt!).getTime() : 0;
+      const db = b.updatedAt || b.createdAt ? new Date(b.updatedAt || b.createdAt!).getTime() : 0;
+      return db - da;
+    });
+    return sorted.slice(0, 5).map((task) => {
+      const date = task.updatedAt || task.createdAt;
+      const label =
+        task.status === "Completed"
+          ? t.dashboard.taskCompleted
+          : task.status === "In Progress"
+            ? t.dashboard.reviewCompleted
+            : t.dashboard.addNewTask;
+      return {
+        id: task.id,
+        title: task.title ?? "",
+        assignee: task.assignee ?? "",
+        label,
+        date: date ? formatDistanceToNow(new Date(date), { addSuffix: true }) : "",
+        status: task.status,
+      };
+    });
+  }, [baseFilteredTasks, t]);
+
+  // Falr-style: In Progress tasks (top 5)
+  const inProgressTasks = useMemo(
+    () => baseFilteredTasks.filter((t) => t.status === "In Progress").slice(0, 5),
+    [baseFilteredTasks]
+  );
 
   const handleBadgeFilter = useCallback(
     (filter: DashboardBadgeFilter) => {
@@ -139,25 +182,184 @@ export default function Dashboard() {
     );
   }
 
+  const welcomeName = user?.displayName?.split(" ")[0] ?? "User";
+
   return (
-    <div className="space-y-8">
-      {/* Dashboard thống kê: badges + biểu đồ xu hướng */}
-      <section>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold tracking-tight">{t.dashboard.overview}</h2>
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            {t.dashboard.lastSynced}: {format(new Date(), "h:mm a")}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => refresh()}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-            </Button>
+    <div className="space-y-6 dashboard-page">
+      {/* Protend-style: Page title + breadcrumb / welcome strip */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+            <span>{t.dashboard.title}</span>
+            <span aria-hidden>/</span>
+            <span className="text-foreground font-medium">{t.dashboard.overview}</span>
+          </nav>
+          <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">
+            {language === "vi" ? `Xin chào, ${welcomeName}` : `Welcome back, ${welcomeName}`}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {t.dashboard.overview}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>{t.dashboard.lastSynced}: {format(new Date(), "HH:mm")}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 shrink-0"
+            onClick={() => refresh()}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Protend-style: Notification / Message / Calendar cards + gradient CTA */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="flex items-center gap-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/30 shadow-sm">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-200/60 dark:bg-amber-700/40 text-amber-700 dark:text-amber-300">
+            <Bell className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">{t.dashboard.notification}</p>
+            <p className="text-xs text-amber-700/80 dark:text-amber-300/80">5 {t.dashboard.unreadNotification}</p>
           </div>
         </div>
+        <div className="flex items-center gap-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/30 shadow-sm">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-200/60 dark:bg-emerald-700/40 text-emerald-700 dark:text-emerald-300">
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">{t.dashboard.message}</p>
+            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80">5 {t.dashboard.unreadNotification}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 p-4 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200/50 dark:border-violet-800/30 shadow-sm">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-200/60 dark:bg-violet-700/40 text-violet-700 dark:text-violet-300">
+            <Calendar className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-violet-900 dark:text-violet-100">{t.dashboard.calendar}</p>
+            <p className="text-xs text-violet-700/80 dark:text-violet-300/80">5 {t.dashboard.unreadNotification}</p>
+          </div>
+        </div>
+        <div className="hidden lg:flex items-center justify-between gap-4 p-4 rounded-xl bg-gradient-to-r from-primary/90 to-violet-600 dark:from-primary dark:to-violet-700 text-primary-foreground border-0 shadow-md">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold opacity-95">{t.dashboard.manageProjectOneTouch}</p>
+            <p className="text-xs opacity-80 mt-0.5">Etiam facilisis ligula nec posuere.</p>
+          </div>
+          {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="shrink-0 bg-white/20 hover:bg-white/30 text-primary-foreground border-0"
+              onClick={() => setIsCreateDialogOpen(true)}
+              disabled={isCreating}
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              {t.dashboard.createNew}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Falr-style: Recent Activity + In Progress Project (Bootstrap 4 admin layout) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border border-border shadow-sm overflow-hidden">
+          <CardHeader className="py-4 px-5 border-b border-border bg-muted/20">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Activity className="h-4 w-4 text-muted-foreground" />
+              {t.dashboard.recentActivity}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {recentActivityItems.length === 0 ? (
+              <div className="p-6 text-sm text-muted-foreground text-center">{t.dashboard.noTasksFound}</div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {recentActivityItems.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex gap-3 px-5 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => setSelectedTask(baseFilteredTasks.find((t) => t.id === item.id) ?? null)}
+                  >
+                    <span className="flex h-2 w-2 shrink-0 mt-1.5 rounded-full bg-primary" aria-hidden />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {item.assignee && `${item.assignee} · `}
+                        {item.date}
+                      </p>
+                      <span className="inline-block mt-1 text-xs font-medium text-primary">{item.label}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="p-3 border-t border-border bg-muted/20">
+              <button
+                type="button"
+                className="text-xs font-medium text-primary hover:underline"
+                onClick={() => taskListRef.current?.scrollIntoView({ behavior: "smooth" })}
+              >
+                {t.dashboard.seeAll} →
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border border-border shadow-sm overflow-hidden">
+          <CardHeader className="py-4 px-5 border-b border-border bg-muted/20">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              {t.dashboard.inProgressProject}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {inProgressTasks.length === 0 ? (
+              <div className="p-6 text-sm text-muted-foreground text-center">{t.dashboard.noTasksFound}</div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {inProgressTasks.map((task) => (
+                  <li
+                    key={task.id}
+                    className="px-5 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => setSelectedTask(task)}
+                  >
+                    <p className="text-sm font-medium text-foreground truncate">{task.title ?? ""}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {task.dueDate
+                        ? (language === "vi" ? "Hạn: " : "Due: ") + format(new Date(task.dueDate), "dd/MM/yyyy")
+                        : t.task.noDateSet}
+                    </p>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${task.progress ?? 0}%` }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="p-3 border-t border-border bg-muted/20">
+              <button
+                type="button"
+                className="text-xs font-medium text-primary hover:underline"
+                onClick={() => {
+                  setStatusFilter("In Progress");
+                  setTimeout(() => taskListRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+                }}
+              >
+                {t.dashboard.seeAll} →
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Dashboard thống kê: badges + biểu đồ xu hướng */}
+      <section>
         <TaskDashboard
           tasks={baseFilteredTasks}
           onBadgeFilter={handleBadgeFilter}
@@ -165,12 +367,12 @@ export default function Dashboard() {
         />
       </section>
 
-      {/* Task List (chi tiết theo bộ lọc / badge đã chọn) */}
+      {/* Task List — Protend-style table card */}
       <section
         ref={taskListRef}
-        className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden"
+        className="bg-card rounded-xl border border-border shadow-sm overflow-hidden"
       >
-        <div className="p-4 border-b border-border/50 flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
+        <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
             <Badge variant="secondary" className="font-normal">

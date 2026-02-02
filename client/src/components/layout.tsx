@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, CheckSquare, Users, Settings, LogOut, ChevronDown, Bell, Languages, Shield, UserCog, FileText, Menu, X, Clipboard, Edit, Palette, Code } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Users, Settings, LogOut, ChevronDown, Bell, Languages, Shield, UserCog, FileText, Menu, X, Clipboard, Edit, Palette, Code, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { UserRole } from "@/hooks/use-tasks";
@@ -101,7 +101,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       className={`
                         flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200
                         ${isActive 
-                          ? "bg-primary/10 text-primary shadow-sm" 
+                          ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 shadow-sm" 
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         }
                       `}
@@ -141,7 +141,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       className={`
                         flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200
                         ${isActive 
-                          ? "bg-primary/10 text-primary shadow-sm" 
+                          ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 shadow-sm" 
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         }
                       `}
@@ -190,7 +190,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </h1>
           </div>
           
-          <div className="flex items-center gap-4 ml-auto">
+          <div className="flex items-center gap-3 sm:gap-4 ml-auto">
+            {/* Protend-style: Create New Project CTA on Dashboard */}
+            {(role === UserRole.ADMIN || role === UserRole.MANAGER) && location === "/" && (
+              <Link href="/#create">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm gap-1.5 font-medium">
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t.dashboard.createNewProject}</span>
+                </Button>
+              </Link>
+            )}
             {/* Language Switcher */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -258,8 +267,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page Content */}
-        <div className="p-4 sm:p-8 space-y-8 animate-enter">
+        {/* Page Content — Protend-style: consistent padding, light bg for dashboard feel */}
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/20 min-h-0 animate-enter">
           {children}
         </div>
       </main>
