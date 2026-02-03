@@ -1,4 +1,4 @@
-import { eq, asc, inArray } from "drizzle-orm";
+import { eq, asc, inArray, and, desc } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -18,6 +18,7 @@ import {
   translationContracts,
   proofreadingContracts,
   contractStages,
+  notifications,
   type User,
   type InsertUser,
   type UserWithRolesAndGroups,
@@ -30,6 +31,8 @@ import {
   type InsertDocument,
   type TaskAssignment,
   type InsertTaskAssignment,
+  type Notification,
+  type InsertNotification,
   type ContractMember,
   type InsertContractMember,
   type DocumentTask,
@@ -114,7 +117,7 @@ export async function deleteUser(id: string): Promise<void> {
   await requireDb().delete(users).where(eq(users.id, id));
 }
 
-/** User kèm roles và groups từ user_roles, user_groups (nguồn duy nhất). */
+/** User kèm roles, groups và roleAssignments từ user_roles, user_groups (nguồn duy nhất). */
 export async function getUsersWithRolesAndGroups(): Promise<UserWithRolesAndGroups[]> {
   const [userList, allUr, allUg, roleList, groupList] = await Promise.all([
     requireDb().select().from(users).orderBy(asc(users.displayName)),
@@ -125,14 +128,19 @@ export async function getUsersWithRolesAndGroups(): Promise<UserWithRolesAndGrou
   ]);
   const roleById = Object.fromEntries(roleList.map((r) => [r.id, r]));
   const groupById = Object.fromEntries(groupList.map((g) => [g.id, g]));
-  return userList.map((u) => ({
-    ...u,
-    roles: allUr.filter((ur) => ur.userId === u.id).map((ur) => roleById[ur.roleId]).filter(Boolean),
-    groups: allUg.filter((ug) => ug.userId === u.id).map((ug) => groupById[ug.groupId]).filter(Boolean),
-  }));
+  return userList.map((u) => {
+    const userUr = allUr.filter((ur) => ur.userId === u.id);
+    const rolesList = [...new Set(userUr.map((ur) => roleById[ur.roleId]).filter(Boolean))];
+    return {
+      ...u,
+      roles: rolesList,
+      groups: allUg.filter((ug) => ug.userId === u.id).map((ug) => groupById[ug.groupId]).filter(Boolean),
+      roleAssignments: userUr.map((ur) => ({ roleId: ur.roleId, componentId: ur.componentId ?? null })),
+    };
+  });
 }
 
-/** User theo id kèm roles và groups. */
+/** User theo id kèm roles, groups và roleAssignments. */
 export async function getUserByIdWithRolesAndGroups(id: string): Promise<UserWithRolesAndGroups | undefined> {
   const u = await getUserById(id);
   if (!u) return undefined;
@@ -148,18 +156,33 @@ export async function getUserByIdWithRolesAndGroups(id: string): Promise<UserWit
   ]);
   const roleById = Object.fromEntries(roleList.map((r) => [r.id, r]));
   const groupById = Object.fromEntries(groupList.map((g) => [g.id, g]));
+  const rolesList = [...new Set(userRolesRows.map((ur) => roleById[ur.roleId]).filter(Boolean))];
   return {
     ...u,
-    roles: userRolesRows.map((ur) => roleById[ur.roleId]).filter(Boolean),
+    roles: rolesList,
     groups: userGroupsRows.map((ug) => groupById[ug.groupId]).filter(Boolean),
+    roleAssignments: userRolesRows.map((ur) => ({ roleId: ur.roleId, componentId: ur.componentId ?? null })),
   };
 }
 
-/** Ghi đè toàn bộ roles của user (nguồn duy nhất: user_roles). */
+/** Ghi đè toàn bộ roles của user với component_id = null (nguồn duy nhất: user_roles). */
 export async function setUserRoles(userId: string, roleIds: string[]): Promise<void> {
   await requireDb().delete(userRoles).where(eq(userRoles.userId, userId));
   if (roleIds.length) {
-    await requireDb().insert(userRoles).values(roleIds.map((roleId) => ({ userId, roleId })));
+    await requireDb().insert(userRoles).values(roleIds.map((roleId) => ({ userId, roleId, componentId: null })));
+  }
+}
+
+/** Ghi đè toàn bộ role assignments của user (roleId + componentId). Dùng cho thư ký nhiều hợp phần. */
+export async function setUserRoleAssignments(
+  userId: string,
+  assignments: Array<{ roleId: string; componentId?: string | null }>
+): Promise<void> {
+  await requireDb().delete(userRoles).where(eq(userRoles.userId, userId));
+  if (assignments.length) {
+    await requireDb().insert(userRoles).values(
+      assignments.map((a) => ({ userId, roleId: a.roleId, componentId: a.componentId ?? null }))
+    );
   }
 }
 
@@ -517,6 +540,106 @@ export async function deleteTaskAssignment(id: string): Promise<void> {
 
 export async function deleteTaskAssignmentsByTaskId(taskId: string): Promise<void> {
   await requireDb().delete(taskAssignments).where(eq(taskAssignments.taskId, taskId));
+}
+
+// -----------------------------------------------------------------------------
+// Notifications CRUD
+// -----------------------------------------------------------------------------
+export async function createNotification(
+  data: Omit<InsertNotification, "id"> & { id?: string }
+): Promise<Notification> {
+  const rows = await requireDb().insert(notifications).values(data).returning();
+  if (!rows[0]) throw new Error("Failed to create notification");
+  return rows[0];
+}
+
+export async function getNotificationsByUserId(
+  userId: string,
+  options?: { unreadOnly?: boolean; limit?: number }
+): Promise<Notification[]> {
+  const unreadOnly = options?.unreadOnly ?? false;
+  let rows = await requireDb()
+    .select()
+    .from(notifications)
+    .where(
+      unreadOnly
+        ? and(eq(notifications.userId, userId), eq(notifications.isRead, false))
+        : eq(notifications.userId, userId)
+    )
+    .orderBy(desc(notifications.createdAt));
+  if (options?.limit && rows.length > options.limit) {
+    rows = rows.slice(0, options.limit);
+  }
+  return rows;
+}
+
+export async function markNotificationAsRead(
+  userId: string,
+  notificationId: string
+): Promise<Notification | undefined> {
+  const rows = await requireDb()
+    .update(notifications)
+    .set({ isRead: true, readAt: new Date() })
+    .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
+    .returning();
+  return rows[0];
+}
+
+export async function getUnreadNotificationCount(userId: string): Promise<number> {
+  const rows = await requireDb()
+    .select()
+    .from(notifications)
+    .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+  return rows.length;
+}
+
+export async function getNotificationByAssignmentType(
+  userId: string,
+  taskAssignmentId: string,
+  type: string
+): Promise<Notification | undefined> {
+  const rows = await requireDb()
+    .select()
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        eq(notifications.taskAssignmentId, taskAssignmentId),
+        eq(notifications.type, type)
+      )
+    )
+    .limit(1);
+  return rows[0];
+}
+
+export async function getNotificationByTaskType(
+  userId: string,
+  taskId: string,
+  type: string
+): Promise<Notification | undefined> {
+  const rows = await requireDb()
+    .select()
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        eq(notifications.taskId, taskId),
+        eq(notifications.type, type)
+      )
+    )
+    .limit(1);
+  return rows[0];
+}
+
+export async function getTaskAssignmentsWithTaskByUserId(
+  userId: string
+): Promise<Array<{ assignment: TaskAssignment; task: Task }>> {
+  return requireDb()
+    .select({ assignment: taskAssignments, task: tasks })
+    .from(taskAssignments)
+    .innerJoin(tasks, eq(taskAssignments.taskId, tasks.id))
+    .where(eq(taskAssignments.userId, userId))
+    .orderBy(desc(taskAssignments.createdAt));
 }
 
 // -----------------------------------------------------------------------------

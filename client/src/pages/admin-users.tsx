@@ -45,6 +45,12 @@ import { KeyRound, Loader2, Pencil, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@shared/routes";
 
+/** (roleId, componentId) từ user_roles — dùng cho Thư ký hợp phần + Tên Hợp phần */
+interface RoleAssignmentItem {
+  roleId: string;
+  componentId: string | null;
+}
+
 interface ApiUser {
   id: string;
   email: string;
@@ -55,8 +61,17 @@ interface ApiUser {
   isActive: boolean;
   roles?: RoleItem[];
   groups?: GroupItem[];
+  roleAssignments?: RoleAssignmentItem[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+interface ComponentItem {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  displayOrder: number;
 }
 
 interface RoleItem {
@@ -103,6 +118,8 @@ type UpdateUserPayload = {
   isActive?: boolean;
   roleIds?: string[];
   groupIds?: string[];
+  /** Ghi đè user_roles theo (roleId, componentId). Dùng khi có Thư ký hợp phần + Tên Hợp phần. */
+  roleAssignments?: { roleId: string; componentId: string | null }[];
 };
 async function updateUser(
   userId: string,
@@ -133,11 +150,14 @@ export default function AdminUsersPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [roleComboboxOpen, setRoleComboboxOpen] = useState(false);
   const [groupComboboxOpen, setGroupComboboxOpen] = useState(false);
+  const [componentComboboxOpen, setComponentComboboxOpen] = useState(false);
   const [editForm, setEditForm] = useState<
     Pick<ApiUser, "displayName" | "firstName" | "lastName" | "department"> & {
       isActive: boolean;
       roleIds: string[];
       groupIds: string[];
+      /** Id hợp phần (component_id) cho vai trò Thư ký hợp phần — lưu vào user_roles.component_id */
+      componentIds: string[];
     }
   >({
     displayName: "",
@@ -147,6 +167,7 @@ export default function AdminUsersPage() {
     isActive: true,
     roleIds: [],
     groupIds: [],
+    componentIds: [],
   });
 
   const {
@@ -172,6 +193,15 @@ export default function AdminUsersPage() {
     queryFn: async () => {
       const res = await fetch(api.groups.list.path, { credentials: "include" });
       if (!res.ok) throw new Error("Không tải được danh sách nhóm nhân sự");
+      return res.json();
+    },
+  });
+
+  const { data: componentsList = [] } = useQuery<ComponentItem[]>({
+    queryKey: [api.components.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.components.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Không tải được danh sách hợp phần");
       return res.json();
     },
   });
@@ -241,18 +271,35 @@ export default function AdminUsersPage() {
     passwordMutation.mutate({ userId: passwordDialog.user.id, newPassword });
   };
 
+  const roleThuKyHopPhan = rolesList.find((r) => r.name === "Thư ký hợp phần" || r.code === "prj_secretary");
+  const groupHopPhanDichThuat = groupsList.find((g) => g.name === "Hợp phần dịch thuật" || g.code === "hop_phan_dich_thuat");
+
   const openEditDialog = (user: ApiUser) => {
     setEditDialog({ user });
+    const roleIds = user.roles?.map((r) => r.id) ?? [];
+    const thuKyRole = rolesList.find((r) => r.name === "Thư ký hợp phần" || r.code === "prj_secretary");
+    const componentIdsFromRole =
+      thuKyRole && user.roleAssignments
+        ? user.roleAssignments
+            .filter((a) => a.roleId === thuKyRole.id && a.componentId)
+            .map((a) => a.componentId as string)
+        : [];
     setEditForm({
       displayName: user.displayName ?? "",
       firstName: user.firstName ?? "",
       lastName: user.lastName ?? "",
       department: user.department ?? "",
       isActive: user.isActive ?? true,
-      roleIds: user.roles?.map((r) => r.id) ?? [],
+      roleIds,
       groupIds: user.groups?.map((g) => g.id) ?? [],
+      componentIds: componentIdsFromRole,
     });
   };
+
+  const showComponentField =
+    !!roleThuKyHopPhan &&
+    (editForm.roleIds.includes(roleThuKyHopPhan.id) ||
+      (editDialog?.user.groups?.some((g) => g.id === groupHopPhanDichThuat?.id) ?? false));
 
   const handleSubmitEdit = () => {
     if (!editDialog) return;
@@ -264,6 +311,15 @@ export default function AdminUsersPage() {
       });
       return;
     }
+    const roleAssignments =
+      roleThuKyHopPhan && showComponentField
+        ? editForm.roleIds.flatMap((roleId) => {
+            if (roleId === roleThuKyHopPhan.id) {
+              return (editForm.componentIds || []).map((componentId) => ({ roleId, componentId }));
+            }
+            return [{ roleId, componentId: null as string | null }];
+          })
+        : undefined;
     updateUserMutation.mutate({
       userId: editDialog.user.id,
       data: {
@@ -272,7 +328,7 @@ export default function AdminUsersPage() {
         lastName: editForm.lastName?.trim() || null,
         department: editForm.department?.trim() || null,
         isActive: editForm.isActive,
-        roleIds: editForm.roleIds,
+        ...(roleAssignments !== undefined ? { roleAssignments } : { roleIds: editForm.roleIds }),
         groupIds: editForm.groupIds,
       },
     });
@@ -620,6 +676,71 @@ export default function AdminUsersPage() {
                   </PopoverContent>
                 </Popover>
               </div>
+              {showComponentField && (
+                <div className="grid gap-2">
+                  <Label>Tên Hợp phần (nhiều — lưu vào user_roles.component_id)</Label>
+                  <Popover
+                    open={componentComboboxOpen}
+                    onOpenChange={setComponentComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={componentComboboxOpen}
+                        className="w-full justify-between font-normal min-h-9 h-auto py-2 text-left">
+                        <span className="flex-1 min-w-0 break-words whitespace-normal mr-2">
+                          {(editForm.componentIds?.length ?? 0) > 0
+                            ? (editForm.componentIds ?? [])
+                                .map(
+                                  (id) =>
+                                    componentsList.find((c) => c.id === id)?.name,
+                                )
+                                .filter(Boolean)
+                                .join(", ")
+                            : "Chọn hợp phần..."}
+                        </span>
+                        <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 flex-shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] p-0"
+                      align="start">
+                      <Command>
+                        <CommandInput placeholder="Tìm hợp phần..." />
+                        <CommandList>
+                          <CommandEmpty>Không tìm thấy hợp phần.</CommandEmpty>
+                          <CommandGroup>
+                            {componentsList.map((c) => {
+                              const selected = (editForm.componentIds ?? []).includes(c.id);
+                              return (
+                                <CommandItem
+                                  key={c.id}
+                                  value={c.name}
+                                  onSelect={() => {
+                                    setEditForm((f) => ({
+                                      ...f,
+                                      componentIds: selected
+                                        ? (f.componentIds ?? []).filter((id) => id !== c.id)
+                                        : [...(f.componentIds ?? []), c.id],
+                                    }));
+                                  }}>
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selected ? "opacity-100" : "opacity-0",
+                                    )}
+                                  />
+                                  {c.name}
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"

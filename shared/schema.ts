@@ -267,6 +267,27 @@ export type TaskAssignment = typeof taskAssignments.$inferSelect;
 export type InsertTaskAssignment = z.infer<typeof insertTaskAssignmentSchema>;
 
 // -----------------------------------------------------------------------------
+// Notifications (thông báo cho nhân sự)
+// -----------------------------------------------------------------------------
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // task_assigned | task_due_soon | task_overdue
+  taskId: text("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+  taskAssignmentId: uuid("task_assignment_id").references(() => taskAssignments.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications);
+export const selectNotificationSchema = createSelectSchema(notifications);
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// -----------------------------------------------------------------------------
 // Contract members (contracts ↔ users)
 // -----------------------------------------------------------------------------
 export const contractMembers = pgTable("contract_members", {
@@ -370,12 +391,13 @@ export type Role = typeof roles.$inferSelect;
 export type InsertRole = z.infer<typeof insertRoleSchema>;
 
 // -----------------------------------------------------------------------------
-// User roles (users ↔ roles)
+// User roles (users ↔ roles). component_id: hợp phần cho vai trò (vd Thư ký hợp phần); NULL = toàn cục.
 // -----------------------------------------------------------------------------
 export const userRoles = pgTable("user_roles", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   roleId: uuid("role_id").notNull().references(() => roles.id, { onDelete: "cascade" }),
+  componentId: uuid("component_id").references(() => components.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -404,5 +426,13 @@ export const EmployeeGroup = {
 
 export type EmployeeGroupType = (typeof EmployeeGroup)[keyof typeof EmployeeGroup];
 
-/** User + roles và groups từ user_roles, user_groups (dùng cho API và auth). */
-export type UserWithRolesAndGroups = User & { roles: Role[]; groups: Group[] };
+/** (roleId, componentId) từ user_roles — dùng để phân quyền thư ký theo hợp phần. */
+export type UserRoleAssignment = { roleId: string; componentId: string | null };
+
+/** User + roles, groups và roleAssignments (user_roles có component_id) cho API và auth. */
+export type UserWithRolesAndGroups = User & {
+  roles: Role[];
+  groups: Group[];
+  /** Chi tiết (roleId, componentId) từ user_roles; componentId null = vai trò toàn cục. */
+  roleAssignments?: UserRoleAssignment[];
+};

@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, CheckSquare, Users, Settings, LogOut, ChevronDown, Bell, Languages, Shield, UserCog, FileText, Menu, X, Clipboard, Edit, Palette, Code, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole } from "@/hooks/use-tasks";
+import { useTasks, UserRole } from "@/hooks/use-tasks";
 import { useI18n } from "@/hooks/use-i18n";
+import { useNotifications, useUnreadNotificationCount, useMarkNotificationRead } from "@/hooks/use-notifications";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +21,23 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import type { TaskWithAssignmentDetails, Notification } from "@shared/schema";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { TaskDialog } from "@/components/task-dialog";
+import { formatDistanceToNow } from "date-fns";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -27,6 +45,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const displayName = user?.displayName ?? "User";
   const department = user?.department ?? "";
   const { language, setLanguage, t } = useI18n();
+  const { data: tasks = [] } = useTasks();
+  const { data: notifications = [] } = useNotifications();
+  const { data: unreadCount } = useUnreadNotificationCount();
+  const { mutate: markNotificationRead } = useMarkNotificationRead();
   
   // Desktop sidebar state - load from localStorage or default to true
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -36,11 +58,55 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   // Mobile sidebar state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
+  const [notificationStatusFilter, setNotificationStatusFilter] = useState<"all" | "unread" | "read">("all");
+  const [notificationGroupFilter, setNotificationGroupFilter] = useState("all");
+  const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
 
   // Save sidebar state to localStorage
   useEffect(() => {
     localStorage.setItem("sidebarOpen", String(sidebarOpen));
   }, [sidebarOpen]);
+
+  const normalizeGroupName = (g?: string | null) => {
+    const s = (g ?? "").trim();
+    if (s === "Công việc chung" || s === "CV chung") return "CV chung";
+    return s || "(Không nhóm)";
+  };
+
+  const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+  const notificationList = useMemo(() => {
+    const list = notifications.map((n) => {
+      const task = n.taskId ? taskById.get(n.taskId) : undefined;
+      return { ...n, task, group: normalizeGroupName(task?.group) };
+    });
+    return list.sort((a, b) => {
+      const da = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+      const db = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+      return db - da;
+    });
+  }, [notifications, taskById]);
+
+  const latestNotifications = useMemo(() => notificationList.slice(0, 5), [notificationList]);
+  const notificationGroups = useMemo(() => {
+    const groups = new Set<string>();
+    notificationList.forEach((n) => groups.add(n.group ?? "(Không nhóm)"));
+    return Array.from(groups).sort();
+  }, [notificationList]);
+
+  const filteredNotifications = useMemo(() => {
+    let list = notificationList;
+    if (notificationStatusFilter === "unread") list = list.filter((n) => !n.isRead);
+    if (notificationStatusFilter === "read") list = list.filter((n) => n.isRead);
+    if (notificationGroupFilter !== "all") list = list.filter((n) => n.group === notificationGroupFilter);
+    return list;
+  }, [notificationList, notificationStatusFilter, notificationGroupFilter]);
+
+  const isThuKyHopPhan = user?.roles?.some(
+    (r) => r.name === "Thư ký hợp phần" || r.code === "prj_secretary"
+  );
+  // Admin, Quản lý có thể xem tất cả trang quản lý công việc (kể cả Thư ký hợp phần).
+  const canViewThuKyHopPhan = isThuKyHopPhan || role === UserRole.ADMIN || role === UserRole.MANAGER;
 
   const navItems = [
     { href: "/", label: t.dashboard.title, icon: LayoutDashboard },
@@ -49,7 +115,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/thiet-ke", label: "Thiết kế", icon: Palette },
     { href: "/cntt", label: "CNTT", icon: Code },
     { href: "/team", label: "Team", icon: Users },
-    { href: "/thu-ky-hop-phan", label: "Thư ký hợp phần", icon: FileText },
+    ...(canViewThuKyHopPhan ? [{ href: "/thu-ky-hop-phan", label: "Thư ký hợp phần", icon: FileText }] : []),
     ...(role === UserRole.ADMIN || role === UserRole.MANAGER
       ? [
           { href: "/admin", label: "Admin", icon: Shield as React.ComponentType<any> },
@@ -225,10 +291,67 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
             
-            <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-card" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary">
+                  <Bell className="w-5 h-5" />
+                  {(unreadCount?.count ?? 0) > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 text-[10px] leading-[18px] text-center rounded-full bg-red-500 text-white border-2 border-card">
+                      {unreadCount?.count}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[360px] p-0">
+                <div className="px-3 py-2 border-b border-border/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">{t.dashboard.notification}</span>
+                    <Badge variant="secondary" className="text-xs">{unreadCount?.count ?? 0}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t.dashboard.unreadNotification}</p>
+                </div>
+                {latestNotifications.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                    {t.dashboard.noTasksFound}
+                  </div>
+                ) : (
+                  <div className="max-h-[320px] overflow-auto">
+                    {latestNotifications.map((n) => {
+                      const createdAt = n.createdAt ? new Date(n.createdAt as any) : null;
+                      return (
+                        <button
+                          key={n.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 border-b border-border/40 hover:bg-muted/30 transition-colors ${n.isRead ? "" : "bg-amber-50/40 dark:bg-amber-950/20"}`}
+                          onClick={() => {
+                            if (!n.isRead) markNotificationRead(n.id);
+                            if (n.task) setSelectedTask(n.task);
+                          }}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className={`mt-1 h-2 w-2 rounded-full ${n.isRead ? "bg-muted-foreground/40" : "bg-amber-500"}`} />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{n.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">{n.message}</p>
+                              {createdAt && (
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  {formatDistanceToNow(createdAt, { addSuffix: true })}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="px-3 py-2 border-t border-border/50">
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setNotificationDialogOpen(true)}>
+                    {t.dashboard.seeAll}
+                  </Button>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             <div className="h-6 w-px bg-border/50 mx-1" />
 
@@ -272,6 +395,93 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+
+      <Dialog open={notificationDialogOpen} onOpenChange={setNotificationDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t.dashboard.notification}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex gap-2">
+              {[
+                { key: "all", label: language === "vi" ? "Tất cả" : "All" },
+                { key: "unread", label: language === "vi" ? "Chưa xem" : "Unread" },
+                { key: "read", label: language === "vi" ? "Đã xem" : "Read" },
+              ].map((item) => (
+                <Badge
+                  key={item.key}
+                  variant={notificationStatusFilter === item.key ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setNotificationStatusFilter(item.key as "all" | "unread" | "read")}
+                >
+                  {item.label}
+                </Badge>
+              ))}
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <Select value={notificationGroupFilter} onValueChange={setNotificationGroupFilter}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder={t.dashboard.byGroup} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t.dashboard.allGroups}</SelectItem>
+                  {notificationGroups.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="mt-4 max-h-[420px] overflow-auto border rounded-lg">
+            {filteredNotifications.length === 0 ? (
+              <div className="p-6 text-sm text-muted-foreground text-center">
+                {t.dashboard.noTasksFound}
+              </div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {filteredNotifications.map((n) => {
+                  const createdAt = n.createdAt ? new Date(n.createdAt as any) : null;
+                  return (
+                    <li
+                      key={n.id}
+                      className={`flex gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer ${n.isRead ? "" : "bg-amber-50/50 dark:bg-amber-950/20"}`}
+                      onClick={() => {
+                        if (!n.isRead) markNotificationRead(n.id);
+                        if (n.task) setSelectedTask(n.task);
+                      }}
+                    >
+                      <span className={`mt-1 h-2 w-2 rounded-full ${n.isRead ? "bg-muted-foreground/40" : "bg-amber-500"}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium truncate">{n.title}</p>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {n.group}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{n.message}</p>
+                        {createdAt && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {formatDistanceToNow(createdAt, { addSuffix: true })}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <TaskDialog
+        open={!!selectedTask}
+        onOpenChange={(open) => !open && setSelectedTask(null)}
+        task={selectedTask}
+      />
     </div>
   );
 }

@@ -1,7 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { UserRole, UserRoleType } from "./use-tasks";
 
-/** User từ /api/auth/me (có thể có roles, groups từ user_roles, user_groups). */
+/** (roleId, componentId) từ user_roles — dùng cho Thư ký hợp phần theo hợp phần. */
+export interface RoleAssignmentItem {
+  roleId: string;
+  componentId: string | null;
+}
+
+/** User từ /api/auth/me (có thể có roles, groups, roleAssignments từ user_roles, user_groups). */
 export interface AuthUser {
   id: string;
   email: string;
@@ -12,6 +18,8 @@ export interface AuthUser {
   isActive: boolean;
   roles?: { id: string; code: string; name: string }[];
   groups?: { id: string; code: string; name: string }[];
+  /** Chi tiết (roleId, componentId) từ user_roles — dùng phân quyền Thư ký hợp phần theo hợp phần. */
+  roleAssignments?: RoleAssignmentItem[];
 }
 
 interface AuthContextType {
@@ -30,8 +38,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function deriveRole(user: AuthUser | null): UserRoleType {
   const roles = user?.roles;
   if (Array.isArray(roles) && roles.length) {
-    if (roles.some((r) => r.name === UserRole.ADMIN || r.code === "admin")) return UserRole.ADMIN;
-    if (roles.some((r) => r.name === UserRole.MANAGER || r.code === "manager")) return UserRole.MANAGER;
+    // Admin: code admin, name Admin hoặc Quản trị
+    if (roles.some((r) => r.name === UserRole.ADMIN || r.code === "admin" || r.name === "Quản trị" || r.name === "Quản trị viên")) return UserRole.ADMIN;
+    // Quản lý: code manager, name Manager, Quản lý, hoặc Trưởng/Phó ban (Trưởng ban Thư ký, ptbtk, tbtk...)
+    if (roles.some((r) =>
+      r.name === UserRole.MANAGER || r.code === "manager" || r.name === "Quản lý"
+      || (r.name && (r.name.includes("Trưởng ban") || r.name.includes("Phó trưởng ban")))
+      || (r.code && (r.code.replace(/\t/g, "").trim() === "tbtk" || r.code.replace(/\t/g, "").trim() === "ptbtk"))
+    )) return UserRole.MANAGER;
   }
   return UserRole.EMPLOYEE;
 }

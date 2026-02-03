@@ -35,6 +35,34 @@ function validateTaskContractLink(payload: { taskType?: string | null; relatedWo
   }
 }
 
+const DUE_SOON_DAYS = 7;
+
+function formatDateOnly(input: string | Date | null | undefined): string | null {
+  if (!input) return null;
+  if (typeof input === "string") return input;
+  return input.toISOString().slice(0, 10);
+}
+
+function buildNotificationContent(type: "task_assigned" | "task_due_soon" | "task_overdue", taskTitle: string, dueDate?: string | null) {
+  const safeTitle = taskTitle || "Công việc";
+  if (type === "task_assigned") {
+    return {
+      title: "Công việc mới được giao",
+      message: `Bạn được giao: ${safeTitle}`,
+    };
+  }
+  if (type === "task_due_soon") {
+    return {
+      title: "Công việc sắp đến hạn",
+      message: dueDate ? `Sắp đến hạn (${dueDate}): ${safeTitle}` : `Sắp đến hạn: ${safeTitle}`,
+    };
+  }
+  return {
+    title: "Công việc đã quá hạn",
+    message: dueDate ? `Đã quá hạn (${dueDate}): ${safeTitle}` : `Đã quá hạn: ${safeTitle}`,
+  };
+}
+
 
 export async function registerRoutes(
   httpServer: Server,
@@ -231,7 +259,7 @@ export async function registerRoutes(
         await dbStorage.deleteTaskAssignmentsByTaskId(id);
         if (assignmentsInput.length > 0) {
           for (const a of assignmentsInput) {
-            await dbStorage.createTaskAssignment({
+            const assignment = await dbStorage.createTaskAssignment({
               taskId: id,
               userId: a.userId,
               stageType: a.stageType,
@@ -243,6 +271,21 @@ export async function registerRoutes(
               progress: a.progress ?? 0,
               notes: a.notes ?? null,
             });
+            const existing = await dbStorage.getNotificationByTaskType(a.userId, id, "task_assigned");
+            if (!existing) {
+              const content = buildNotificationContent("task_assigned", task.title ?? "");
+              await dbStorage.createNotification({
+                userId: a.userId,
+                type: "task_assigned",
+                taskId: id,
+                taskAssignmentId: assignment.id,
+                title: content.title,
+                message: content.message,
+                isRead: false,
+                createdAt: new Date(),
+                readAt: null,
+              });
+            }
           }
         }
       }
@@ -302,7 +345,7 @@ export async function registerRoutes(
 
       if (db && assignmentsInput && assignmentsInput.length > 0) {
         for (const a of assignmentsInput) {
-          await dbStorage.createTaskAssignment({
+          const assignment = await dbStorage.createTaskAssignment({
             taskId: task.id,
             userId: a.userId,
             stageType: a.stageType,
@@ -314,6 +357,21 @@ export async function registerRoutes(
             progress: a.progress ?? 0,
             notes: a.notes ?? null,
           });
+          const existing = await dbStorage.getNotificationByTaskType(a.userId, task.id, "task_assigned");
+          if (!existing) {
+            const content = buildNotificationContent("task_assigned", task.title ?? "");
+            await dbStorage.createNotification({
+              userId: a.userId,
+              type: "task_assigned",
+              taskId: task.id,
+              taskAssignmentId: assignment.id,
+              title: content.title,
+              message: content.message,
+              isRead: false,
+              createdAt: new Date(),
+              readAt: null,
+            });
+          }
         }
       }
 
@@ -363,6 +421,79 @@ export async function registerRoutes(
       console.error("Error refreshing tasks:", error);
       const message = error instanceof Error ? error.message : "Failed to refresh tasks";
       res.status(500).json({ message });
+    }
+  });
+
+  // ---------- Notifications ----------
+  app.get(api.notifications.unreadCount.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.json({ count: 0 });
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      const count = await dbStorage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (err) {
+      console.error("Error fetching unread notifications count:", err);
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch notifications" });
+    }
+  });
+
+  app.get(api.notifications.list.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.json([]);
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      const unreadOnly = String(req.query.unread || "").toLowerCase() === "true";
+
+      // Generate due-soon / overdue notifications on demand (idempotent by assignment+type)
+      const assignments = await dbStorage.getTaskAssignmentsWithTaskByUserId(userId);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      for (const { assignment, task } of assignments) {
+        const dueDateStr = formatDateOnly(assignment.dueDate);
+        if (!dueDateStr) continue;
+        const dueDate = new Date(dueDateStr);
+        const isCompleted = assignment.completedAt != null || task.status === "Completed";
+        if (isCompleted) continue;
+        const diffDays = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        let type: "task_due_soon" | "task_overdue" | null = null;
+        if (diffDays < 0) type = "task_overdue";
+        else if (diffDays <= DUE_SOON_DAYS) type = "task_due_soon";
+        if (!type) continue;
+        const existing = await dbStorage.getNotificationByAssignmentType(userId, assignment.id, type);
+        if (!existing) {
+          const content = buildNotificationContent(type, task.title ?? "", dueDateStr);
+          await dbStorage.createNotification({
+            userId,
+            type,
+            taskId: assignment.taskId,
+            taskAssignmentId: assignment.id,
+            title: content.title,
+            message: content.message,
+            isRead: false,
+            createdAt: new Date(),
+            readAt: null,
+          });
+        }
+      }
+
+      const list = await dbStorage.getNotificationsByUserId(userId, { unreadOnly });
+      res.json(list);
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch notifications" });
+    }
+  });
+
+  app.patch(api.notifications.markRead.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await dbStorage.markNotificationAsRead(userId, id);
+      if (!updated) return res.status(404).json({ message: "Notification not found" });
+      res.json(updated);
+    } catch (err) {
+      console.error("Error marking notification as read:", err);
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to update notification" });
     }
   });
 
@@ -943,6 +1074,10 @@ export async function registerRoutes(
     isActive: z.boolean().optional(),
     roleIds: z.array(z.string().uuid()).optional(),
     groupIds: z.array(z.string().uuid()).optional(),
+    /** Ghi đè user_roles theo (roleId, componentId). Dùng khi có Thư ký hợp phần + Tên Hợp phần. */
+    roleAssignments: z
+      .array(z.object({ roleId: z.string().uuid(), componentId: z.string().uuid().nullable().optional() }))
+      .optional(),
   });
 
   app.patch(api.users.update.path, requireAuth, requireRole(UserRole.ADMIN, UserRole.MANAGER), async (req, res) => {
@@ -959,8 +1094,14 @@ export async function registerRoutes(
       if (Object.keys(payload).length) {
         await dbStorage.updateUser(id, payload as Parameters<typeof dbStorage.updateUser>[1]);
       }
-      if (input.roleIds !== undefined) await dbStorage.setUserRoles(id, input.roleIds);
-      if (input.groupIds !== undefined) await dbStorage.setUserGroups(id, input.groupIds);
+      if (input.roleAssignments !== undefined) {
+        await dbStorage.setUserRoleAssignments(
+          id,
+          input.roleAssignments.map((a) => ({ roleId: a.roleId, componentId: a.componentId ?? null }))
+        );
+      } else if (input.roleIds !== undefined) {
+        await dbStorage.setUserRoles(id, input.roleIds);
+      }
       const user = await dbStorage.getUserByIdWithRolesAndGroups(id);
       if (!user) return res.status(404).json({ message: "User not found" });
       res.json(sanitizeUser(user));

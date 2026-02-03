@@ -1,20 +1,50 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
-import { useTasks, useRefreshTasks, useCreateTask, UserRole } from "@/hooks/use-tasks";
+import {
+  useTasks,
+  useRefreshTasks,
+  useCreateTask,
+  UserRole,
+} from "@/hooks/use-tasks";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
+import { useUnreadNotificationCount } from "@/hooks/use-notifications";
 import {
   TaskDashboard,
   applyDashboardBadgeFilter,
   type DashboardBadgeFilter,
 } from "@/components/task-dashboard";
 import { TaskDialog } from "@/components/task-dialog";
-import { TaskTable, sortTasks, type TaskSortColumn } from "@/components/task-table";
+import {
+  TaskTable,
+  sortTasks,
+  type TaskSortColumn,
+} from "@/components/task-table";
+import { TaskKanbanBoard } from "@/components/task-kanban-board";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus, Bell, MessageSquare, Calendar } from "lucide-react";
+import {
+  Loader2,
+  RefreshCw,
+  Search,
+  Filter,
+  AlertTriangle,
+  Plus,
+  Bell,
+  MessageSquare,
+  Calendar,
+  LayoutGrid,
+  List,
+} from "lucide-react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format, formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,20 +57,27 @@ export default function Dashboard() {
   const { role, user } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
-  
+  const { data: unreadCount } = useUnreadNotificationCount();
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
   const [badgeFilter, setBadgeFilter] = useState<DashboardBadgeFilter>(null);
   const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
+  const [selectedTask, setSelectedTask] =
+    useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "board">("table");
   const taskListRef = useRef<HTMLDivElement>(null);
 
   // Open create dialog when navigating from header CTA (#create)
   useEffect(() => {
-    if (typeof window !== "undefined" && (window.location.hash === "#create" || window.location.search.includes("create=1"))) {
+    if (
+      typeof window !== "undefined" &&
+      (window.location.hash === "#create" ||
+        window.location.search.includes("create=1"))
+    ) {
       setIsCreateDialogOpen(true);
       window.history.replaceState(null, "", window.location.pathname);
     }
@@ -49,7 +86,7 @@ export default function Dashboard() {
   // Get unique groups from tasks
   const availableGroups = useMemo(() => {
     if (!tasks) return [];
-    const groups = new Set(tasks.map(t => t.group).filter(Boolean));
+    const groups = new Set(tasks.map((t) => t.group).filter(Boolean));
     return Array.from(groups).sort();
   }, [tasks]);
 
@@ -91,8 +128,14 @@ export default function Dashboard() {
   const recentActivityItems = useMemo(() => {
     if (!baseFilteredTasks.length) return [];
     const sorted = [...baseFilteredTasks].sort((a, b) => {
-      const da = a.updatedAt || a.createdAt ? new Date(a.updatedAt || a.createdAt!).getTime() : 0;
-      const db = b.updatedAt || b.createdAt ? new Date(b.updatedAt || b.createdAt!).getTime() : 0;
+      const da =
+        a.updatedAt || a.createdAt
+          ? new Date(a.updatedAt || a.createdAt!).getTime()
+          : 0;
+      const db =
+        b.updatedAt || b.createdAt
+          ? new Date(b.updatedAt || b.createdAt!).getTime()
+          : 0;
       return db - da;
     });
     return sorted.slice(0, 5).map((task) => {
@@ -101,14 +144,16 @@ export default function Dashboard() {
         task.status === "Completed"
           ? t.dashboard.taskCompleted
           : task.status === "In Progress"
-            ? t.dashboard.reviewCompleted
-            : t.dashboard.addNewTask;
+          ? t.dashboard.reviewCompleted
+          : t.dashboard.addNewTask;
       return {
         id: task.id,
         title: task.title ?? "",
         assignee: task.assignee ?? "",
         label,
-        date: date ? formatDistanceToNow(new Date(date), { addSuffix: true }) : "",
+        date: date
+          ? formatDistanceToNow(new Date(date), { addSuffix: true })
+          : "",
         status: task.status,
       };
     });
@@ -116,17 +161,36 @@ export default function Dashboard() {
 
   // Falr-style: In Progress tasks (top 5)
   const inProgressTasks = useMemo(
-    () => baseFilteredTasks.filter((t) => t.status === "In Progress").slice(0, 5),
+    () =>
+      baseFilteredTasks.filter((t) => t.status === "In Progress").slice(0, 5),
     [baseFilteredTasks]
   );
 
-  const handleBadgeFilter = useCallback(
-    (filter: DashboardBadgeFilter) => {
-      setBadgeFilter(filter);
-      setTimeout(() => taskListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    },
-    []
-  );
+  // Danh sách nhân sự để lọc bảng (từ baseFilteredTasks)
+  const byAssignee = useMemo(() => {
+    const counts: Record<string, number> = {};
+    baseFilteredTasks.forEach((task) => {
+      const name = task.assignee?.trim() ?? "";
+      counts[name] = (counts[name] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count, display: name || t.task.unassigned }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+  }, [baseFilteredTasks, t]);
+
+
+  const handleBadgeFilter = useCallback((filter: DashboardBadgeFilter) => {
+    setBadgeFilter(filter);
+    setTimeout(
+      () =>
+        taskListRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        }),
+      100
+    );
+  }, []);
 
   const handleSort = useCallback((column: TaskSortColumn) => {
     setSortBy((prev) => {
@@ -138,20 +202,29 @@ export default function Dashboard() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "High": return "bg-orange-100 text-orange-700 hover:bg-orange-100/80";
-      case "Critical": return "bg-red-100 text-red-700 hover:bg-red-100/80";
-      case "Medium": return "bg-blue-100 text-blue-700 hover:bg-blue-100/80";
-      default: return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
+      case "High":
+        return "bg-orange-100 text-orange-700 hover:bg-orange-100/80";
+      case "Critical":
+        return "bg-red-100 text-red-700 hover:bg-red-100/80";
+      case "Medium":
+        return "bg-blue-100 text-blue-700 hover:bg-blue-100/80";
+      default:
+        return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Completed": return "bg-green-100 text-green-700 hover:bg-green-100/80";
-      case "In Progress": return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
-      case "Pending": return "bg-yellow-50 text-yellow-700 hover:bg-yellow-50/80 border-yellow-200";
-      case "Cancelled": return "bg-gray-50 text-gray-700 hover:bg-gray-50/80 border-gray-200";
-      default: return "bg-gray-100 text-gray-700 hover:bg-gray-100/80";
+      case "Completed":
+        return "bg-green-100 text-green-700 hover:bg-green-100/80";
+      case "In Progress":
+        return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
+      case "Pending":
+        return "bg-yellow-50 text-yellow-700 hover:bg-yellow-50/80 border-yellow-200";
+      case "Cancelled":
+        return "bg-gray-50 text-gray-700 hover:bg-gray-50/80 border-gray-200";
+      default:
+        return "bg-gray-100 text-gray-700 hover:bg-gray-100/80";
     }
   };
 
@@ -175,7 +248,9 @@ export default function Dashboard() {
           {t.errors.failedToLoad}
         </p>
         <Button onClick={() => refresh()} disabled={isRefreshing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw
+            className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+          />
           {t.errors.retryConnection}
         </Button>
       </div>
@@ -192,25 +267,32 @@ export default function Dashboard() {
           <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
             <span>{t.dashboard.title}</span>
             <span aria-hidden>/</span>
-            <span className="text-foreground font-medium">{t.dashboard.overview}</span>
+            <span className="text-foreground font-medium">
+              {t.dashboard.overview}
+            </span>
           </nav>
           <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">
-            {language === "vi" ? `Xin chào, ${welcomeName}` : `Welcome back, ${welcomeName}`}
+            {language === "vi"
+              ? `Xin chào, ${welcomeName}`
+              : `Welcome back, ${welcomeName}`}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {t.dashboard.overview}
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>{t.dashboard.lastSynced}: {format(new Date(), "HH:mm")}</span>
+          <span>
+            {t.dashboard.lastSynced}: {format(new Date(), "HH:mm")}
+          </span>
           <Button
             variant="outline"
             size="sm"
             className="h-8 w-8 p-0 shrink-0"
             onClick={() => refresh()}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            disabled={isRefreshing}>
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+            />
           </Button>
         </div>
       </div>
@@ -222,8 +304,12 @@ export default function Dashboard() {
             <Bell className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">{t.dashboard.notification}</p>
-            <p className="text-xs text-amber-700/80 dark:text-amber-300/80">5 {t.dashboard.unreadNotification}</p>
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+              {t.dashboard.notification}
+            </p>
+            <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
+              {unreadCount?.count ?? 0} {t.dashboard.unreadNotification}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/30 shadow-sm">
@@ -231,8 +317,12 @@ export default function Dashboard() {
             <MessageSquare className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">{t.dashboard.message}</p>
-            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80">5 {t.dashboard.unreadNotification}</p>
+            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+              {t.dashboard.message}
+            </p>
+            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
+              5 {t.dashboard.unreadNotification}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-4 p-4 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200/50 dark:border-violet-800/30 shadow-sm">
@@ -240,14 +330,22 @@ export default function Dashboard() {
             <Calendar className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-violet-900 dark:text-violet-100">{t.dashboard.calendar}</p>
-            <p className="text-xs text-violet-700/80 dark:text-violet-300/80">5 {t.dashboard.unreadNotification}</p>
+            <p className="text-sm font-semibold text-violet-900 dark:text-violet-100">
+              {t.dashboard.calendar}
+            </p>
+            <p className="text-xs text-violet-700/80 dark:text-violet-300/80">
+              5 {t.dashboard.unreadNotification}
+            </p>
           </div>
         </div>
         <div className="hidden lg:flex items-center justify-between gap-4 p-4 rounded-xl bg-gradient-to-r from-primary/90 to-violet-600 dark:from-primary dark:to-violet-700 text-primary-foreground border-0 shadow-md">
           <div className="min-w-0">
-            <p className="text-sm font-semibold opacity-95">{t.dashboard.manageProjectOneTouch}</p>
-            <p className="text-xs opacity-80 mt-0.5">Etiam facilisis ligula nec posuere.</p>
+            <p className="text-sm font-semibold opacity-95">
+              {t.dashboard.manageProjectOneTouch}
+            </p>
+            <p className="text-xs opacity-80 mt-0.5">
+              Etiam facilisis ligula nec posuere.
+            </p>
           </div>
           {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
             <Button
@@ -255,8 +353,7 @@ export default function Dashboard() {
               variant="secondary"
               className="shrink-0 bg-white/20 hover:bg-white/30 text-primary-foreground border-0"
               onClick={() => setIsCreateDialogOpen(true)}
-              disabled={isCreating}
-            >
+              disabled={isCreating}>
               <Plus className="h-4 w-4 mr-1.5" />
               {t.dashboard.createNew}
             </Button>
@@ -275,23 +372,35 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-0">
             {recentActivityItems.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground text-center">{t.dashboard.noTasksFound}</div>
+              <div className="p-6 text-sm text-muted-foreground text-center">
+                {t.dashboard.noTasksFound}
+              </div>
             ) : (
               <ul className="divide-y divide-border">
                 {recentActivityItems.map((item) => (
                   <li
                     key={item.id}
                     className="flex gap-3 px-5 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => setSelectedTask(baseFilteredTasks.find((t) => t.id === item.id) ?? null)}
-                  >
-                    <span className="flex h-2 w-2 shrink-0 mt-1.5 rounded-full bg-primary" aria-hidden />
+                    onClick={() =>
+                      setSelectedTask(
+                        baseFilteredTasks.find((t) => t.id === item.id) ?? null
+                      )
+                    }>
+                    <span
+                      className="flex h-2 w-2 shrink-0 mt-1.5 rounded-full bg-primary"
+                      aria-hidden
+                    />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {item.title}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {item.assignee && `${item.assignee} · `}
                         {item.date}
                       </p>
-                      <span className="inline-block mt-1 text-xs font-medium text-primary">{item.label}</span>
+                      <span className="inline-block mt-1 text-xs font-medium text-primary">
+                        {item.label}
+                      </span>
                     </div>
                   </li>
                 ))}
@@ -301,8 +410,9 @@ export default function Dashboard() {
               <button
                 type="button"
                 className="text-xs font-medium text-primary hover:underline"
-                onClick={() => taskListRef.current?.scrollIntoView({ behavior: "smooth" })}
-              >
+                onClick={() =>
+                  taskListRef.current?.scrollIntoView({ behavior: "smooth" })
+                }>
                 {t.dashboard.seeAll} →
               </button>
             </div>
@@ -317,19 +427,23 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-0">
             {inProgressTasks.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground text-center">{t.dashboard.noTasksFound}</div>
+              <div className="p-6 text-sm text-muted-foreground text-center">
+                {t.dashboard.noTasksFound}
+              </div>
             ) : (
               <ul className="divide-y divide-border">
                 {inProgressTasks.map((task) => (
                   <li
                     key={task.id}
                     className="px-5 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => setSelectedTask(task)}
-                  >
-                    <p className="text-sm font-medium text-foreground truncate">{task.title ?? ""}</p>
+                    onClick={() => setSelectedTask(task)}>
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {task.title ?? ""}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {task.dueDate
-                        ? (language === "vi" ? "Hạn: " : "Due: ") + format(new Date(task.dueDate), "dd/MM/yyyy")
+                        ? (language === "vi" ? "Hạn: " : "Due: ") +
+                          format(new Date(task.dueDate), "dd/MM/yyyy")
                         : t.task.noDateSet}
                     </p>
                     <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -348,9 +462,14 @@ export default function Dashboard() {
                 className="text-xs font-medium text-primary hover:underline"
                 onClick={() => {
                   setStatusFilter("In Progress");
-                  setTimeout(() => taskListRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-                }}
-              >
+                  setTimeout(
+                    () =>
+                      taskListRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                      }),
+                    100
+                  );
+                }}>
                 {t.dashboard.seeAll} →
               </button>
             </div>
@@ -370,8 +489,7 @@ export default function Dashboard() {
       {/* Task List — Protend-style table card */}
       <section
         ref={taskListRef}
-        className="bg-card rounded-xl border border-border shadow-sm overflow-hidden"
-      >
+        className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
@@ -383,25 +501,29 @@ export default function Dashboard() {
                 size="sm"
                 onClick={() => setIsCreateDialogOpen(true)}
                 disabled={isCreating}
-                className="ml-2"
-              >
+                className="ml-2">
                 <Plus className="w-4 h-4 mr-2" />
                 {t.dashboard.createNew}
               </Button>
             )}
           </div>
-          
+
           <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t.common.search + " " + t.dashboard.tasks.toLowerCase() + "..."}
+                placeholder={
+                  t.common.search +
+                  " " +
+                  t.dashboard.tasks.toLowerCase() +
+                  "..."
+                }
                 className="pl-9 bg-background"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            
+
             <Select value={groupFilter} onValueChange={setGroupFilter}>
               <SelectTrigger className="w-[160px] bg-background">
                 <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
@@ -409,14 +531,16 @@ export default function Dashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.dashboard.allGroups}</SelectItem>
-                {availableGroups.filter((g): g is string => !!g).map((group) => (
-                  <SelectItem key={group} value={group}>
-                    {group}
-                  </SelectItem>
-                ))}
+                {availableGroups
+                  .filter((g): g is string => !!g)
+                  .map((group) => (
+                    <SelectItem key={group} value={group}>
+                      {group}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[140px] bg-background">
                 <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
@@ -424,43 +548,106 @@ export default function Dashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.dashboard.allStatus}</SelectItem>
-                <SelectItem value="Not Started">{t.status.notStarted}</SelectItem>
-                <SelectItem value="In Progress">{t.status.inProgress}</SelectItem>
+                <SelectItem value="Not Started">
+                  {t.status.notStarted}
+                </SelectItem>
+                <SelectItem value="In Progress">
+                  {t.status.inProgress}
+                </SelectItem>
                 <SelectItem value="Completed">{t.status.completed}</SelectItem>
                 <SelectItem value="Pending">{t.status.pending}</SelectItem>
                 <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
               </SelectContent>
             </Select>
+
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(v) => v && (v === "table" || v === "board") && setViewMode(v)}
+              className="border rounded-md bg-background"
+            >
+              <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
+                <List className="h-4 w-4 mr-1.5" />
+                {t.dashboard.viewTable}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="board" aria-label={t.dashboard.viewBoard}>
+                <LayoutGrid className="h-4 w-4 mr-1.5" />
+                {t.dashboard.viewBoard}
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
         </div>
 
-        <TaskTable
-          tasks={filteredTasks}
-          onTaskClick={setSelectedTask}
-          sortBy={sortBy}
-          sortDir={sortDir}
-          onSort={handleSort}
-          getPriorityColor={getPriorityColor}
-          getStatusColor={getStatusColor}
-        />
+        {/* Lựa chọn lọc theo nhân sự cho bảng thống kê bên dưới */}
+        <div className="px-4 sm:px-5 py-3 border-b border-border bg-muted/20 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground shrink-0">
+            {t.dashboard.filterByStaff}:
+          </span>
+          <Badge
+            variant={badgeFilter?.type !== "assignee" ? "default" : "outline"}
+            className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
+            onClick={() => handleBadgeFilter(null)}
+          >
+            {t.filter.allStaff}
+          </Badge>
+          {byAssignee.map(({ name, count, display }) => (
+            <Badge
+              key={name || "_unassigned"}
+              variant={badgeFilter?.type === "assignee" && badgeFilter?.value === name ? "default" : "outline"}
+              className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
+              onClick={() =>
+                handleBadgeFilter(
+                  badgeFilter?.type === "assignee" && badgeFilter?.value === name
+                    ? null
+                    : { type: "assignee", value: name }
+                )
+              }
+            >
+              {display} ({count})
+            </Badge>
+          ))}
+        </div>
+
+        {viewMode === "table" ? (
+          <TaskTable
+            tasks={filteredTasks}
+            onTaskClick={setSelectedTask}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={handleSort}
+            getPriorityColor={getPriorityColor}
+            getStatusColor={getStatusColor}
+          />
+        ) : (
+          <TaskKanbanBoard
+            tasks={filteredTasks}
+            onTaskClick={setSelectedTask}
+            getPriorityColor={getPriorityColor}
+            getStatusColor={getStatusColor}
+            noGroupLabel={language === "vi" ? "(Không nhóm)" : "(No group)"}
+          />
+        )}
       </section>
 
-      <TaskDialog 
-        open={!!selectedTask} 
-        onOpenChange={(open) => !open && setSelectedTask(null)} 
-        task={selectedTask} 
+      <TaskDialog
+        open={!!selectedTask}
+        onOpenChange={(open) => !open && setSelectedTask(null)}
+        task={selectedTask}
       />
-      
-      <TaskDialog 
-        open={isCreateDialogOpen} 
-        onOpenChange={(open) => setIsCreateDialogOpen(open)} 
+
+      <TaskDialog
+        open={isCreateDialogOpen}
+        onOpenChange={(open) => setIsCreateDialogOpen(open)}
         task={null}
         onCreate={(taskData) => {
           createTask(taskData, {
             onSuccess: () => {
               toast({
                 title: t.common.success,
-                description: t.task.createNew + " " + (language === 'vi' ? 'thành công' : 'successfully'),
+                description:
+                  t.task.createNew +
+                  " " +
+                  (language === "vi" ? "thành công" : "successfully"),
               });
               setIsCreateDialogOpen(false);
             },

@@ -34,6 +34,7 @@ import {
   proofreadingContracts,
   components,
   contractStages,
+  notifications,
   type TaskWithAssignmentDetails,
 } from "./schema";
 
@@ -131,6 +132,31 @@ export const api = {
       path: "/api/tasks/refresh",
       responses: {
         200: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  notifications: {
+    list: {
+      method: "GET" as const,
+      path: "/api/notifications",
+      responses: {
+        200: z.array(z.custom<typeof notifications.$inferSelect>()),
+      },
+    },
+    unreadCount: {
+      method: "GET" as const,
+      path: "/api/notifications/unread-count",
+      responses: {
+        200: z.object({ count: z.number() }),
+      },
+    },
+    markRead: {
+      method: "PATCH" as const,
+      path: "/api/notifications/:id/read",
+      responses: {
+        200: z.custom<typeof notifications.$inferSelect>(),
+        404: errorSchemas.notFound,
       },
     },
   },

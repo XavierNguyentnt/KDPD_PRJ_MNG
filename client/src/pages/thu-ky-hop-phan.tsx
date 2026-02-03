@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTasks, useCreateTask, UserRole } from "@/hooks/use-tasks";
 import { useAuth } from "@/hooks/use-auth";
@@ -6,6 +7,8 @@ import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
 import { useUsers } from "@/hooks/use-works-and-components";
 import { TaskTable, sortTasks, type TaskSortColumn } from "@/components/task-table";
+import { TaskKanbanBoard } from "@/components/task-kanban-board";
+import { TaskStatsBadgesOnly } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
 import { TaskFilters, getDefaultTaskFilters, applyTaskFilters, type TaskFilterState } from "@/components/task-filters";
 import { api, buildUrl } from "@shared/routes";
@@ -55,6 +58,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -63,7 +67,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, FileText, Search, Trash2, Upload, Filter, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, Plus, Pencil, FileText, Search, Trash2, Upload, Filter, ArrowUpDown, ArrowUp, ArrowDown, LayoutGrid, List } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { WorksImport } from "@/components/works-import";
 import { DateInput } from "@/components/ui/date-input";
 import { NumberInput } from "@/components/ui/number-input";
@@ -360,13 +365,34 @@ async function fetchComponents(): Promise<Component[]> {
   return res.json();
 }
 
+const ROLE_THU_KY_NAME = "Thư ký hợp phần";
+const ROLE_THU_KY_CODE = "prj_secretary";
+
 export default function ThuKyHopPhanPage() {
-  const { role, user } = useAuth();
+  const [, setLocation] = useLocation();
+  const { role, user, loading: authLoading } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const thuKyRole = useMemo(
+    () => user?.roles?.find((r) => r.name === ROLE_THU_KY_NAME || r.code === ROLE_THU_KY_CODE),
+    [user?.roles]
+  );
+  const allowedComponentIds = useMemo(
+    () =>
+      thuKyRole && user?.roleAssignments
+        ? user.roleAssignments
+            .filter((a) => a.roleId === thuKyRole.id && a.componentId)
+            .map((a) => a.componentId as string)
+        : [],
+    [thuKyRole, user?.roleAssignments]
+  );
+  // Admin, Quản lý có thể xem tất cả trang quản lý công việc (kể cả Thư ký hợp phần).
+  const canAccessPage = !!thuKyRole || role === UserRole.ADMIN || role === UserRole.MANAGER;
+
   const [tasksPage, setTasksPage] = useState(1);
+  const [taskViewMode, setTaskViewMode] = useState<"table" | "board">("table");
   const [worksPage, setWorksPage] = useState(1);
   const [tcPage, setTcPage] = useState(1);
   const [pcPage, setPcPage] = useState(1);
@@ -408,9 +434,32 @@ export default function ThuKyHopPhanPage() {
   });
   const { data: componentsList = [] } = useQuery({ queryKey: ["components"], queryFn: fetchComponents });
 
+  // Chỉ Thư ký hợp phần: lọc works/tc/pc theo hợp phần được gán.
+  const worksScoped = useMemo(
+    () =>
+      allowedComponentIds.length > 0
+        ? works.filter((w) => w.componentId && allowedComponentIds.includes(w.componentId))
+        : works,
+    [works, allowedComponentIds]
+  );
+  const tcScoped = useMemo(
+    () =>
+      allowedComponentIds.length > 0
+        ? translationContracts.filter((c) => c.componentId && allowedComponentIds.includes(c.componentId))
+        : translationContracts,
+    [translationContracts, allowedComponentIds]
+  );
+  const pcScoped = useMemo(
+    () =>
+      allowedComponentIds.length > 0
+        ? proofreadingContracts.filter((c) => c.componentId && allowedComponentIds.includes(c.componentId))
+        : proofreadingContracts,
+    [proofreadingContracts, allowedComponentIds]
+  );
+
   const taskStages = useMemo(
-    () => Array.from(new Set(works.map((w) => w.stage).filter(Boolean))) as string[],
-    [works]
+    () => Array.from(new Set(worksScoped.map((w) => w.stage).filter(Boolean))) as string[],
+    [worksScoped]
   );
   const taskComponentOptions = useMemo(
     () => componentsList.map((c) => ({ id: c.id, name: c.name })),
@@ -419,8 +468,8 @@ export default function ThuKyHopPhanPage() {
   
   // Get unique stages from works for filtering
   const worksStages = useMemo(
-    () => Array.from(new Set(works.map((w) => w.stage).filter(Boolean))).sort() as string[],
-    [works]
+    () => Array.from(new Set(worksScoped.map((w) => w.stage).filter(Boolean))).sort() as string[],
+    [worksScoped]
   );
 
   // Reset page to 1 when filters change
@@ -440,6 +489,17 @@ export default function ThuKyHopPhanPage() {
     if (!tasks) return [];
     // Filter tasks for "Thư ký hợp phần" group only (similar to Biên tập, CNTT, etc.)
     let list = tasks.filter((t) => t.group === "Thư ký hợp phần");
+    // Thư ký hợp phần: chỉ hiển thị task thuộc work/contract của hợp phần được gán.
+    if (allowedComponentIds.length > 0) {
+      const allowedWorkIds = new Set(worksScoped.map((w) => w.id));
+      const allowedTcIds = new Set(tcScoped.map((c) => c.id));
+      const allowedPcIds = new Set(pcScoped.map((c) => c.id));
+      list = list.filter(
+        (t) =>
+          (t.relatedWorkId && allowedWorkIds.has(t.relatedWorkId)) ||
+          (t.relatedContractId && (allowedTcIds.has(t.relatedContractId) || allowedPcIds.has(t.relatedContractId)))
+      );
+    }
     if (role === UserRole.EMPLOYEE) {
       list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
     }
@@ -453,9 +513,9 @@ export default function ThuKyHopPhanPage() {
           t.group?.toLowerCase().includes(q)
       );
     }
-    list = applyTaskFilters(list, taskFilters, works);
+    list = applyTaskFilters(list, taskFilters, worksScoped);
     return sortTasks(list, taskSortBy, taskSortDir);
-  }, [tasks, role, user?.displayName, tasksSearch, taskFilters, works, taskSortBy, taskSortDir]);
+  }, [tasks, role, user?.displayName, tasksSearch, taskFilters, worksScoped, tcScoped, pcScoped, allowedComponentIds, taskSortBy, taskSortDir]);
 
   const handleTaskSort = (column: TaskSortColumn) => {
     setTaskSortBy((prev) => {
@@ -528,7 +588,7 @@ export default function ThuKyHopPhanPage() {
   // Filter and sort ALL data from DB (before pagination)
   // Order: Filter -> Sort -> Paginate (in paginatedWorks)
   const filteredWorks = useMemo(() => {
-    let list = works;
+    let list = worksScoped;
     
     // Step 1: Filter by component
     if (worksComponentFilter && worksComponentFilter !== "all") {
@@ -554,12 +614,12 @@ export default function ThuKyHopPhanPage() {
     
     // Step 4: Apply sorting to ALL filtered data (not just current page)
     return sortWorks(list, worksSortColumns, getComponentName);
-  }, [works, worksSearch, worksComponentFilter, worksStageFilter, worksSortColumns, componentsList]);
+  }, [worksScoped, worksSearch, worksComponentFilter, worksStageFilter, worksSortColumns, componentsList]);
 
   // Filter and sort ALL data from DB (before pagination)
   // Order: Filter -> Sort -> Paginate (in paginatedTc)
   const filteredTc = useMemo(() => {
-    let list = translationContracts;
+    let list = tcScoped;
     
     // Step 1: Filter by component
     if (tcComponentFilter && tcComponentFilter !== "all") {
@@ -568,7 +628,7 @@ export default function ThuKyHopPhanPage() {
     
     // Step 2: Filter by stage (via work)
     if (tcStageFilter && tcStageFilter !== "all") {
-      const workIdsWithStage = new Set(works.filter((w) => w.stage === tcStageFilter).map((w) => w.id));
+      const workIdsWithStage = new Set(worksScoped.filter((w) => w.stage === tcStageFilter).map((w) => w.id));
       list = list.filter((c) => c.workId && workIdsWithStage.has(c.workId));
     }
     
@@ -584,12 +644,12 @@ export default function ThuKyHopPhanPage() {
     
     // Step 4: Apply sorting to ALL filtered data (not just current page)
     return sortTranslationContracts(list, tcSortColumns, getComponentName);
-  }, [translationContracts, tcSearch, tcComponentFilter, tcStageFilter, tcSortColumns, works, componentsList]);
+  }, [tcScoped, tcSearch, tcComponentFilter, tcStageFilter, tcSortColumns, worksScoped, componentsList]);
 
   // Filter and sort ALL data from DB (before pagination)
   // Order: Filter -> Sort -> Paginate (in paginatedPc)
   const filteredPc = useMemo(() => {
-    let list = proofreadingContracts;
+    let list = pcScoped;
     
     // Step 1: Filter by component
     if (pcComponentFilter && pcComponentFilter !== "all") {
@@ -598,7 +658,7 @@ export default function ThuKyHopPhanPage() {
     
     // Step 2: Filter by stage (via work)
     if (pcStageFilter && pcStageFilter !== "all") {
-      const workIdsWithStage = new Set(works.filter((w) => w.stage === pcStageFilter).map((w) => w.id));
+      const workIdsWithStage = new Set(worksScoped.filter((w) => w.stage === pcStageFilter).map((w) => w.id));
       list = list.filter((c) => c.workId && workIdsWithStage.has(c.workId));
     }
     
@@ -615,7 +675,7 @@ export default function ThuKyHopPhanPage() {
     
     // Step 4: Apply sorting to ALL filtered data (not just current page)
     return sortProofreadingContracts(list, pcSortColumns, getComponentName);
-  }, [proofreadingContracts, pcSearch, pcComponentFilter, pcStageFilter, pcSortColumns, works, componentsList]);
+  }, [pcScoped, pcSearch, pcComponentFilter, pcStageFilter, pcSortColumns, worksScoped, componentsList]);
 
   const paginatedTasks = useMemo(() => {
     const start = (tasksPage - 1) * PAGE_SIZE;
@@ -818,6 +878,40 @@ export default function ThuKyHopPhanPage() {
 
   const { mutate: createTask } = useCreateTask();
 
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  // Chỉ Thư ký hợp phần mới truy cập được trang Thư ký hợp phần.
+  if (!canAccessPage) {
+    return (
+      <div className="p-8 max-w-lg mx-auto">
+        <Alert variant="destructive">
+          <AlertTitle>Không có quyền truy cập</AlertTitle>
+          <AlertDescription>
+            Chỉ Thư ký hợp phần mới truy cập được trang Thư ký hợp phần. Nếu bạn cần quyền này, hãy liên hệ Admin.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+  // Thư ký hợp phần (không phải Admin/Quản lý) phải được gán ít nhất một hợp phần.
+  if (canAccessPage && thuKyRole && allowedComponentIds.length === 0) {
+    return (
+      <div className="p-8 max-w-lg mx-auto">
+        <Alert>
+          <AlertTitle>Chưa được gán hợp phần</AlertTitle>
+          <AlertDescription>
+            Bạn chưa được gán Tên Hợp phần. Chỉ có thể làm việc với dữ liệu của hợp phần được gán. Liên hệ Admin để được gán hợp phần trong mục Quản lý người dùng.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Tabs defaultValue="tasks" className="w-full">
@@ -830,28 +924,48 @@ export default function ThuKyHopPhanPage() {
 
         {/* Tab: Tasks */}
         <TabsContent value="tasks" className="mt-6">
-          <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="p-4 border-b flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
+          <div className="grid gap-6">
+            <TaskStatsBadgesOnly tasks={filteredTasks} />
+          </div>
+          <div className="rounded-xl border border-border bg-card overflow-hidden mt-6">
+            <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-64">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Tìm công việc..."
-                    className="pl-9"
+                    className="pl-9 bg-background"
                     value={tasksSearch}
                     onChange={(e) => setTasksSearch(e.target.value)}
                   />
                 </div>
                 <Badge variant="secondary">{filteredTasks.length} công việc</Badge>
               </div>
-              {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
-                <Button size="sm" onClick={() => setIsCreateTaskOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Thêm công việc
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                <ToggleGroup
+                  type="single"
+                  value={taskViewMode}
+                  onValueChange={(v) => v && (v === "table" || v === "board") && setTaskViewMode(v)}
+                  className="border rounded-md bg-background"
+                >
+                  <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
+                    <List className="h-4 w-4 mr-1.5" />
+                    {t.dashboard.viewTable}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="board" aria-label={t.dashboard.viewBoard}>
+                    <LayoutGrid className="h-4 w-4 mr-1.5" />
+                    {t.dashboard.viewBoard}
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
+                  <Button size="sm" onClick={() => setIsCreateTaskOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Thêm công việc
+                  </Button>
+                )}
+              </div>
             </div>
-            <div className="px-4 py-3 border-b border-border/50 bg-muted/10">
+            <div className="px-4 py-3 border-b border-border bg-muted/20">
               <TaskFilters
                 users={users}
                 components={taskComponentOptions}
@@ -867,6 +981,14 @@ export default function ThuKyHopPhanPage() {
               </div>
             ) : tasksError ? (
               <div className="p-8 text-center text-muted-foreground">Không tải được danh sách công việc.</div>
+            ) : taskViewMode === "board" ? (
+              <TaskKanbanBoard
+                tasks={filteredTasks}
+                onTaskClick={setSelectedTask}
+                getPriorityColor={getPriorityColor}
+                getStatusColor={getStatusColor}
+                noGroupLabel={language === "vi" ? "(Không nhóm)" : "(No group)"}
+              />
             ) : (
               <>
                 <TaskTable

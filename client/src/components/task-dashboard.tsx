@@ -21,6 +21,9 @@ import {
   PieChart,
   Pie,
   Cell,
+  BarChart,
+  Bar,
+  Legend,
 } from "recharts";
 import { useI18n } from "@/hooks/use-i18n";
 import {
@@ -47,6 +50,7 @@ export type DashboardBadgeFilter =
       value: "in_progress_on_time" | "in_progress_behind" | "completed_on_time" | "completed_behind";
     }
   | { type: "overdue"; value: "overdue" }
+  | { type: "not_completed"; value: "not_completed" }
   | null;
 
 type TimeRange = "day" | "week" | "month" | "quarter" | "year";
@@ -123,8 +127,14 @@ export function applyDashboardBadgeFilter(
       return tasks;
     case "overdue":
       return tasks.filter(
-        (t) => !isTaskCompleted(t) && t.dueDate != null && new Date(t.dueDate) < new Date()
+        (t) =>
+          t.status === "In Progress" &&
+          !isTaskCompleted(t) &&
+          t.dueDate != null &&
+          new Date(t.dueDate) < new Date()
       );
+    case "not_completed":
+      return tasks.filter((t) => t.vote === "khong_hoan_thanh");
     default:
       return tasks;
   }
@@ -143,12 +153,14 @@ export function TaskDashboard({
   const stats = useMemo(() => {
     const total = tasks.length;
     const completed = tasks.filter(isTaskCompleted).length;
+    const notCompleted = tasks.filter((x) => x.vote === "khong_hoan_thanh").length;
     const inProgress = tasks.filter((x) => x.status === "In Progress").length;
-    const overdue = tasks.filter((x) => {
+    const overdueInProgress = tasks.filter((x) => {
+      if (x.status !== "In Progress") return false;
       if (!x.dueDate || isTaskCompleted(x)) return false;
       return new Date(x.dueDate) < new Date();
     }).length;
-    return { total, completed, inProgress, overdue };
+    return { total, completed, notCompleted, inProgress, overdueInProgress };
   }, [tasks]);
 
   const byStatus = useMemo(() => {
@@ -163,18 +175,6 @@ export function TaskDashboard({
     }));
   }, [tasks, t]);
 
-  const byAssignee = useMemo(() => {
-    const counts: Record<string, number> = {};
-    tasks.forEach((task) => {
-      const name = task.assignee?.trim() ?? "";
-      counts[name] = (counts[name] || 0) + 1;
-    });
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count, display: name || t.task.unassigned }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 15);
-  }, [tasks, t]);
-
   const byGroup = useMemo(() => {
     const counts: Record<string, number> = {};
     tasks.forEach((task) => {
@@ -184,6 +184,37 @@ export function TaskDashboard({
     return Object.entries(counts)
       .map(([group, count]) => ({ group, count }))
       .sort((a, b) => b.count - a.count);
+  }, [tasks]);
+
+  /** Chuẩn hóa tên nhóm cho biểu đồ cột (CV chung + Công việc chung -> CV chung). */
+  const normalizeGroupName = (g: string | null | undefined): string => {
+    const s = (g ?? "").trim();
+    if (s === "Công việc chung" || s === "CV chung") return "CV chung";
+    return s || "(Không nhóm)";
+  };
+
+  /** Thứ tự nhóm công việc cho biểu đồ cột. */
+  const GROUP_ORDER = ["CV chung", "Biên tập", "Thiết kế", "CNTT", "Thư ký hợp phần"];
+
+  /** Dữ liệu biểu đồ cột: số công việc theo trạng thái (Đang tiến hành, Hoàn thành, Không hoàn thành) của từng nhóm. */
+  const groupStatusBarData = useMemo(() => {
+    const buckets: Record<string, { inProgress: number; completed: number; notCompleted: number }> = {};
+    GROUP_ORDER.forEach((g) => {
+      buckets[g] = { inProgress: 0, completed: 0, notCompleted: 0 };
+    });
+    tasks.forEach((task) => {
+      const group = normalizeGroupName(task.group);
+      if (!(group in buckets)) buckets[group] = { inProgress: 0, completed: 0, notCompleted: 0 };
+      if (task.status === "In Progress") buckets[group].inProgress++;
+      else if (isTaskCompleted(task)) buckets[group].completed++;
+      if (task.vote === "khong_hoan_thanh") buckets[group].notCompleted++;
+    });
+    return GROUP_ORDER.filter((g) => buckets[g]).map((name) => ({
+      name,
+      inProgress: buckets[name].inProgress,
+      completed: buckets[name].completed,
+      notCompleted: buckets[name].notCompleted,
+    }));
   }, [tasks]);
 
   const scheduleStats = useMemo(() => {
@@ -240,6 +271,23 @@ export function TaskDashboard({
         { name: t.dashboard.behindSchedule, value: scheduleStats.completedBehind, fill: "#f59e0b" },
       ].filter((d) => d.value > 0),
     }),
+    [scheduleStats, t]
+  );
+
+  /** Dữ liệu biểu đồ cột tỷ lệ Đúng tiến độ/Chậm tiến độ cho 2 nhóm Đang tiến hành và Hoàn thành */
+  const scheduleRatioBarData = useMemo(
+    () => [
+      {
+        name: t.dashboard.inProgressGroup,
+        onSchedule: scheduleStats.inProgressOnTime,
+        behindSchedule: scheduleStats.inProgressBehind,
+      },
+      {
+        name: t.dashboard.completedGroup,
+        onSchedule: scheduleStats.completedOnTime,
+        behindSchedule: scheduleStats.completedBehind,
+      },
+    ],
     [scheduleStats, t]
   );
 
@@ -326,14 +374,14 @@ export function TaskDashboard({
 
   return (
     <div className="grid gap-6">
-      {/* Protend-style stat cards: full colored background (blue, green, orange, red) like ProTend */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Badge thống kê: gradient (Tổng trắng, Hoàn thành xanh lá, Đang tiến hành xanh lam, Quá hạn cam, Không hoàn thành đỏ) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <Card
-          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-blue-500 dark:bg-blue-600 text-blue-950 dark:text-blue-50 group hover:-translate-y-0.5"
+          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-slate-100 via-white to-slate-50 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800 text-slate-800 dark:text-slate-100 group hover:-translate-y-0.5"
           onClick={() => onBadgeFilter?.(null)}
         >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 dark:bg-white/15 group-hover:bg-white/25 transition-colors">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-300/40 dark:bg-slate-500/30 group-hover:opacity-90 transition-colors">
               <BarChart3 className="h-6 w-6" />
             </div>
             <div className="min-w-0">
@@ -343,7 +391,7 @@ export function TaskDashboard({
           </CardContent>
         </Card>
         <Card
-          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-emerald-500 dark:bg-emerald-600 text-emerald-950 dark:text-emerald-50 group hover:-translate-y-0.5"
+          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-emerald-500 to-emerald-700 dark:from-emerald-600 dark:to-emerald-800 text-emerald-950 dark:text-emerald-50 group hover:-translate-y-0.5"
           onClick={() => onBadgeFilter?.({ type: "status", value: "Completed" })}
         >
           <CardContent className="p-5 flex items-center gap-4">
@@ -357,7 +405,7 @@ export function TaskDashboard({
           </CardContent>
         </Card>
         <Card
-          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-amber-500 dark:bg-amber-600 text-amber-950 dark:text-amber-50 group hover:-translate-y-0.5"
+          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-blue-500 to-blue-700 dark:from-blue-600 dark:to-blue-800 text-blue-950 dark:text-blue-50 group hover:-translate-y-0.5"
           onClick={() => onBadgeFilter?.({ type: "status", value: "In Progress" })}
         >
           <CardContent className="p-5 flex items-center gap-4">
@@ -371,7 +419,7 @@ export function TaskDashboard({
           </CardContent>
         </Card>
         <Card
-          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-rose-500 dark:bg-rose-600 text-rose-950 dark:text-rose-50 group hover:-translate-y-0.5"
+          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-orange-500 to-amber-600 dark:from-orange-600 dark:to-amber-700 text-orange-950 dark:text-orange-50 group hover:-translate-y-0.5"
           onClick={() =>
             onBadgeFilter?.(
               isActive({ type: "overdue", value: "overdue" }) ? null : { type: "overdue", value: "overdue" }
@@ -383,8 +431,28 @@ export function TaskDashboard({
               <AlertCircle className="h-6 w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.overdue}</p>
-              <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.overdue} +</h3>
+              <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.notFinished}</p>
+              <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.overdueInProgress} +</h3>
+            </div>
+          </CardContent>
+        </Card>
+        <Card
+          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-rose-500 to-red-600 dark:from-rose-600 dark:to-red-700 text-rose-950 dark:text-rose-50 group hover:-translate-y-0.5"
+          onClick={() =>
+            onBadgeFilter?.(
+              isActive({ type: "not_completed", value: "not_completed" })
+                ? null
+                : { type: "not_completed", value: "not_completed" }
+            )
+          }
+        >
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 dark:bg-white/15 group-hover:bg-white/25 transition-colors">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.notCompleted}</p>
+              <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.notCompleted} +</h3>
             </div>
           </CardContent>
         </Card>
@@ -462,31 +530,6 @@ export function TaskDashboard({
         </CardContent>
       </Card>
 
-      {/* Badges: By staff */}
-      <Card className="border border-border/50 shadow-sm overflow-hidden">
-        <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
-          <CardTitle className="text-base font-semibold">{t.dashboard.byStaff}</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="flex flex-wrap gap-2">
-            {byAssignee.map(({ name, count, display }) => (
-              <Badge
-                key={name || "_unassigned"}
-                variant={isActive({ type: "assignee", value: name }) ? "default" : "outline"}
-                className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
-                onClick={() =>
-                  onBadgeFilter?.(
-                    isActive({ type: "assignee", value: name }) ? null : { type: "assignee", value: name }
-                  )
-                }
-              >
-                {display} ({count})
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Thống kê theo nhóm công việc: biểu đồ tròn + badges */}
       <Card className="border border-border/50 shadow-sm overflow-hidden">
         <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
@@ -554,7 +597,68 @@ export function TaskDashboard({
         </CardContent>
       </Card>
 
-      {/* Thống kê phụ: Đang tiến hành / Đã hoàn thành — biểu đồ tròn + badges */}
+      {/* Biểu đồ cột: số công việc theo trạng thái (Đang tiến hành, Hoàn thành, Không hoàn thành) của từng nhóm */}
+      <Card className="border border-border/50 shadow-sm overflow-hidden">
+        <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <BarChart3 className="w-4 h-4" />
+            </span>
+            {t.dashboard.byGroup} — {t.dashboard.byStatus}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="h-[320px] w-full">
+            {groupStatusBarData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={groupStatusBarData} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `${v}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: "8px",
+                      border: "1px solid hsl(var(--border))",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    }}
+                    formatter={(value: number, name: string) => [value, name]}
+                    labelFormatter={(label) => label}
+                  />
+                  <Legend
+                    formatter={(value) => {
+                      if (value === "inProgress") return t.stats.inProgress;
+                      if (value === "completed") return t.stats.completed;
+                      if (value === "notCompleted") return t.stats.notCompleted;
+                      return value;
+                    }}
+                  />
+                  <Bar dataKey="inProgress" name={t.stats.inProgress} fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={28} />
+                  <Bar dataKey="completed" name={t.stats.completed} fill="#10b981" radius={[4, 4, 0, 0]} barSize={28} />
+                  <Bar dataKey="notCompleted" name={t.stats.notCompleted} fill="#ef4444" radius={[4, 4, 0, 0]} barSize={28} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50">
+                {t.dashboard.noTasksFound}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Thống kê phụ: Đang tiến hành / Đã hoàn thành — biểu đồ tỷ lệ Đúng/Chậm tiến độ + biểu đồ tròn + badges */}
       <Card className="border border-border/50 shadow-sm overflow-hidden">
         <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -565,6 +669,52 @@ export function TaskDashboard({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6">
+          {/* Biểu đồ tỷ lệ Đúng tiến độ / Chậm tiến độ cho 2 nhóm */}
+          <div className="mb-6">
+            <p className="text-sm font-medium text-muted-foreground mb-3">
+              {t.dashboard.onSchedule} / {t.dashboard.behindSchedule}
+            </p>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={scheduleRatioBarData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `${v}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: "8px",
+                      border: "1px solid hsl(var(--border))",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    }}
+                    formatter={(value: number, name: string) => [value, name]}
+                    labelFormatter={(label) => label}
+                  />
+                  <Legend
+                    formatter={(value) => {
+                      if (value === "onSchedule") return t.dashboard.onSchedule;
+                      if (value === "behindSchedule") return t.dashboard.behindSchedule;
+                      return value;
+                    }}
+                  />
+                  <Bar dataKey="onSchedule" name={t.dashboard.onSchedule} stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} barSize={36} />
+                  <Bar dataKey="behindSchedule" name={t.dashboard.behindSchedule} stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} barSize={36} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Đang tiến hành: đúng tiến độ vs chậm tiến độ */}
             <div className="space-y-3">

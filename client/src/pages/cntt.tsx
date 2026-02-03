@@ -4,16 +4,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
 import { useWorks, useComponents, useUsers } from "@/hooks/use-works-and-components";
-import { TaskStats } from "@/components/task-stats";
+import { TaskStatsBadgesOnly } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
 import { TaskTable, sortTasks, type TaskSortColumn } from "@/components/task-table";
+import { TaskKanbanBoard } from "@/components/task-kanban-board";
 import { TaskFilters, getDefaultTaskFilters, applyTaskFilters, type TaskFilterState } from "@/components/task-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus } from "lucide-react";
-import { Task } from "@shared/schema";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus, LayoutGrid, List } from "lucide-react";
+import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
 
 const INCLUDED_GROUPS = ["CNTT", "Quét trùng lặp"];
@@ -32,8 +34,9 @@ export default function CNTTPage() {
   const [groupFilter, setGroupFilter] = useState("all");
   const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
   const { data: works = [] } = useWorks();
   const { data: components = [] } = useComponents();
@@ -80,6 +83,24 @@ export default function CNTTPage() {
       else setSortDir("asc");
       return column;
     });
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "High": return "bg-orange-100 text-orange-700 hover:bg-orange-100/80";
+      case "Critical": return "bg-red-100 text-red-700 hover:bg-red-100/80";
+      case "Medium": return "bg-blue-100 text-blue-700 hover:bg-blue-100/80";
+      default: return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
+    }
+  };
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Completed": return "bg-green-100 text-green-700 hover:bg-green-100/80";
+      case "In Progress": return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
+      case "Pending": return "bg-amber-100 text-amber-700 hover:bg-amber-100/80";
+      case "Cancelled": return "bg-red-100 text-red-700 hover:bg-red-100/80";
+      default: return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
+    }
   };
 
   if (isLoading) {
@@ -129,11 +150,11 @@ export default function CNTTPage() {
             </Button>
           </div>
         </div>
-        <TaskStats tasks={filteredTasks} />
+        <TaskStatsBadgesOnly tasks={filteredTasks} />
       </section>
 
-      <section className="bg-card rounded-xl border border-border/50 shadow-sm">
-        <div className="p-4 border-b border-border/50 flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
+      <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
             <Badge variant="secondary" className="font-normal">
@@ -170,10 +191,25 @@ export default function CNTTPage() {
                 ))}
               </SelectContent>
             </Select>
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(v) => v && (v === "table" || v === "board") && setViewMode(v)}
+              className="border rounded-md bg-background"
+            >
+              <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
+                <List className="h-4 w-4 mr-1.5" />
+                {t.dashboard.viewTable}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="board" aria-label={t.dashboard.viewBoard}>
+                <LayoutGrid className="h-4 w-4 mr-1.5" />
+                {t.dashboard.viewBoard}
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
         </div>
 
-        <div className="px-4 py-3 border-b border-border/50 bg-muted/10">
+        <div className="px-4 py-3 border-b border-border bg-muted/20">
           <TaskFilters
             users={users}
             components={componentOptions}
@@ -184,26 +220,38 @@ export default function CNTTPage() {
           />
         </div>
 
-        <TaskTable
-          tasks={filteredTasks}
-          onTaskClick={setSelectedTask}
-          sortBy={sortBy}
-          sortDir={sortDir}
-          onSort={handleSort}
-          columns={{
-            id: true,
-            title: true,
-            group: true,
-            assignee: true,
-            priority: true,
-            status: true,
-            dueDate: true,
-            progress: true,
-            receivedDate: true,
-            actualCompletedAt: true,
-            vote: true,
-          }}
-        />
+        {viewMode === "table" ? (
+          <TaskTable
+            tasks={filteredTasks}
+            onTaskClick={setSelectedTask}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={handleSort}
+            getPriorityColor={getPriorityColor}
+            getStatusColor={getStatusColor}
+            columns={{
+              id: true,
+              title: true,
+              group: true,
+              assignee: true,
+              priority: true,
+              status: true,
+              dueDate: true,
+              progress: true,
+              receivedDate: true,
+              actualCompletedAt: true,
+              vote: true,
+            }}
+          />
+        ) : (
+          <TaskKanbanBoard
+            tasks={filteredTasks}
+            onTaskClick={setSelectedTask}
+            getPriorityColor={getPriorityColor}
+            getStatusColor={getStatusColor}
+            noGroupLabel={language === "vi" ? "(Không nhóm)" : "(No group)"}
+          />
+        )}
       </section>
 
       <TaskDialog open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)} task={selectedTask} />

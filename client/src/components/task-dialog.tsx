@@ -234,6 +234,7 @@ export function TaskDialog({
   const updateMutation = useUpdateTask();
   const deleteMutation = useDeleteTask();
   const isNewTask = !task;
+  const [isEditing, setIsEditing] = useState(false);
   const effectiveTask = (
     task?.group === "Biên tập" ||
     task?.group === "Thiết kế" ||
@@ -742,7 +743,16 @@ export function TaskDialog({
     }
   }, [effectiveTask, task, form, defaultGroup]);
 
-  const canEditMeta = role === UserRole.ADMIN || role === UserRole.MANAGER;
+  const canEditMetaRaw = role === UserRole.ADMIN || role === UserRole.MANAGER;
+  const canEditMeta = canEditMetaRaw && (isNewTask || isEditing);
+
+  useEffect(() => {
+    if (!open) {
+      setIsEditing(false);
+      return;
+    }
+    setIsEditing(isNewTask);
+  }, [open, isNewTask, task?.id]);
 
   const onSubmit = (data: FormData) => {
     if (isNewTask && onCreate) {
@@ -2573,18 +2583,25 @@ export function TaskDialog({
                 onClick={() => onOpenChange(false)}>
                 {t.common.cancel}
               </Button>
-              <Button
-                type="submit"
-                disabled={
-                  updateMutation.isPending ||
-                  isCreating ||
-                  deleteMutation.isPending
-                }>
-                {(updateMutation.isPending || isCreating) && (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                )}
-                {isNewTask ? t.common.create : t.task.saveChanges}
-              </Button>
+              {!isNewTask && canEditMetaRaw && !isEditing && (
+                <Button type="button" onClick={() => setIsEditing(true)}>
+                  {language === "vi" ? "Cập nhật" : "Update"}
+                </Button>
+              )}
+              {(isNewTask || isEditing) && (
+                <Button
+                  type="submit"
+                  disabled={
+                    updateMutation.isPending ||
+                    isCreating ||
+                    deleteMutation.isPending
+                  }>
+                  {(updateMutation.isPending || isCreating) && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
+                  {isNewTask ? t.common.create : t.task.saveChanges}
+                </Button>
+              )}
             </div>
           </DialogFooter>
         </form>
