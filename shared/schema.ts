@@ -124,6 +124,17 @@ export const translationContracts = pgTable("translation_contracts", {
   actualPageCount: integer("actual_page_count"),
   completionRate: numeric("completion_rate", { precision: 10, scale: 4 }),
   settlementValue: numeric("settlement_value", { precision: 15, scale: 2 }),
+  progressCheckDate: date("progress_check_date"),
+  expertReviewDate: date("expert_review_date"),
+  projectAcceptanceDate: date("project_acceptance_date"),
+  status: text("status"),
+  cancelledAt: date("cancelled_at"),
+  proofreadingInProgress: boolean("proofreading_in_progress").default(false),
+  proofreadingCompleted: boolean("proofreading_completed").default(false),
+  editingInProgress: boolean("editing_in_progress").default(false),
+  editingCompleted: boolean("editing_completed").default(false),
+  printTransferDate: date("print_transfer_date"),
+  publishedDate: date("published_date"),
   note: text("note"),
 });
 

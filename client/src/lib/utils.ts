@@ -5,6 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Normalize string for diacritics-insensitive search. */
+export function normalizeSearch(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d");
+}
+
 /** Parse to local date (no UTC shift). Returns [year, month0, day] or null. */
 function parseToLocalDate(value: string | Date | null | undefined): [number, number, number] | null {
   if (value == null || value === "") return null;

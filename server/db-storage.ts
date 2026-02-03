@@ -447,6 +447,12 @@ export async function updateTranslationContract(id: string, data: Partial<Insert
   return rows[0];
 }
 
+export async function deleteTranslationContract(id: string): Promise<TranslationContract> {
+  const rows = await requireDb().delete(translationContracts).where(eq(translationContracts.id, id)).returning();
+  if (!rows[0]) throw new Error(`Translation contract ${id} not found`);
+  return rows[0];
+}
+
 // -----------------------------------------------------------------------------
 // Proofreading contracts CRUD
 // -----------------------------------------------------------------------------
@@ -467,6 +473,12 @@ export async function createProofreadingContract(data: InsertProofreadingContrac
 
 export async function updateProofreadingContract(id: string, data: Partial<InsertProofreadingContract>): Promise<ProofreadingContract> {
   const rows = await requireDb().update(proofreadingContracts).set(data).where(eq(proofreadingContracts.id, id)).returning();
+  if (!rows[0]) throw new Error(`Proofreading contract ${id} not found`);
+  return rows[0];
+}
+
+export async function deleteProofreadingContract(id: string): Promise<ProofreadingContract> {
+  const rows = await requireDb().delete(proofreadingContracts).where(eq(proofreadingContracts.id, id)).returning();
   if (!rows[0]) throw new Error(`Proofreading contract ${id} not found`);
   return rows[0];
 }

@@ -1,11 +1,12 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { useI18n } from "@/hooks/use-i18n";
 import { formatDateDDMMYYYY } from "@/lib/utils";
 import { Workflow, BienTapWorkflowHelpers, BienTapStageType, StageStatus } from "@shared/workflow";
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Pencil, Trash2 } from "lucide-react";
 
 export type TaskSortColumn = "id" | "title" | "group" | "assignee" | "priority" | "status" | "dueDate" | "progress" | "receivedDate" | "actualCompletedAt" | "vote";
 
@@ -68,8 +69,31 @@ interface TaskTableProps {
       render: (task: TaskWithAssignmentDetails) => React.ReactNode;
     }>;
   };
+  actions?: {
+    onView?: (task: TaskWithAssignmentDetails) => void;
+    onEdit?: (task: TaskWithAssignmentDetails) => void;
+    onDelete?: (task: TaskWithAssignmentDetails) => void;
+  };
   getPriorityColor?: (priority: string) => string;
   getStatusColor?: (status: string) => string;
+}
+
+function getBienTapRoundType(task: TaskWithAssignmentDetails): string | null {
+  if (task.group !== "Biên tập") return null;
+  if (!task.workflow) return null;
+  try {
+    const workflow =
+      typeof task.workflow === "string"
+        ? JSON.parse(task.workflow)
+        : task.workflow;
+    const roundType = workflow?.rounds?.[0]?.roundType;
+    if (typeof roundType === "string" && roundType.trim() !== "") {
+      return roundType.trim();
+    }
+  } catch (_) {
+    return null;
+  }
+  return null;
 }
 
 function SortableHead({
@@ -118,6 +142,7 @@ export function TaskTable({
   sortBy,
   sortDir = "asc",
   onSort,
+  actions,
   getPriorityColor,
   getStatusColor 
 }: TaskTableProps) {
@@ -202,7 +227,7 @@ export function TaskTable({
         
         if (assignees.length > 0) {
           return (
-            <td className="p-4 align-middle">
+            <td className="p-4 align-middle min-w-[220px]">
               <div className="flex flex-col gap-1.5">
                 {assignees.map((assignee, idx) => {
                   const statusColor = getStageStatusColor(assignee.status);
@@ -230,7 +255,7 @@ export function TaskTable({
     const assignments = (task as TaskWithAssignmentDetails & { assignments?: Array<{ stageType: string; status?: string; displayName?: string | null }> }).assignments;
     if (assignments && assignments.length > 0) {
       return (
-        <td className="p-4 align-middle">
+        <td className="p-4 align-middle min-w-[220px]">
           <div className="flex flex-col gap-1.5">
             {assignments.map((asn, idx) => {
               const label = getAssignmentLabel(asn.stageType);
@@ -251,7 +276,7 @@ export function TaskTable({
 
     // Default: show regular assignee
     return (
-      <td className="p-4 align-middle">
+      <td className="p-4 align-middle min-w-[220px]">
         {task.assignee ? (
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
@@ -353,6 +378,7 @@ export function TaskTable({
 
   const priorityColorFn = getPriorityColor || defaultGetPriorityColor;
   const statusColorFn = getStatusColor || defaultGetStatusColor;
+  const hasActions = !!actions && (actions.onView || actions.onEdit || actions.onDelete);
 
   // Calculate left position for title column
   const titleColumnLeft = defaultColumns.id ? 80 : 0;
@@ -400,7 +426,7 @@ export function TaskTable({
                 sortBy={sortBy}
                 sortDir={sortDir}
                 onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[260px] min-w-[220px]"
               />
             )}
             {defaultColumns.priority && (
@@ -479,6 +505,9 @@ export function TaskTable({
                 {col.label}
               </th>
             ))}
+            {hasActions && (
+              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px]"></th>
+            )}
           </tr>
         </thead>
         <tbody className="[&_tr:last-child]:border-0">
@@ -486,8 +515,9 @@ export function TaskTable({
             <tr className="border-b transition-colors">
               <td 
                 colSpan={
-                  Object.values(defaultColumns).filter(Boolean).length + 
-                  (defaultColumns.customColumns?.length || 0)
+                  Object.values(defaultColumns).filter(Boolean).length +
+                  (defaultColumns.customColumns?.length || 0) +
+                  (hasActions ? 1 : 0)
                 } 
                 className="p-4 align-middle h-32 text-center text-muted-foreground"
               >
@@ -513,6 +543,11 @@ export function TaskTable({
                   >
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium text-sm">{task.title}</span>
+                      {getBienTapRoundType(task) && (
+                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                          {t.task.roundTypeLabel}: {getBienTapRoundType(task)}
+                        </span>
+                      )}
                       {task.description && (
                         <span className="text-xs text-muted-foreground truncate max-w-[200px]">
                           {task.description}
@@ -580,6 +615,49 @@ export function TaskTable({
                     {col.render(task)}
                   </td>
                 ))}
+                {hasActions && (
+                  <td className="p-4 align-middle">
+                    <div className="flex items-center gap-1">
+                      {actions?.onView && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            actions.onView?.(task);
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {actions?.onEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            actions.onEdit?.(task);
+                          }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {actions?.onDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            actions.onDelete?.(task);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))
           )}

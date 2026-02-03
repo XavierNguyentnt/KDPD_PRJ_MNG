@@ -403,6 +403,7 @@ export const api = {
     get: { method: "GET" as const, path: "/api/translation-contracts/:id", responses: { 200: z.custom<typeof translationContracts.$inferSelect>(), 404: errorSchemas.notFound } },
     create: { method: "POST" as const, path: "/api/translation-contracts", input: insertTranslationContractSchema.omit({ id: true }), responses: { 200: z.custom<typeof translationContracts.$inferSelect>(), 400: errorSchemas.validation } },
     update: { method: "PATCH" as const, path: "/api/translation-contracts/:id", input: insertTranslationContractSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof translationContracts.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/translation-contracts/:id", responses: { 200: z.custom<typeof translationContracts.$inferSelect>(), 404: errorSchemas.notFound } },
   },
 
   proofreadingContracts: {
@@ -410,6 +411,7 @@ export const api = {
     get: { method: "GET" as const, path: "/api/proofreading-contracts/:id", responses: { 200: z.custom<typeof proofreadingContracts.$inferSelect>(), 404: errorSchemas.notFound } },
     create: { method: "POST" as const, path: "/api/proofreading-contracts", input: insertProofreadingContractSchema.omit({ id: true }), responses: { 200: z.custom<typeof proofreadingContracts.$inferSelect>(), 400: errorSchemas.validation } },
     update: { method: "PATCH" as const, path: "/api/proofreading-contracts/:id", input: insertProofreadingContractSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof proofreadingContracts.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/proofreading-contracts/:id", responses: { 200: z.custom<typeof proofreadingContracts.$inferSelect>(), 404: errorSchemas.notFound } },
   },
 
   components: {

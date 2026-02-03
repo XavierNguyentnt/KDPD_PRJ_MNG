@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useTasks, useRefreshTasks, useCreateTask, UserRole } from "@/hooks/use-tasks";
+import { useTasks, useRefreshTasks, useCreateTask, useDeleteTask, UserRole } from "@/hooks/use-tasks";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
@@ -13,15 +13,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, RefreshCw, Search, AlertTriangle, Plus, LayoutGrid, List } from "lucide-react";
 import { Task } from "@shared/schema";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
+import { normalizeSearch } from "@/lib/utils";
 
 export default function CVChungPage() {
   const { data: tasks, isLoading, isError } = useTasks();
   const { mutate: refresh, isPending: isRefreshing } = useRefreshTasks();
   const { mutate: createTask, isPending: isCreating } = useCreateTask();
+  const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask();
   const { role, user } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
@@ -31,6 +43,9 @@ export default function CVChungPage() {
   const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
+  const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
+  const [deleteTaskConfirmOpen, setDeleteTaskConfirmOpen] = useState(false);
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
@@ -53,13 +68,13 @@ export default function CVChungPage() {
     }
 
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = normalizeSearch(search.trim());
       list = list.filter(
         (t) =>
-          t.title?.toLowerCase().includes(q) ||
-          t.description?.toLowerCase().includes(q) ||
-          t.assignee?.toLowerCase().includes(q) ||
-          t.id?.toLowerCase().includes(q)
+          normalizeSearch(t.title ?? "").includes(q) ||
+          normalizeSearch(t.description ?? "").includes(q) ||
+          normalizeSearch(t.assignee ?? "").includes(q) ||
+          normalizeSearch(t.id ?? "").includes(q)
       );
     }
 
@@ -207,12 +222,29 @@ export default function CVChungPage() {
         {viewMode === "table" ? (
           <TaskTable
             tasks={filteredTasks}
-            onTaskClick={setSelectedTask}
+            onTaskClick={(task) => {
+              setSelectedTask(task);
+              setTaskDialogMode("view");
+            }}
             sortBy={sortBy}
             sortDir={sortDir}
             onSort={handleSort}
             getPriorityColor={getPriorityColor}
             getStatusColor={getStatusColor}
+            actions={{
+              onView: (task) => {
+                setSelectedTask(task);
+                setTaskDialogMode("view");
+              },
+              onEdit: (task) => {
+                setSelectedTask(task);
+                setTaskDialogMode("edit");
+              },
+              onDelete: (task) => {
+                setDeleteTaskTarget(task);
+                setDeleteTaskConfirmOpen(true);
+              },
+            }}
             columns={{
               id: true,
               title: true,
@@ -230,7 +262,10 @@ export default function CVChungPage() {
         ) : (
           <TaskKanbanBoard
             tasks={filteredTasks}
-            onTaskClick={setSelectedTask}
+            onTaskClick={(task) => {
+              setSelectedTask(task);
+              setTaskDialogMode("view");
+            }}
             getPriorityColor={getPriorityColor}
             getStatusColor={getStatusColor}
             noGroupLabel={language === "vi" ? "(Không nhóm)" : "(No group)"}
@@ -242,6 +277,7 @@ export default function CVChungPage() {
         open={!!selectedTask}
         onOpenChange={(open) => !open && setSelectedTask(null)}
         task={selectedTask}
+        mode={taskDialogMode}
       />
       
       <TaskDialog 
@@ -258,6 +294,36 @@ export default function CVChungPage() {
         }}
         isCreating={isCreating}
       />
+
+      <AlertDialog open={deleteTaskConfirmOpen} onOpenChange={setDeleteTaskConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa công việc</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa công việc "{deleteTaskTarget?.title ?? deleteTaskTarget?.id}"?
+              Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!deleteTaskTarget?.id) return;
+                deleteTask(deleteTaskTarget.id, {
+                  onSuccess: () => {
+                    setDeleteTaskConfirmOpen(false);
+                    setDeleteTaskTarget(null);
+                  },
+                });
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              Xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

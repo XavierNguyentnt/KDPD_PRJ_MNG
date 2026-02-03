@@ -27,19 +27,19 @@ export function TaskStatsBadgesOnly({ tasks }: TaskStatsProps) {
   }, [tasks]);
 
   const badges = [
-    { label: t.stats.totalTasks, value: stats.total, icon: BarChart3, gradient: "from-slate-100 via-white to-slate-50 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800", textClass: "text-slate-800 dark:text-slate-100", iconBg: "bg-slate-300/40 dark:bg-slate-500/30" },
-    { label: t.stats.completed, value: stats.completed, icon: CheckCircle2, gradient: "from-emerald-500 to-emerald-700 dark:from-emerald-600 dark:to-emerald-800", textClass: "text-emerald-950 dark:text-emerald-50", iconBg: "bg-white/20 dark:bg-white/15" },
-    { label: t.stats.inProgress, value: stats.inProgress, icon: Clock, gradient: "from-blue-500 to-blue-700 dark:from-blue-600 dark:to-blue-800", textClass: "text-blue-950 dark:text-blue-50", iconBg: "bg-white/20 dark:bg-white/15" },
-    { label: t.stats.notFinished, value: stats.overdueInProgress, icon: AlertCircle, gradient: "from-orange-500 to-amber-600 dark:from-orange-600 dark:to-amber-700", textClass: "text-orange-950 dark:text-orange-50", iconBg: "bg-white/20 dark:bg-white/15" },
-    { label: t.stats.notCompleted, value: stats.notCompleted, icon: AlertCircle, gradient: "from-rose-500 to-red-600 dark:from-rose-600 dark:to-red-700", textClass: "text-rose-950 dark:text-rose-50", iconBg: "bg-white/20 dark:bg-white/15" },
+    { label: t.stats.totalTasks, value: stats.total, icon: BarChart3, gradient: "bg-white dark:bg-slate-900/30", textClass: "text-slate-700 dark:text-slate-100", iconBg: "bg-slate-200/60 dark:bg-slate-700/40" },
+    { label: t.stats.completed, value: stats.completed, icon: CheckCircle2, gradient: "bg-emerald-50 dark:bg-emerald-950/30", textClass: "text-emerald-700 dark:text-emerald-300", iconBg: "bg-emerald-200/60 dark:bg-emerald-700/40" },
+    { label: t.stats.inProgress, value: stats.inProgress, icon: Clock, gradient: "bg-blue-50 dark:bg-blue-950/30", textClass: "text-blue-700 dark:text-blue-300", iconBg: "bg-blue-200/60 dark:bg-blue-700/40" },
+    { label: t.stats.notFinished, value: stats.overdueInProgress, icon: AlertCircle, gradient: "bg-amber-50 dark:bg-amber-950/30", textClass: "text-amber-800 dark:text-amber-300", iconBg: "bg-amber-200/60 dark:bg-amber-700/40" },
+    { label: t.stats.notCompleted, value: stats.notCompleted, icon: AlertCircle, gradient: "bg-rose-50 dark:bg-rose-950/30", textClass: "text-rose-700 dark:text-rose-300", iconBg: "bg-rose-200/60 dark:bg-rose-700/40" },
   ];
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
       {badges.map(({ label, value, icon: Icon, gradient, textClass, iconBg }) => (
-        <Card key={label} className={`overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 bg-gradient-to-br ${gradient} ${textClass} group hover:-translate-y-0.5`}>
+        <Card key={label} className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 ${gradient} ${textClass}`}>
           <CardContent className="p-5 flex items-center gap-4">
-            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${iconBg} group-hover:opacity-90 transition-colors`}>
+            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${iconBg}`}>
               <Icon className="h-6 w-6" />
             </div>
             <div className="min-w-0">

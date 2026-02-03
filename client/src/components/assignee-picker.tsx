@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, normalizeSearch } from "@/lib/utils";
 import { Check, ChevronDown, User, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -46,7 +46,9 @@ export function AssigneePicker({
 }: AssigneePickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["users"],
@@ -56,18 +58,39 @@ export function AssigneePicker({
 
   const filtered = useMemo(() => {
     if (!search.trim()) return users;
-    const q = search.trim().toLowerCase();
+    const q = normalizeSearch(search.trim());
     return users.filter(
       (u) =>
-        (u.displayName ?? "").toLowerCase().includes(q) ||
-        (u.email ?? "").toLowerCase().includes(q) ||
-        (u.department != null && String(u.department).toLowerCase().includes(q))
+        normalizeSearch(u.displayName ?? "").includes(q) ||
+        normalizeSearch(u.email ?? "").includes(q) ||
+        (u.department != null && normalizeSearch(String(u.department)).includes(q))
     );
   }, [users, search]);
 
   useEffect(() => {
     if (!open) setSearch("");
   }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setHighlightedIndex(-1);
+      return;
+    }
+    if (filtered.length === 0) {
+      setHighlightedIndex(-1);
+      return;
+    }
+    const selectedIndex = filtered.findIndex(
+      (u) => assigneeId === u.id || (value && value === u.displayName),
+    );
+    setHighlightedIndex(selectedIndex >= 0 ? selectedIndex : 0);
+  }, [open, filtered, assigneeId, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = itemRefs.current[highlightedIndex];
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [open, highlightedIndex]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -90,6 +113,34 @@ export function AssigneePicker({
     setOpen(false);
   };
 
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      if (filtered.length === 0) return;
+      const dir = e.key === "ArrowDown" ? 1 : -1;
+      setHighlightedIndex((prev) => {
+        if (prev < 0) return 0;
+        const next = (prev + dir + filtered.length) % filtered.length;
+        return next;
+      });
+      return;
+    }
+    if (e.key === "Enter") {
+      if (open) {
+        e.preventDefault();
+        const selected = filtered[highlightedIndex];
+        if (selected) handleSelect(selected);
+      }
+      return;
+    }
+    if (e.key === "Escape" && open) {
+      e.preventDefault();
+      setOpen(false);
+    }
+  };
+
   return (
     <div className={cn("space-y-2", className)} ref={containerRef}>
       {label && <Label>{label}</Label>}
@@ -110,6 +161,7 @@ export function AssigneePicker({
               if (!open) setOpen(true);
             }}
             onFocus={() => setOpen(true)}
+            onKeyDown={handleInputKeyDown}
             placeholder={placeholder}
             disabled={disabled}
             className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-muted-foreground"
@@ -140,16 +192,20 @@ export function AssigneePicker({
             ) : (
               <ScrollArea className="h-64">
                 <ul className="p-1">
-                  {filtered.map((u) => {
+                  {filtered.map((u, index) => {
                     const isSelected = assigneeId === u.id || (value && value === u.displayName);
+                    const isHighlighted = index === highlightedIndex;
                     return (
                       <li key={u.id}>
                         <button
                           type="button"
                           onClick={() => handleSelect(u)}
+                          ref={(el) => {
+                            itemRefs.current[index] = el;
+                          }}
                           className={cn(
                             "w-full flex items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground",
-                            isSelected && "bg-accent"
+                            (isSelected || isHighlighted) && "bg-accent text-accent-foreground"
                           )}
                         >
                           {isSelected ? (

@@ -225,8 +225,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main 
-        className="flex-1 flex flex-col min-h-screen transition-all duration-300"
-        style={{ marginLeft: sidebarOpen ? "16rem" : "0" }}
+        className={`flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300 ml-0 ${sidebarOpen ? "md:ml-64" : "md:ml-0"}`}
       >
         {/* Header */}
         <header className="h-16 border-b border-border/50 bg-card/50 backdrop-blur-xl px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">

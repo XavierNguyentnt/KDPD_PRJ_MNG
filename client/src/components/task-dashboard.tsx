@@ -377,11 +377,11 @@ export function TaskDashboard({
       {/* Badge thống kê: gradient (Tổng trắng, Hoàn thành xanh lá, Đang tiến hành xanh lam, Quá hạn cam, Không hoàn thành đỏ) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <Card
-          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-slate-100 via-white to-slate-50 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800 text-slate-800 dark:text-slate-100 group hover:-translate-y-0.5"
+          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900/30 text-slate-700 dark:text-slate-100"
           onClick={() => onBadgeFilter?.(null)}
         >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-300/40 dark:bg-slate-500/30 group-hover:opacity-90 transition-colors">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200/60 dark:bg-slate-700/40">
               <BarChart3 className="h-6 w-6" />
             </div>
             <div className="min-w-0">
@@ -391,11 +391,11 @@ export function TaskDashboard({
           </CardContent>
         </Card>
         <Card
-          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-emerald-500 to-emerald-700 dark:from-emerald-600 dark:to-emerald-800 text-emerald-950 dark:text-emerald-50 group hover:-translate-y-0.5"
+          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
           onClick={() => onBadgeFilter?.({ type: "status", value: "Completed" })}
         >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 dark:bg-white/15 group-hover:bg-white/25 transition-colors">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-200/60 dark:bg-emerald-700/40">
               <CheckCircle2 className="h-6 w-6" />
             </div>
             <div className="min-w-0">
@@ -405,11 +405,11 @@ export function TaskDashboard({
           </CardContent>
         </Card>
         <Card
-          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-blue-500 to-blue-700 dark:from-blue-600 dark:to-blue-800 text-blue-950 dark:text-blue-50 group hover:-translate-y-0.5"
+          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300"
           onClick={() => onBadgeFilter?.({ type: "status", value: "In Progress" })}
         >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 dark:bg-white/15 group-hover:bg-white/25 transition-colors">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-200/60 dark:bg-blue-700/40">
               <Clock className="h-6 w-6" />
             </div>
             <div className="min-w-0">
@@ -419,7 +419,7 @@ export function TaskDashboard({
           </CardContent>
         </Card>
         <Card
-          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-orange-500 to-amber-600 dark:from-orange-600 dark:to-amber-700 text-orange-950 dark:text-orange-50 group hover:-translate-y-0.5"
+          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300"
           onClick={() =>
             onBadgeFilter?.(
               isActive({ type: "overdue", value: "overdue" }) ? null : { type: "overdue", value: "overdue" }
@@ -427,7 +427,7 @@ export function TaskDashboard({
           }
         >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 dark:bg-white/15 group-hover:bg-white/25 transition-colors">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-200/60 dark:bg-amber-700/40">
               <AlertCircle className="h-6 w-6" />
             </div>
             <div className="min-w-0">
@@ -437,7 +437,7 @@ export function TaskDashboard({
           </CardContent>
         </Card>
         <Card
-          className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-br from-rose-500 to-red-600 dark:from-rose-600 dark:to-red-700 text-rose-950 dark:text-rose-50 group hover:-translate-y-0.5"
+          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300"
           onClick={() =>
             onBadgeFilter?.(
               isActive({ type: "not_completed", value: "not_completed" })
@@ -447,7 +447,7 @@ export function TaskDashboard({
           }
         >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 dark:bg-white/15 group-hover:bg-white/25 transition-colors">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-200/60 dark:bg-rose-700/40">
               <AlertCircle className="h-6 w-6" />
             </div>
             <div className="min-w-0">
@@ -458,20 +458,20 @@ export function TaskDashboard({
         </Card>
       </div>
 
-      {/* Thống kê theo trạng thái: biểu đồ tròn + badges — Protend-style card */}
-      <Card className="border border-border/50 shadow-sm overflow-hidden">
-        <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <BarChart3 className="w-4 h-4" />
-            </span>
-            {t.dashboard.byStatus}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            {statusChartData.length > 0 && (
-              <div className="h-[240px] w-full min-w-0">
+      {/* Biểu đồ tròn: theo trạng thái + theo nhóm công việc (card tách biệt) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border border-border/50 shadow-sm overflow-hidden">
+          <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <BarChart3 className="w-4 h-4" />
+              </span>
+              {t.dashboard.byStatus}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            {statusChartData.length > 0 ? (
+              <div className="h-[220px] w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -501,8 +501,12 @@ export function TaskDashboard({
                   </PieChart>
                 </ResponsiveContainer>
               </div>
+            ) : (
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50">
+                {t.dashboard.noTasksFound}
+              </div>
             )}
-            <div>
+            <div className="mt-4">
               <p className="text-xs text-muted-foreground mb-2">{t.dashboard.clickBadgeToFilter}</p>
               <div className="flex flex-wrap gap-2">
                 {byStatus.map(({ status, count, label }, idx) => (
@@ -526,24 +530,21 @@ export function TaskDashboard({
                 ))}
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Thống kê theo nhóm công việc: biểu đồ tròn + badges */}
-      <Card className="border border-border/50 shadow-sm overflow-hidden">
-        <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <BarChart3 className="w-4 h-4" />
-            </span>
-            {t.dashboard.byGroup}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            {groupChartData.length > 0 && (
-              <div className="h-[240px] w-full min-w-0">
+        <Card className="border border-border/50 shadow-sm overflow-hidden">
+          <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <BarChart3 className="w-4 h-4" />
+              </span>
+              {t.dashboard.byGroup}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            {groupChartData.length > 0 ? (
+              <div className="h-[220px] w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -573,8 +574,12 @@ export function TaskDashboard({
                   </PieChart>
                 </ResponsiveContainer>
               </div>
+            ) : (
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50">
+                {t.dashboard.noTasksFound}
+              </div>
             )}
-            <div>
+            <div className="mt-4">
               <p className="text-xs text-muted-foreground mb-2">{t.dashboard.clickBadgeToFilter}</p>
               <div className="flex flex-wrap gap-2">
                 {byGroup.map(({ group, count }) => (
@@ -593,88 +598,83 @@ export function TaskDashboard({
                 ))}
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Biểu đồ cột: số công việc theo trạng thái (Đang tiến hành, Hoàn thành, Không hoàn thành) của từng nhóm */}
-      <Card className="border border-border/50 shadow-sm overflow-hidden">
-        <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <BarChart3 className="w-4 h-4" />
-            </span>
-            {t.dashboard.byGroup} — {t.dashboard.byStatus}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="h-[320px] w-full">
-            {groupStatusBarData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={groupStatusBarData} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" vertical={false} />
-                  <XAxis
-                    dataKey="name"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => `${v}`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid hsl(var(--border))",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    }}
-                    formatter={(value: number, name: string) => [value, name]}
-                    labelFormatter={(label) => label}
-                  />
-                  <Legend
-                    formatter={(value) => {
-                      if (value === "inProgress") return t.stats.inProgress;
-                      if (value === "completed") return t.stats.completed;
-                      if (value === "notCompleted") return t.stats.notCompleted;
-                      return value;
-                    }}
-                  />
-                  <Bar dataKey="inProgress" name={t.stats.inProgress} fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={28} />
-                  <Bar dataKey="completed" name={t.stats.completed} fill="#10b981" radius={[4, 4, 0, 0]} barSize={28} />
-                  <Bar dataKey="notCompleted" name={t.stats.notCompleted} fill="#ef4444" radius={[4, 4, 0, 0]} barSize={28} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50">
-                {t.dashboard.noTasksFound}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Biểu đồ cột: theo nhóm công việc / theo đúng-chậm tiến độ (card tách biệt) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border border-border/50 shadow-sm overflow-hidden">
+          <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <BarChart3 className="w-4 h-4" />
+              </span>
+              {t.dashboard.byGroup} — {t.dashboard.byStatus}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="h-[280px] w-full">
+              {groupStatusBarData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={groupStatusBarData} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => `${v}`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: "8px",
+                        border: "1px solid hsl(var(--border))",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      }}
+                      formatter={(value: number, name: string) => [value, name]}
+                      labelFormatter={(label) => label}
+                    />
+                    <Legend
+                      formatter={(value) => {
+                        if (value === "inProgress") return t.stats.inProgress;
+                        if (value === "completed") return t.stats.completed;
+                        if (value === "notCompleted") return t.stats.notCompleted;
+                        return value;
+                      }}
+                    />
+                    <Bar dataKey="inProgress" name={t.stats.inProgress} fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={28} />
+                    <Bar dataKey="completed" name={t.stats.completed} fill="#10b981" radius={[4, 4, 0, 0]} barSize={28} />
+                    <Bar dataKey="notCompleted" name={t.stats.notCompleted} fill="#ef4444" radius={[4, 4, 0, 0]} barSize={28} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50">
+                  {t.dashboard.noTasksFound}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Thống kê phụ: Đang tiến hành / Đã hoàn thành — biểu đồ tỷ lệ Đúng/Chậm tiến độ + biểu đồ tròn + badges */}
-      <Card className="border border-border/50 shadow-sm overflow-hidden">
-        <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Calendar className="w-4 h-4" />
-            </span>
-            {t.dashboard.inProgressGroup} / {t.dashboard.completedGroup}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          {/* Biểu đồ tỷ lệ Đúng tiến độ / Chậm tiến độ cho 2 nhóm */}
-          <div className="mb-6">
-            <p className="text-sm font-medium text-muted-foreground mb-3">
-              {t.dashboard.onSchedule} / {t.dashboard.behindSchedule}
-            </p>
-            <div className="h-[200px] w-full">
+        <Card className="border border-border/50 shadow-sm overflow-hidden">
+          <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <BarChart3 className="w-4 h-4" />
+              </span>
+              {t.dashboard.inProgressGroup} — {t.dashboard.completedGroup}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={scheduleRatioBarData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" vertical={false} />
@@ -713,158 +713,9 @@ export function TaskDashboard({
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Đang tiến hành: đúng tiến độ vs chậm tiến độ */}
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-muted-foreground">{t.dashboard.inProgressGroup}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 items-center">
-                {scheduleChartData.inProgress.length > 0 ? (
-                  <div className="h-[180px] w-full max-w-[180px] mx-auto sm:mx-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={scheduleChartData.inProgress}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={65}
-                          paddingAngle={2}
-                          dataKey="value"
-                          nameKey="name"
-                          label={({ name, value }) => `${name}: ${value}`}
-                        >
-                          {scheduleChartData.inProgress.map((entry, index) => (
-                            <Cell key={`ip-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value: number, name: string) => [value, name]}
-                          contentStyle={{
-                            borderRadius: "8px",
-                            border: "1px solid hsl(var(--border))",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50 max-w-[180px]">
-                    {t.dashboard.noTasksFound}
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <Badge
-                    variant={
-                      isActive({ type: "schedule", value: "in_progress_on_time" }) ? "default" : "secondary"
-                    }
-                    className="cursor-pointer font-normal bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400 hover:opacity-90"
-                    onClick={() =>
-                      onBadgeFilter?.(
-                        isActive({ type: "schedule", value: "in_progress_on_time" })
-                          ? null
-                          : { type: "schedule", value: "in_progress_on_time" }
-                      )
-                    }
-                  >
-                    {t.dashboard.onSchedule} ({scheduleStats.inProgressOnTime})
-                  </Badge>
-                  <Badge
-                    variant={
-                      isActive({ type: "schedule", value: "in_progress_behind" }) ? "default" : "secondary"
-                    }
-                    className="cursor-pointer font-normal bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400 hover:opacity-90"
-                    onClick={() =>
-                      onBadgeFilter?.(
-                        isActive({ type: "schedule", value: "in_progress_behind" })
-                          ? null
-                          : { type: "schedule", value: "in_progress_behind" }
-                      )
-                    }
-                  >
-                    {t.dashboard.behindSchedule} ({scheduleStats.inProgressBehind})
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            {/* Đã hoàn thành: đúng tiến độ vs chậm tiến độ */}
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-muted-foreground">{t.dashboard.completedGroup}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 items-center">
-                {scheduleChartData.completed.length > 0 ? (
-                  <div className="h-[180px] w-full max-w-[180px] mx-auto sm:mx-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={scheduleChartData.completed}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={65}
-                          paddingAngle={2}
-                          dataKey="value"
-                          nameKey="name"
-                          label={({ name, value }) => `${name}: ${value}`}
-                        >
-                          {scheduleChartData.completed.map((entry, index) => (
-                            <Cell key={`done-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value: number, name: string) => [value, name]}
-                          contentStyle={{
-                            borderRadius: "8px",
-                            border: "1px solid hsl(var(--border))",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50 max-w-[180px]">
-                    {t.dashboard.noTasksFound}
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <Badge
-                    variant={
-                      isActive({ type: "schedule", value: "completed_on_time" }) ? "default" : "secondary"
-                    }
-                    className="cursor-pointer font-normal bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400 hover:opacity-90"
-                    onClick={() =>
-                      onBadgeFilter?.(
-                        isActive({ type: "schedule", value: "completed_on_time" })
-                          ? null
-                          : { type: "schedule", value: "completed_on_time" }
-                      )
-                    }
-                  >
-                    {t.dashboard.onSchedule} ({scheduleStats.completedOnTime})
-                  </Badge>
-                  <Badge
-                    variant={
-                      isActive({ type: "schedule", value: "completed_behind" }) ? "default" : "secondary"
-                    }
-                    className="cursor-pointer font-normal bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400 hover:opacity-90"
-                    onClick={() =>
-                      onBadgeFilter?.(
-                        isActive({ type: "schedule", value: "completed_behind" })
-                          ? null
-                          : { type: "schedule", value: "completed_behind" }
-                      )
-                    }
-                  >
-                    {t.dashboard.behindSchedule} ({scheduleStats.completedBehind})
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Trend chart — Protend-style */}
       <Card className="border border-border/50 shadow-sm overflow-hidden">

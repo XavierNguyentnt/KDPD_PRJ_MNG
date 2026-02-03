@@ -862,6 +862,17 @@ export async function registerRoutes(
       res.status(500).json({ message: err instanceof Error ? err.message : "Failed to update translation contract" });
     }
   });
+  app.delete(api.translationContracts.delete.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const row = await dbStorage.deleteTranslationContract(id);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to delete translation contract" });
+    }
+  });
 
   app.get(api.proofreadingContracts.list.path, requireAuth, async (_req, res) => {
     try {
@@ -884,10 +895,26 @@ export async function registerRoutes(
       res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch proofreading contract" });
     }
   });
+  const numericKeysPc = ["rateRatio", "contractValue"] as const;
+  const uuidKeysPc = ["componentId", "workId", "translationContractId"] as const;
+  const normalizeProofreadingContractBody = (body: Record<string, unknown>) => {
+    const out = { ...body };
+    for (const key of numericKeysPc) {
+      const v = out[key];
+      if (v !== undefined && v !== null && v !== "") {
+        out[key] = typeof v === "number" ? String(v) : v;
+      }
+    }
+    for (const key of uuidKeysPc) {
+      if (out[key] === "") out[key] = null;
+    }
+    return out;
+  };
   app.post(api.proofreadingContracts.create.path, requireAuth, async (req, res) => {
     try {
       if (!db) return res.status(503).json({ message: "Database not configured" });
-      const input = api.proofreadingContracts.create.input.parse(req.body);
+      const body = normalizeProofreadingContractBody((req.body as Record<string, unknown>) || {});
+      const input = api.proofreadingContracts.create.input.parse(body);
       const row = await dbStorage.createProofreadingContract(input);
       res.json(row);
     } catch (err) {
@@ -899,13 +926,25 @@ export async function registerRoutes(
     try {
       if (!db) return res.status(503).json({ message: "Database not configured" });
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-      const input = api.proofreadingContracts.update.input.parse(req.body);
+      const body = normalizeProofreadingContractBody((req.body as Record<string, unknown>) || {});
+      const input = api.proofreadingContracts.update.input.parse(body);
       const row = await dbStorage.updateProofreadingContract(id, input);
       res.json(row);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
       if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
       res.status(500).json({ message: err instanceof Error ? err.message : "Failed to update proofreading contract" });
+    }
+  });
+  app.delete(api.proofreadingContracts.delete.path, requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const row = await dbStorage.deleteProofreadingContract(id);
+      res.json(row);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not found")) return res.status(404).json({ message: err.message });
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to delete proofreading contract" });
     }
   });
 

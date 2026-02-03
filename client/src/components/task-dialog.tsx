@@ -59,6 +59,7 @@ interface TaskDialogProps {
   task: TaskWithAssignmentDetails | null;
   onCreate?: (task: any) => void;
   isCreating?: boolean;
+  mode?: "view" | "edit";
   /** Nhóm mặc định khi tạo mới (theo trang đang mở: Công việc chung, Biên tập, Thiết kế, CNTT) */
   defaultGroup?: string;
 }
@@ -133,13 +134,32 @@ function formatStageDisplay(stage: string | null | undefined): string {
   return num ? "GĐ " + num : "GĐ " + stage;
 }
 
-/** Lấy round_number (1, 2, 3...) từ Loại bông (roundType). Ví dụ: "Bông 3 (thô)" → 3. */
+/** Lấy round_number từ Loại bông theo quy ước biên tập. */
 function roundNumberFromRoundType(
   roundType: string | null | undefined,
+  maxRoundHint?: number | null,
 ): number {
   if (!roundType || typeof roundType !== "string") return 1;
-  const m = roundType.match(/Bông\s*(\d+)/i);
-  return m ? Math.max(1, parseInt(m[1], 10)) : 1;
+  const raw = roundType.trim();
+  const normalized = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d");
+
+  if (normalized.includes("tien bien tap")) return 1;
+  if (normalized.includes("bong chuyen in")) {
+    const base = maxRoundHint && maxRoundHint > 0 ? maxRoundHint : 2;
+    return base + 1;
+  }
+  const m = raw.match(/Bông\s*(\d+)/i);
+  if (m) {
+    const n = Math.max(1, parseInt(m[1], 10));
+    // Bông 1 (thô/tinh) = round 3, Bông 2 = round 4, ...
+    return n + 2;
+  }
+  if (normalized.includes("bong tho")) return 2;
+  return 1;
 }
 
 /** Ngày hoàn thành dự kiến + Ngày hoàn thành thực tế. Với Biên tập: tự động = max(stages), chỉ đọc, dd/mm/yyyy. */
@@ -215,6 +235,7 @@ export function TaskDialog({
   task,
   onCreate,
   isCreating = false,
+  mode = "view",
   defaultGroup,
 }: TaskDialogProps) {
   const { role } = useAuth();
@@ -255,6 +276,33 @@ export function TaskDialog({
       ? Array.from(groups)
       : ["Công việc chung", "Biên tập", "Thiết kế", "CNTT", "Quét trùng lặp", "Thư ký hợp phần"];
   }, [allTasks]);
+
+  const getMaxBienTapRoundForWork = (
+    workId?: string | null,
+    excludeTaskId?: string | null,
+  ): number | null => {
+    if (!workId || !allTasks) return null;
+    let max = 0;
+    for (const t of allTasks) {
+      if (t.id === excludeTaskId) continue;
+      if (t.group !== "Biên tập") continue;
+      if (t.relatedWorkId !== workId) continue;
+      let roundNum = 0;
+      if (t.workflow) {
+        try {
+          const wf = typeof t.workflow === "string" ? JSON.parse(t.workflow) : t.workflow;
+          const round = wf?.rounds?.[0];
+          if (round?.roundNumber) {
+            roundNum = Number(round.roundNumber);
+          } else if (round?.roundType) {
+            roundNum = roundNumberFromRoundType(round.roundType);
+          }
+        } catch (_) {}
+      }
+      if (roundNum > max) max = roundNum;
+    }
+    return max > 0 ? max : null;
+  };
 
   const formatDateForInput = (v: string | Date | null | undefined): string => {
     if (!v) return "";
@@ -592,6 +640,7 @@ export function TaskDialog({
 
   // Reset form when task changes; for Biên tập tasks populate workflow stage fields (use effectiveTask to get assignments when available)
   useEffect(() => {
+    if (!open) return;
     if (effectiveTask) {
       const base = {
         title: effectiveTask.title,
@@ -741,7 +790,7 @@ export function TaskDialog({
         },
       ]);
     }
-  }, [effectiveTask, task, form, defaultGroup]);
+  }, [open, effectiveTask, task, form, defaultGroup]);
 
   const canEditMetaRaw = role === UserRole.ADMIN || role === UserRole.MANAGER;
   const canEditMeta = canEditMetaRaw && (isNewTask || isEditing);
@@ -751,8 +800,8 @@ export function TaskDialog({
       setIsEditing(false);
       return;
     }
-    setIsEditing(isNewTask);
-  }, [open, isNewTask, task?.id]);
+    setIsEditing(isNewTask || mode === "edit");
+  }, [open, isNewTask, task?.id, mode]);
 
   const onSubmit = (data: FormData) => {
     if (isNewTask && onCreate) {
@@ -904,6 +953,7 @@ export function TaskDialog({
         payload.taskType = "PROOFREADING";
         payload.relatedWorkId = data.relatedWorkId || null;
         payload.relatedContractId = data.relatedContractId || null;
+        payload.vote = data.vote ?? null;
       } else if (selectedGroup === "Công việc chung") {
         payload.taskType = "GENERAL";
         payload.relatedWorkId = data.relatedWorkId || null;
@@ -972,7 +1022,11 @@ export function TaskDialog({
             : s === StageStatus.IN_PROGRESS
             ? "in_progress"
             : "not_started";
-        const roundNum = roundNumberFromRoundType(data.roundType);
+        const maxRoundHint = getMaxBienTapRoundForWork(
+          data.relatedWorkId ?? null,
+          task?.id ?? null,
+        );
+        const roundNum = roundNumberFromRoundType(data.roundType, maxRoundHint);
         payload.assignments = [
           data.btv2Id && {
             userId: data.btv2Id,
@@ -1204,6 +1258,7 @@ export function TaskDialog({
         data.relatedWorkId || null;
       (payload as Record<string, unknown>).relatedContractId =
         data.relatedContractId || null;
+      (payload as Record<string, unknown>).vote = data.vote ?? null;
       const workflow = BienTapWorkflowHelpers.createWorkflow(1);
       if (data.roundType) workflow.rounds[0].roundType = data.roundType;
       const round = workflow.rounds[0];
@@ -1249,7 +1304,12 @@ export function TaskDialog({
             : s === StageStatus.IN_PROGRESS
             ? "in_progress"
             : "not_started";
-        const roundNum = roundNumberFromRoundType(data.roundType);
+        const maxRoundHint = getMaxBienTapRoundForWork(
+          (task as TaskWithAssignmentDetails & { relatedWorkId?: string | null })
+            ?.relatedWorkId ?? null,
+          task?.id ?? null,
+        );
+        const roundNum = roundNumberFromRoundType(data.roundType, maxRoundHint);
         payload.assignments = [
           data.btv2Id && {
             userId: data.btv2Id,
@@ -1978,25 +2038,15 @@ export function TaskDialog({
                       <SelectValue placeholder={t.task.selectRoundType} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Tiền biên tập">
-                        Tiền biên tập
-                      </SelectItem>
+                      <SelectItem value="Tiền biên tập">Tiền biên tập</SelectItem>
                       <SelectItem value="Bông thô">Bông thô</SelectItem>
-                      <SelectItem value="Bông 1 (thô)">Bông 1 (thô)</SelectItem>
-                      <SelectItem value="Bông 1 (tinh)">
-                        Bông 1 (tinh)
-                      </SelectItem>
-                      <SelectItem value="Bông 2 (thô)">Bông 2 (thô)</SelectItem>
-                      <SelectItem value="Bông 2 (tinh)">
-                        Bông 2 (tinh)
-                      </SelectItem>
-                      <SelectItem value="Bông 3 (thô)">Bông 3 (thô)</SelectItem>
-                      <SelectItem value="Bông 3 (tinh)">
-                        Bông 3 (tinh)
-                      </SelectItem>
-                      <SelectItem value="Bông chuyển in">
-                        Bông chuyển in
-                      </SelectItem>
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                        <React.Fragment key={`round-${n}`}>
+                          <SelectItem value={`Bông ${n} (thô)`}>{`Bông ${n} (thô)`}</SelectItem>
+                          <SelectItem value={`Bông ${n} (tinh)`}>{`Bông ${n} (tinh)`}</SelectItem>
+                        </React.Fragment>
+                      ))}
+                      <SelectItem value="Bông chuyển in">Bông chuyển in</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2351,6 +2401,24 @@ export function TaskDialog({
                           <SelectItem value={StageStatus.CANCELLED}>
                             {t.status.cancelled}
                           </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">{language === "vi" ? "Đánh giá công việc" : "Evaluation"}</Label>
+                      <Select
+                        value={form.watch("vote") ?? ""}
+                        onValueChange={(v) => form.setValue("vote", v || null)}
+                        disabled={!isNewTask && !canEditMeta}
+                      >
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder={language === "vi" ? "Chọn đánh giá" : "Select"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="tot">{language === "vi" ? "Hoàn thành tốt" : "Good"}</SelectItem>
+                          <SelectItem value="kha">{language === "vi" ? "Hoàn thành khá" : "Fair"}</SelectItem>
+                          <SelectItem value="khong_tot">{language === "vi" ? "Không tốt" : "Poor"}</SelectItem>
+                          <SelectItem value="khong_hoan_thanh">{language === "vi" ? "Không hoàn thành" : "Not completed"}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

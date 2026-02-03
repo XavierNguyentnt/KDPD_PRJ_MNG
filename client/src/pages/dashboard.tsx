@@ -8,7 +8,6 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
-import { useUnreadNotificationCount } from "@/hooks/use-notifications";
 import {
   TaskDashboard,
   applyDashboardBadgeFilter,
@@ -24,6 +23,7 @@ import { TaskKanbanBoard } from "@/components/task-kanban-board";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
+import { normalizeSearch } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -57,7 +57,6 @@ export default function Dashboard() {
   const { role, user } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
-  const { data: unreadCount } = useUnreadNotificationCount();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -103,13 +102,13 @@ export default function Dashboard() {
       filtered = filtered.filter((t) => t.group === groupFilter);
     }
     if (search.trim()) {
-      const lower = search.trim().toLowerCase();
+      const lower = normalizeSearch(search.trim());
       filtered = filtered.filter(
         (t) =>
-          t.title?.toLowerCase().includes(lower) ||
-          t.description?.toLowerCase().includes(lower) ||
-          t.assignee?.toLowerCase().includes(lower) ||
-          t.group?.toLowerCase().includes(lower)
+          normalizeSearch(t.title ?? "").includes(lower) ||
+          normalizeSearch(t.description ?? "").includes(lower) ||
+          normalizeSearch(t.assignee ?? "").includes(lower) ||
+          normalizeSearch(t.group ?? "").includes(lower)
       );
     }
     if (statusFilter !== "all") {
@@ -294,70 +293,6 @@ export default function Dashboard() {
               className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
             />
           </Button>
-        </div>
-      </div>
-
-      {/* Protend-style: Notification / Message / Calendar cards + gradient CTA */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        <div className="flex items-center gap-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/30 shadow-sm">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-200/60 dark:bg-amber-700/40 text-amber-700 dark:text-amber-300">
-            <Bell className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-              {t.dashboard.notification}
-            </p>
-            <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
-              {unreadCount?.count ?? 0} {t.dashboard.unreadNotification}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/30 shadow-sm">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-200/60 dark:bg-emerald-700/40 text-emerald-700 dark:text-emerald-300">
-            <MessageSquare className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-              {t.dashboard.message}
-            </p>
-            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
-              5 {t.dashboard.unreadNotification}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 p-4 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200/50 dark:border-violet-800/30 shadow-sm">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-200/60 dark:bg-violet-700/40 text-violet-700 dark:text-violet-300">
-            <Calendar className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-violet-900 dark:text-violet-100">
-              {t.dashboard.calendar}
-            </p>
-            <p className="text-xs text-violet-700/80 dark:text-violet-300/80">
-              5 {t.dashboard.unreadNotification}
-            </p>
-          </div>
-        </div>
-        <div className="hidden lg:flex items-center justify-between gap-4 p-4 rounded-xl bg-gradient-to-r from-primary/90 to-violet-600 dark:from-primary dark:to-violet-700 text-primary-foreground border-0 shadow-md">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold opacity-95">
-              {t.dashboard.manageProjectOneTouch}
-            </p>
-            <p className="text-xs opacity-80 mt-0.5">
-              Etiam facilisis ligula nec posuere.
-            </p>
-          </div>
-          {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
-            <Button
-              size="sm"
-              variant="secondary"
-              className="shrink-0 bg-white/20 hover:bg-white/30 text-primary-foreground border-0"
-              onClick={() => setIsCreateDialogOpen(true)}
-              disabled={isCreating}>
-              <Plus className="h-4 w-4 mr-1.5" />
-              {t.dashboard.createNew}
-            </Button>
-          )}
         </div>
       </div>
 

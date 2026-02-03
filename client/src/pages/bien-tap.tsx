@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useTasks, useRefreshTasks, useCreateTask, UserRole } from "@/hooks/use-tasks";
+import { useTasks, useRefreshTasks, useCreateTask, useDeleteTask, UserRole } from "@/hooks/use-tasks";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
@@ -9,18 +9,37 @@ import { TaskDialog } from "@/components/task-dialog";
 import { TaskTable, sortTasks, type TaskSortColumn } from "@/components/task-table";
 import { TaskKanbanBoard } from "@/components/task-kanban-board";
 import { TaskFilters, getDefaultTaskFilters, applyTaskFilters, type TaskFilterState } from "@/components/task-filters";
+import { BienTapWorkProgress } from "@/components/bien-tap-work-progress";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, RefreshCw, Search, AlertTriangle, Plus, LayoutGrid, List } from "lucide-react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
+import { normalizeSearch } from "@/lib/utils";
 
 export default function BienTapPage() {
   const { data: tasks, isLoading, isError } = useTasks();
   const { mutate: refresh, isPending: isRefreshing } = useRefreshTasks();
   const { mutate: createTask, isPending: isCreating } = useCreateTask();
+  const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask();
   const { role, user } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
@@ -30,6 +49,9 @@ export default function BienTapPage() {
   const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
+  const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
+  const [deleteTaskConfirmOpen, setDeleteTaskConfirmOpen] = useState(false);
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
@@ -39,25 +61,31 @@ export default function BienTapPage() {
   const stages = useMemo(() => Array.from(new Set(works.map((w) => w.stage).filter(Boolean))) as string[], [works]);
   const componentOptions = useMemo(() => components.map((c) => ({ id: c.id, name: c.name })), [components]);
 
-  const filteredTasks = useMemo(() => {
+  const bienTapTasksScoped = useMemo(() => {
     if (!tasks) return [];
     let list = tasks.filter((t) => t.group === "Biên tập");
     if (role === UserRole.EMPLOYEE) {
       list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
     }
+    return list;
+  }, [tasks, role, user?.displayName]);
+
+  const filteredTasks = useMemo(() => {
+    let list = bienTapTasksScoped;
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = normalizeSearch(search.trim());
       list = list.filter(
         (t) =>
-          t.title?.toLowerCase().includes(q) ||
-          t.description?.toLowerCase().includes(q) ||
-          t.assignee?.toLowerCase().includes(q) ||
-          t.id?.toLowerCase().includes(q)
+          normalizeSearch(t.title ?? "").includes(q) ||
+          normalizeSearch(t.description ?? "").includes(q) ||
+          normalizeSearch(t.assignee ?? "").includes(q) ||
+          normalizeSearch(t.id ?? "").includes(q)
       );
     }
     list = applyTaskFilters(list, filters, works);
     return sortTasks(list, sortBy, sortDir);
-  }, [tasks, role, user?.displayName, search, filters, works, sortBy, sortDir]);
+    return sortTasks(list, sortBy, sortDir);
+  }, [bienTapTasksScoped, search, filters, works, sortBy, sortDir]);
 
   const handleSort = (column: TaskSortColumn) => {
     setSortBy((prev) => {
@@ -114,30 +142,37 @@ export default function BienTapPage() {
 
   return (
     <div className="space-y-8">
-      {/* Overview Stats */}
-      <section>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <p className="text-sm text-muted-foreground">Quản lý công việc biên tập với các nhân sự: BTV 1, BTV 2, Người Đọc duyệt...</p>
-          </div>
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            {t.dashboard.lastSynced}: {format(new Date(), 'h:mm a')}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 w-8 p-0" 
-              onClick={() => refresh()}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </div>
-        <TaskStatsBadgesOnly tasks={filteredTasks} />
-      </section>
+      <Tabs defaultValue="tasks">
+        <TabsList className="grid w-full max-w-xl grid-cols-2">
+          <TabsTrigger value="tasks">Công việc biên tập</TabsTrigger>
+          <TabsTrigger value="progress">Theo dõi tiến độ theo tác phẩm</TabsTrigger>
+        </TabsList>
 
-      {/* Task List */}
-      <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        <TabsContent value="tasks" className="space-y-8">
+          {/* Overview Stats */}
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-sm text-muted-foreground">Quản lý công việc biên tập với các nhân sự: BTV 1, BTV 2, Người Đọc duyệt...</p>
+              </div>
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                {t.dashboard.lastSynced}: {format(new Date(), 'h:mm a')}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 w-8 p-0" 
+                  onClick={() => refresh()}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            </div>
+            <TaskStatsBadgesOnly tasks={filteredTasks} />
+          </section>
+
+          {/* Task List */}
+          <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
@@ -199,12 +234,29 @@ export default function BienTapPage() {
         {viewMode === "table" ? (
           <TaskTable
             tasks={filteredTasks}
-            onTaskClick={setSelectedTask}
+            onTaskClick={(task) => {
+              setSelectedTask(task);
+              setTaskDialogMode("view");
+            }}
             sortBy={sortBy}
             sortDir={sortDir}
             onSort={handleSort}
             getPriorityColor={getPriorityColor}
             getStatusColor={getStatusColor}
+            actions={{
+              onView: (task) => {
+                setSelectedTask(task);
+                setTaskDialogMode("view");
+              },
+              onEdit: (task) => {
+                setSelectedTask(task);
+                setTaskDialogMode("edit");
+              },
+              onDelete: (task) => {
+                setDeleteTaskTarget(task);
+                setDeleteTaskConfirmOpen(true);
+              },
+            }}
             columns={{
               id: true,
               title: true,
@@ -222,18 +274,34 @@ export default function BienTapPage() {
         ) : (
           <TaskKanbanBoard
             tasks={filteredTasks}
-            onTaskClick={setSelectedTask}
+            onTaskClick={(task) => {
+              setSelectedTask(task);
+              setTaskDialogMode("view");
+            }}
             getPriorityColor={getPriorityColor}
             getStatusColor={getStatusColor}
             noGroupLabel={language === "vi" ? "(Không nhóm)" : "(No group)"}
           />
         )}
-      </section>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="progress">
+          <section>
+            <BienTapWorkProgress
+              tasks={bienTapTasksScoped}
+              works={works}
+              components={components.map((c) => ({ id: c.id, name: c.name }))}
+            />
+          </section>
+        </TabsContent>
+      </Tabs>
 
       <TaskDialog 
         open={!!selectedTask} 
         onOpenChange={(open) => !open && setSelectedTask(null)} 
         task={selectedTask} 
+        mode={taskDialogMode}
       />
       
       <TaskDialog 
@@ -261,6 +329,36 @@ export default function BienTapPage() {
         }}
         isCreating={isCreating}
       />
+
+      <AlertDialog open={deleteTaskConfirmOpen} onOpenChange={setDeleteTaskConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa công việc</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa công việc "{deleteTaskTarget?.title ?? deleteTaskTarget?.id}"?
+              Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!deleteTaskTarget?.id) return;
+                deleteTask(deleteTaskTarget.id, {
+                  onSuccess: () => {
+                    setDeleteTaskConfirmOpen(false);
+                    setDeleteTaskTarget(null);
+                  },
+                });
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              Xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
