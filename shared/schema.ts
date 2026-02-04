@@ -152,7 +152,6 @@ export const proofreadingContracts = pgTable("proofreading_contracts", {
   componentId: uuid("component_id").references(() => components.id),
   workId: uuid("work_id").references(() => works.id),
   translationContractId: uuid("translation_contract_id").references(() => translationContracts.id),
-  proofreaderName: text("proofreader_name"),
   pageCount: integer("page_count"),
   rateRatio: numeric("rate_ratio", { precision: 10, scale: 4 }),
   contractValue: numeric("contract_value", { precision: 15, scale: 2 }),
@@ -314,6 +313,46 @@ export const insertContractMemberSchema = createInsertSchema(contractMembers);
 export const selectContractMemberSchema = createSelectSchema(contractMembers);
 export type ContractMember = typeof contractMembers.$inferSelect;
 export type InsertContractMember = z.infer<typeof insertContractMemberSchema>;
+
+// -----------------------------------------------------------------------------
+// Translation contract members (translation_contracts ↔ users)
+// -----------------------------------------------------------------------------
+export const translationContractMembers = pgTable("translation_contract_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  translationContractId: uuid("translation_contract_id")
+    .notNull()
+    .references(() => translationContracts.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertTranslationContractMemberSchema = createInsertSchema(translationContractMembers);
+export const selectTranslationContractMemberSchema = createSelectSchema(translationContractMembers);
+export type TranslationContractMember = typeof translationContractMembers.$inferSelect;
+export type InsertTranslationContractMember = z.infer<typeof insertTranslationContractMemberSchema>;
+
+// -----------------------------------------------------------------------------
+// Proofreading contract members (proofreading_contracts ↔ users)
+// -----------------------------------------------------------------------------
+export const proofreadingContractMembers = pgTable("proofreading_contract_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  proofreadingContractId: uuid("proofreading_contract_id")
+    .notNull()
+    .references(() => proofreadingContracts.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertProofreadingContractMemberSchema = createInsertSchema(proofreadingContractMembers);
+export const selectProofreadingContractMemberSchema = createSelectSchema(proofreadingContractMembers);
+export type ProofreadingContractMember = typeof proofreadingContractMembers.$inferSelect;
+export type InsertProofreadingContractMember = z.infer<typeof insertProofreadingContractMemberSchema>;
 
 // -----------------------------------------------------------------------------
 // Document tasks (documents ↔ tasks)

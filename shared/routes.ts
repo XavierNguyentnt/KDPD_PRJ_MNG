@@ -6,6 +6,8 @@ import {
   insertDocumentSchema,
   insertTaskAssignmentSchema,
   insertContractMemberSchema,
+  insertTranslationContractMemberSchema,
+  insertProofreadingContractMemberSchema,
   insertDocumentTaskSchema,
   insertDocumentContractSchema,
   insertGroupSchema,
@@ -23,6 +25,8 @@ import {
   documents,
   taskAssignments,
   contractMembers,
+  translationContractMembers,
+  proofreadingContractMembers,
   documentTasks,
   documentContracts,
   groups,
@@ -310,6 +314,24 @@ export const api = {
     create: { method: "POST" as const, path: "/api/contract-members", input: insertContractMemberSchema.omit({ id: true }), responses: { 200: z.custom<typeof contractMembers.$inferSelect>(), 400: errorSchemas.validation } },
     update: { method: "PATCH" as const, path: "/api/contract-members/:id", input: insertContractMemberSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof contractMembers.$inferSelect>(), 404: errorSchemas.notFound } },
     delete: { method: "DELETE" as const, path: "/api/contract-members/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  translationContractMembers: {
+    list: { method: "GET" as const, path: "/api/translation-contract-members", responses: { 200: z.array(z.custom<typeof translationContractMembers.$inferSelect>()) } },
+    listByContract: { method: "GET" as const, path: "/api/translation-contracts/:contractId/members", responses: { 200: z.array(z.custom<typeof translationContractMembers.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/translation-contract-members/:id", responses: { 200: z.custom<typeof translationContractMembers.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/translation-contract-members", input: insertTranslationContractMemberSchema.omit({ id: true }), responses: { 200: z.custom<typeof translationContractMembers.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/translation-contract-members/:id", input: insertTranslationContractMemberSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof translationContractMembers.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/translation-contract-members/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
+  },
+
+  proofreadingContractMembers: {
+    list: { method: "GET" as const, path: "/api/proofreading-contract-members", responses: { 200: z.array(z.custom<typeof proofreadingContractMembers.$inferSelect>()) } },
+    listByContract: { method: "GET" as const, path: "/api/proofreading-contracts/:contractId/members", responses: { 200: z.array(z.custom<typeof proofreadingContractMembers.$inferSelect>()) } },
+    get: { method: "GET" as const, path: "/api/proofreading-contract-members/:id", responses: { 200: z.custom<typeof proofreadingContractMembers.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: "POST" as const, path: "/api/proofreading-contract-members", input: insertProofreadingContractMemberSchema.omit({ id: true }), responses: { 200: z.custom<typeof proofreadingContractMembers.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: "PATCH" as const, path: "/api/proofreading-contract-members/:id", input: insertProofreadingContractMemberSchema.partial().omit({ id: true }), responses: { 200: z.custom<typeof proofreadingContractMembers.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: "DELETE" as const, path: "/api/proofreading-contract-members/:id", responses: { 200: z.object({ message: z.string() }), 404: errorSchemas.notFound } },
   },
 
   documentTasks: {

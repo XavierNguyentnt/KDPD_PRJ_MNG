@@ -2,10 +2,12 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.7 (bdd1736)
--- Dumped by pg_dump version 17.7
+\restrict sRdptsdAS09x2CjgftCKbMBeIwzda5GTBQf2KNImsZbymse5J4xAKTfv4gmtBKb
 
--- Started on 2026-02-02 16:14:16
+-- Dumped from database version 17.7 (bdd1736)
+-- Dumped by pg_dump version 18.1
+
+-- Started on 2026-02-04 18:38:34
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -30,7 +32,7 @@ CREATE SCHEMA public;
 ALTER SCHEMA public OWNER TO pg_database_owner;
 
 --
--- TOC entry 3689 (class 0 OID 0)
+-- TOC entry 3723 (class 0 OID 0)
 -- Dependencies: 7
 -- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: pg_database_owner
 --
@@ -39,7 +41,7 @@ COMMENT ON SCHEMA public IS 'standard public schema';
 
 
 --
--- TOC entry 256 (class 1255 OID 24657)
+-- TOC entry 258 (class 1255 OID 24657)
 -- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: neondb_owner
 --
 
@@ -77,7 +79,7 @@ CREATE TABLE public.components (
 ALTER TABLE public.components OWNER TO neondb_owner;
 
 --
--- TOC entry 3690 (class 0 OID 0)
+-- TOC entry 3724 (class 0 OID 0)
 -- Dependencies: 246
 -- Name: TABLE components; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -103,7 +105,7 @@ CREATE TABLE public.contract_members (
 ALTER TABLE public.contract_members OWNER TO neondb_owner;
 
 --
--- TOC entry 3691 (class 0 OID 0)
+-- TOC entry 3725 (class 0 OID 0)
 -- Dependencies: 236
 -- Name: TABLE contract_members; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -112,7 +114,7 @@ COMMENT ON TABLE public.contract_members IS 'Bảng trung gian contracts-users: 
 
 
 --
--- TOC entry 3692 (class 0 OID 0)
+-- TOC entry 3726 (class 0 OID 0)
 -- Dependencies: 236
 -- Name: COLUMN contract_members.role; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -142,7 +144,7 @@ CREATE TABLE public.contract_stages (
 ALTER TABLE public.contract_stages OWNER TO neondb_owner;
 
 --
--- TOC entry 3693 (class 0 OID 0)
+-- TOC entry 3727 (class 0 OID 0)
 -- Dependencies: 247
 -- Name: TABLE contract_stages; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -177,7 +179,7 @@ CREATE TABLE public.contracts (
 ALTER TABLE public.contracts OWNER TO neondb_owner;
 
 --
--- TOC entry 3694 (class 0 OID 0)
+-- TOC entry 3728 (class 0 OID 0)
 -- Dependencies: 231
 -- Name: TABLE contracts; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -204,7 +206,7 @@ CREATE TABLE public.document_contracts (
 ALTER TABLE public.document_contracts OWNER TO neondb_owner;
 
 --
--- TOC entry 3695 (class 0 OID 0)
+-- TOC entry 3729 (class 0 OID 0)
 -- Dependencies: 238
 -- Name: TABLE document_contracts; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -213,7 +215,7 @@ COMMENT ON TABLE public.document_contracts IS 'Bảng trung gian documents-contr
 
 
 --
--- TOC entry 3696 (class 0 OID 0)
+-- TOC entry 3730 (class 0 OID 0)
 -- Dependencies: 238
 -- Name: COLUMN document_contracts.role; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -222,7 +224,7 @@ COMMENT ON COLUMN public.document_contracts.role IS 'Vai trò của tài liệu 
 
 
 --
--- TOC entry 3697 (class 0 OID 0)
+-- TOC entry 3731 (class 0 OID 0)
 -- Dependencies: 238
 -- Name: COLUMN document_contracts.note; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -249,7 +251,7 @@ CREATE TABLE public.document_tasks (
 ALTER TABLE public.document_tasks OWNER TO neondb_owner;
 
 --
--- TOC entry 3698 (class 0 OID 0)
+-- TOC entry 3732 (class 0 OID 0)
 -- Dependencies: 237
 -- Name: TABLE document_tasks; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -258,7 +260,7 @@ COMMENT ON TABLE public.document_tasks IS 'Bảng trung gian documents-tasks: 1 
 
 
 --
--- TOC entry 3699 (class 0 OID 0)
+-- TOC entry 3733 (class 0 OID 0)
 -- Dependencies: 237
 -- Name: COLUMN document_tasks.role; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -267,7 +269,7 @@ COMMENT ON COLUMN public.document_tasks.role IS 'Vai trò của tài liệu vớ
 
 
 --
--- TOC entry 3700 (class 0 OID 0)
+-- TOC entry 3734 (class 0 OID 0)
 -- Dependencies: 237
 -- Name: COLUMN document_tasks.note; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -297,7 +299,7 @@ CREATE TABLE public.documents (
 ALTER TABLE public.documents OWNER TO neondb_owner;
 
 --
--- TOC entry 3701 (class 0 OID 0)
+-- TOC entry 3735 (class 0 OID 0)
 -- Dependencies: 233
 -- Name: TABLE documents; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -306,7 +308,7 @@ COMMENT ON TABLE public.documents IS 'Hồ sơ giấy tờ (file/dossier); gắn
 
 
 --
--- TOC entry 3702 (class 0 OID 0)
+-- TOC entry 3736 (class 0 OID 0)
 -- Dependencies: 233
 -- Name: COLUMN documents.document_type; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -332,7 +334,7 @@ CREATE TABLE public.groups (
 ALTER TABLE public.groups OWNER TO neondb_owner;
 
 --
--- TOC entry 3703 (class 0 OID 0)
+-- TOC entry 3737 (class 0 OID 0)
 -- Dependencies: 239
 -- Name: TABLE groups; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -341,7 +343,7 @@ COMMENT ON TABLE public.groups IS 'Nhóm công việc / nhóm nhân sự. 1 nhâ
 
 
 --
--- TOC entry 3704 (class 0 OID 0)
+-- TOC entry 3738 (class 0 OID 0)
 -- Dependencies: 239
 -- Name: COLUMN groups.code; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -371,12 +373,37 @@ CREATE TABLE public.notifications (
 ALTER TABLE public.notifications OWNER TO neondb_owner;
 
 --
--- TOC entry 3705 (class 0 OID 0)
+-- TOC entry 3739 (class 0 OID 0)
 -- Dependencies: 248
 -- Name: TABLE notifications; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
 
 COMMENT ON TABLE public.notifications IS 'Thông báo cho nhân sự: task_assigned, task_due_soon, task_overdue.';
+
+
+--
+-- TOC entry 250 (class 1259 OID 81943)
+-- Name: proofreading_contract_members; Type: TABLE; Schema: public; Owner: neondb_owner
+--
+
+CREATE TABLE public.proofreading_contract_members (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    proofreading_contract_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.proofreading_contract_members OWNER TO neondb_owner;
+
+--
+-- TOC entry 3740 (class 0 OID 0)
+-- Dependencies: 250
+-- Name: TABLE proofreading_contract_members; Type: COMMENT; Schema: public; Owner: neondb_owner
+--
+
+COMMENT ON TABLE public.proofreading_contract_members IS 'Bảng trung gian proofreading_contracts-users: ai là người hiệu đính/người tham gia hợp đồng hiệu đính. Role "partner" lưu trong user_roles.';
 
 
 --
@@ -389,7 +416,6 @@ CREATE TABLE public.proofreading_contracts (
     contract_number text,
     work_id uuid,
     translation_contract_id uuid,
-    proofreader_name text,
     page_count integer,
     rate_ratio numeric,
     contract_value numeric,
@@ -404,16 +430,16 @@ CREATE TABLE public.proofreading_contracts (
 ALTER TABLE public.proofreading_contracts OWNER TO neondb_owner;
 
 --
--- TOC entry 3706 (class 0 OID 0)
+-- TOC entry 3741 (class 0 OID 0)
 -- Dependencies: 245
 -- Name: TABLE proofreading_contracts; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
 
-COMMENT ON TABLE public.proofreading_contracts IS 'Hợp đồng hiệu đính (theo dõi hợp đồng hiệu đính).';
+COMMENT ON TABLE public.proofreading_contracts IS 'Hợp đồng hiệu đính (theo dõi hợp đồng hiệu đính). Thông tin người hiệu đính lưu trong bảng proofreading_contract_members.';
 
 
 --
--- TOC entry 3707 (class 0 OID 0)
+-- TOC entry 3742 (class 0 OID 0)
 -- Dependencies: 245
 -- Name: COLUMN proofreading_contracts.component_id; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -439,7 +465,7 @@ CREATE TABLE public.roles (
 ALTER TABLE public.roles OWNER TO neondb_owner;
 
 --
--- TOC entry 3708 (class 0 OID 0)
+-- TOC entry 3743 (class 0 OID 0)
 -- Dependencies: 241
 -- Name: TABLE roles; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -448,7 +474,7 @@ COMMENT ON TABLE public.roles IS 'Vai trò phân quyền. 1 nhân sự có thể
 
 
 --
--- TOC entry 3709 (class 0 OID 0)
+-- TOC entry 3744 (class 0 OID 0)
 -- Dependencies: 241
 -- Name: COLUMN roles.code; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -496,7 +522,7 @@ CREATE TABLE public.task_assignments (
 ALTER TABLE public.task_assignments OWNER TO neondb_owner;
 
 --
--- TOC entry 3710 (class 0 OID 0)
+-- TOC entry 3745 (class 0 OID 0)
 -- Dependencies: 235
 -- Name: TABLE task_assignments; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -505,7 +531,7 @@ COMMENT ON TABLE public.task_assignments IS 'Bảng trung gian users-tasks: 1 ta
 
 
 --
--- TOC entry 3711 (class 0 OID 0)
+-- TOC entry 3746 (class 0 OID 0)
 -- Dependencies: 235
 -- Name: COLUMN task_assignments.stage_type; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -514,7 +540,7 @@ COMMENT ON COLUMN public.task_assignments.stage_type IS 'primary | btv1 | btv2 |
 
 
 --
--- TOC entry 3712 (class 0 OID 0)
+-- TOC entry 3747 (class 0 OID 0)
 -- Dependencies: 235
 -- Name: COLUMN task_assignments.received_at; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -523,7 +549,7 @@ COMMENT ON COLUMN public.task_assignments.received_at IS 'Ngày nhận công vi�
 
 
 --
--- TOC entry 3713 (class 0 OID 0)
+-- TOC entry 3748 (class 0 OID 0)
 -- Dependencies: 235
 -- Name: COLUMN task_assignments.due_date; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -532,7 +558,7 @@ COMMENT ON COLUMN public.task_assignments.due_date IS 'Ngày hoàn thành dự k
 
 
 --
--- TOC entry 3714 (class 0 OID 0)
+-- TOC entry 3749 (class 0 OID 0)
 -- Dependencies: 235
 -- Name: COLUMN task_assignments.completed_at; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -570,7 +596,7 @@ CREATE TABLE public.tasks (
 ALTER TABLE public.tasks OWNER TO neondb_owner;
 
 --
--- TOC entry 3715 (class 0 OID 0)
+-- TOC entry 3750 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: TABLE tasks; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -579,7 +605,7 @@ COMMENT ON TABLE public.tasks IS 'Công việc (chỉ thông tin task-level). Ng
 
 
 --
--- TOC entry 3716 (class 0 OID 0)
+-- TOC entry 3751 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: COLUMN tasks."group"; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -588,7 +614,7 @@ COMMENT ON COLUMN public.tasks."group" IS 'Nhóm CV: CV chung, Biên tập, Thi�
 
 
 --
--- TOC entry 3717 (class 0 OID 0)
+-- TOC entry 3752 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: COLUMN tasks.task_type; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -597,7 +623,7 @@ COMMENT ON COLUMN public.tasks.task_type IS 'GENERAL | TRANSLATION | PROOFREADIN
 
 
 --
--- TOC entry 3718 (class 0 OID 0)
+-- TOC entry 3753 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: COLUMN tasks.related_work_id; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -606,7 +632,7 @@ COMMENT ON COLUMN public.tasks.related_work_id IS 'Gắn task với work (tác p
 
 
 --
--- TOC entry 3719 (class 0 OID 0)
+-- TOC entry 3754 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: COLUMN tasks.related_contract_id; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -615,12 +641,37 @@ COMMENT ON COLUMN public.tasks.related_contract_id IS 'UUID của translation_co
 
 
 --
--- TOC entry 3720 (class 0 OID 0)
+-- TOC entry 3755 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: COLUMN tasks.vote; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
 
 COMMENT ON COLUMN public.tasks.vote IS 'Đánh giá công việc của Người kiểm soát: tot | kha | khong_tot | khong_hoan_thanh';
+
+
+--
+-- TOC entry 249 (class 1259 OID 81920)
+-- Name: translation_contract_members; Type: TABLE; Schema: public; Owner: neondb_owner
+--
+
+CREATE TABLE public.translation_contract_members (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    translation_contract_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.translation_contract_members OWNER TO neondb_owner;
+
+--
+-- TOC entry 3756 (class 0 OID 0)
+-- Dependencies: 249
+-- Name: TABLE translation_contract_members; Type: COMMENT; Schema: public; Owner: neondb_owner
+--
+
+COMMENT ON TABLE public.translation_contract_members IS 'Bảng trung gian translation_contracts-users: ai là dịch giả/người tham gia hợp đồng dịch thuật. Role "partner" lưu trong user_roles.';
 
 
 --
@@ -646,14 +697,25 @@ CREATE TABLE public.translation_contracts (
     note text,
     component_id uuid,
     overview_value numeric(15,2),
-    translation_value numeric(15,2)
+    translation_value numeric(15,2),
+    progress_check_date date,
+    expert_review_date date,
+    project_acceptance_date date,
+    status text,
+    cancelled_at date,
+    proofreading_in_progress boolean DEFAULT false,
+    editing_in_progress boolean DEFAULT false,
+    print_transfer_date date,
+    published_date date,
+    proofreading_completed boolean DEFAULT false,
+    editing_completed boolean DEFAULT false
 );
 
 
 ALTER TABLE public.translation_contracts OWNER TO neondb_owner;
 
 --
--- TOC entry 3721 (class 0 OID 0)
+-- TOC entry 3757 (class 0 OID 0)
 -- Dependencies: 244
 -- Name: TABLE translation_contracts; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -662,7 +724,7 @@ COMMENT ON TABLE public.translation_contracts IS 'Hợp đồng dịch thuật (
 
 
 --
--- TOC entry 3722 (class 0 OID 0)
+-- TOC entry 3758 (class 0 OID 0)
 -- Dependencies: 244
 -- Name: COLUMN translation_contracts.component_id; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -671,7 +733,7 @@ COMMENT ON COLUMN public.translation_contracts.component_id IS 'Hợp phần (ph
 
 
 --
--- TOC entry 3723 (class 0 OID 0)
+-- TOC entry 3759 (class 0 OID 0)
 -- Dependencies: 244
 -- Name: COLUMN translation_contracts.overview_value; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -680,7 +742,7 @@ COMMENT ON COLUMN public.translation_contracts.overview_value IS 'Kinh phí vi�
 
 
 --
--- TOC entry 3724 (class 0 OID 0)
+-- TOC entry 3760 (class 0 OID 0)
 -- Dependencies: 244
 -- Name: COLUMN translation_contracts.translation_value; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -705,7 +767,7 @@ CREATE TABLE public.user_groups (
 ALTER TABLE public.user_groups OWNER TO neondb_owner;
 
 --
--- TOC entry 3725 (class 0 OID 0)
+-- TOC entry 3761 (class 0 OID 0)
 -- Dependencies: 240
 -- Name: TABLE user_groups; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -731,7 +793,7 @@ CREATE TABLE public.user_roles (
 ALTER TABLE public.user_roles OWNER TO neondb_owner;
 
 --
--- TOC entry 3726 (class 0 OID 0)
+-- TOC entry 3762 (class 0 OID 0)
 -- Dependencies: 242
 -- Name: TABLE user_roles; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -740,7 +802,7 @@ COMMENT ON TABLE public.user_roles IS 'Bảng trung gian users-roles: 1 nhân s�
 
 
 --
--- TOC entry 3727 (class 0 OID 0)
+-- TOC entry 3763 (class 0 OID 0)
 -- Dependencies: 242
 -- Name: COLUMN user_roles.component_id; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -770,7 +832,7 @@ CREATE TABLE public.users (
 ALTER TABLE public.users OWNER TO neondb_owner;
 
 --
--- TOC entry 3728 (class 0 OID 0)
+-- TOC entry 3764 (class 0 OID 0)
 -- Dependencies: 230
 -- Name: TABLE users; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -779,7 +841,7 @@ COMMENT ON TABLE public.users IS 'Nhân sự. Vai trò: bảng user_roles. Nhóm
 
 
 --
--- TOC entry 3729 (class 0 OID 0)
+-- TOC entry 3765 (class 0 OID 0)
 -- Dependencies: 230
 -- Name: COLUMN users.department; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -812,7 +874,7 @@ CREATE TABLE public.works (
 ALTER TABLE public.works OWNER TO neondb_owner;
 
 --
--- TOC entry 3730 (class 0 OID 0)
+-- TOC entry 3766 (class 0 OID 0)
 -- Dependencies: 243
 -- Name: TABLE works; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -821,7 +883,7 @@ COMMENT ON TABLE public.works IS 'Tác phẩm / công việc nguồn (trục ngh
 
 
 --
--- TOC entry 3731 (class 0 OID 0)
+-- TOC entry 3767 (class 0 OID 0)
 -- Dependencies: 243
 -- Name: COLUMN works.component_id; Type: COMMENT; Schema: public; Owner: neondb_owner
 --
@@ -830,7 +892,7 @@ COMMENT ON COLUMN public.works.component_id IS 'Hợp phần dịch thuật (ph�
 
 
 --
--- TOC entry 3681 (class 0 OID 65591)
+-- TOC entry 3713 (class 0 OID 65591)
 -- Dependencies: 246
 -- Data for Name: components; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -845,7 +907,7 @@ COPY public.components (id, code, name, description, display_order, created_at) 
 
 
 --
--- TOC entry 3671 (class 0 OID 57375)
+-- TOC entry 3703 (class 0 OID 57375)
 -- Dependencies: 236
 -- Data for Name: contract_members; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -855,7 +917,7 @@ COPY public.contract_members (id, contract_id, user_id, role, created_at, update
 
 
 --
--- TOC entry 3682 (class 0 OID 65605)
+-- TOC entry 3714 (class 0 OID 65605)
 -- Dependencies: 247
 -- Data for Name: contract_stages; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -865,7 +927,7 @@ COPY public.contract_stages (id, translation_contract_id, proofreading_contract_
 
 
 --
--- TOC entry 3666 (class 0 OID 49166)
+-- TOC entry 3698 (class 0 OID 49166)
 -- Dependencies: 231
 -- Data for Name: contracts; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -875,7 +937,7 @@ COPY public.contracts (id, code, type, name, party_a, party_b, signed_at, value,
 
 
 --
--- TOC entry 3673 (class 0 OID 57427)
+-- TOC entry 3705 (class 0 OID 57427)
 -- Dependencies: 238
 -- Data for Name: document_contracts; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -885,7 +947,7 @@ COPY public.document_contracts (id, document_id, contract_id, role, note, create
 
 
 --
--- TOC entry 3672 (class 0 OID 57402)
+-- TOC entry 3704 (class 0 OID 57402)
 -- Dependencies: 237
 -- Data for Name: document_tasks; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -895,7 +957,7 @@ COPY public.document_tasks (id, document_id, task_id, role, note, created_at, up
 
 
 --
--- TOC entry 3668 (class 0 OID 49196)
+-- TOC entry 3700 (class 0 OID 49196)
 -- Dependencies: 233
 -- Data for Name: documents; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -905,7 +967,7 @@ COPY public.documents (id, title, document_type, file_path, storage_key, contrac
 
 
 --
--- TOC entry 3674 (class 0 OID 57456)
+-- TOC entry 3706 (class 0 OID 57456)
 -- Dependencies: 239
 -- Data for Name: groups; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -921,55 +983,74 @@ d4b1672f-f8f9-4936-acd6-90a750757e5c	bien_tap	Biên tập	Nhóm biên tập	2026
 
 
 --
--- TOC entry 3683 (class 0 OID 73736)
+-- TOC entry 3715 (class 0 OID 73736)
 -- Dependencies: 248
 -- Data for Name: notifications; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
 COPY public.notifications (id, user_id, type, task_id, task_assignment_id, title, message, is_read, created_at, read_at) FROM stdin;
-6a1f3b0c-3e4c-4b7d-9f8c-2d3a5b6c7d80	a45f4e87-1449-4cd3-a32c-9b16b315b1f7	task_overdue	task-1769829346523-mj93dpe	3114ad54-96ff-4477-9b2a-737e299b0939	Công việc đã quá hạn	Đã quá hạn (2025-09-30): Hỗ trợ xây dựng thuyết minh Thư tịch Phật giáo Việt Nam thư mục quan yếu (Hợp phần Phật điển Việt Nam)	f	2026-02-02 00:00:00+00	\N
-0c7f1a2b-4d5e-4f6a-9b3c-1d2e3f4a5b6c	0607714e-e265-4ed1-a36f-39cedd66f10f	task_overdue	task-1769830334378-679953r	86074d8c-31ff-4a1f-a10e-0eb1161862dc	Công việc đã quá hạn	Đã quá hạn (2026-01-31): Hỗ trợ Dịch giả đọc đối chiếu Vân đài loại ngữ	f	2026-02-02 00:00:00+00	\N
-b9a8c7d6-e5f4-4a3b-8c2d-1e0f9a8b7c6d	94025b61-6607-4f2f-b2b4-f4567f14f0b8	task_overdue	task-1769830334378-679953r	266a79c6-9e25-4c3e-b5c6-acb0263db34e	Công việc đã quá hạn	Đã quá hạn (2026-01-31): Hỗ trợ Dịch giả đọc đối chiếu Vân đài loại ngữ	f	2026-02-02 00:00:00+00	\N
-2d3e4f5a-6b7c-4d8e-9f0a-1b2c3d4e5f60	e0f74135-4578-4c1c-9944-55f17046607b	task_overdue	task-1769917584523-1rj9w3a	1ce45d62-974f-4465-9cb4-baa9cecedd30	Công việc đã quá hạn	Đã quá hạn (2025-07-15): Hoàn thành HS Quyết toán HĐ dịch thuật - tài liệu Dị bộ tông luân luận (GĐ2)	f	2026-02-02 00:00:00+00	\N
-7e6d5c4b-3a2f-4e1d-9c8b-7a6f5e4d3c2b	f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	task_overdue	task-1769780386538-0jvd1hm	2f657443-aa24-4000-abf5-cdf778b3c972	Công việc đã quá hạn	Đã quá hạn (2025-05-31): Điều chỉnh và hoàn thành Thuyết minh và Dự toán Đề án Diệu Liên GĐ2	f	2026-02-02 00:00:00+00	\N
-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d	52fa58ae-5f0a-4687-9d47-b0e5d3a210d3	task_overdue	task-1769829631251-rx6sotb	ed0fcf29-990f-47dd-a437-7e782e4ca3a0	Công việc đã quá hạn	Đã quá hạn (2025-10-29): Đọc thẩm định bản dịch NTCDA - tài liệu Trung dung - Đại học tiết yếu	f	2026-02-02 00:00:00+00	\N
-b7cf2eb0-95da-def9-0dfd-c40fd4173006	fa3da8df-1bc3-43fb-be3f-25bbfdf3113b	task_assigned	task-1769830674576-78moydp	3e229a80-7dbf-4838-85d4-f1512914c4af	Công việc mới được giao	Bạn được giao: Đọc rà soát bản thảo chuyển in + Xây dựng Quy trình rà soát bản thảo chuyển in	f	2026-01-31 03:37:47.318078+00	\N
-10490f9f-a0f1-9217-7c49-25f055a9f930	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1769830674576-78moydp	08ae1b5d-3176-4590-8861-d3582be6524c	Công việc mới được giao	Bạn được giao: Đọc rà soát bản thảo chuyển in + Xây dựng Quy trình rà soát bản thảo chuyển in	f	2026-01-31 03:37:47.358513+00	\N
-2a6f21d4-d3af-5d60-194d-be85ecb067e0	fa3da8df-1bc3-43fb-be3f-25bbfdf3113b	task_assigned	task-1769829273381-go74zqy	459fbb0c-24ef-4c7f-8553-965c08f5835e	Công việc mới được giao	Bạn được giao: Xây dựng Sơ thảo Đề án định mức biên tập	f	2026-01-31 03:38:09.654466+00	\N
-0274fd6c-8d32-0c59-0cdf-1b1694a9a48f	6cd0ecee-eb79-463b-84a8-9932c54c7cc2	task_assigned	task-1769829273381-go74zqy	eb1c1484-578e-40d9-ad14-745788330fed	Công việc mới được giao	Bạn được giao: Xây dựng Sơ thảo Đề án định mức biên tập	f	2026-01-31 03:38:09.692453+00	\N
-e5e712c9-e589-3e47-7651-dbbf14226040	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1769829273381-go74zqy	0b75df55-d255-41c4-8157-84b011a88f62	Công việc mới được giao	Bạn được giao: Xây dựng Sơ thảo Đề án định mức biên tập	f	2026-01-31 03:38:09.731542+00	\N
-32236444-4695-169a-ab79-a9d05ac9aced	a45f4e87-1449-4cd3-a32c-9b16b315b1f7	task_assigned	task-1769829346523-mj93dpe	3114ad54-96ff-4477-9b2a-737e299b0939	Công việc mới được giao	Bạn được giao: Hỗ trợ xây dựng thuyết minh Thư tịch Phật giáo Việt Nam thư mục quan yếu (Hợp phần Phật điển Việt Nam)	f	2026-01-31 03:38:33.274682+00	\N
-dc6defd6-0527-d612-4cf7-8664585a6874	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1769829346523-mj93dpe	7221b650-a681-467c-89e9-e63dd12cefc6	Công việc mới được giao	Bạn được giao: Hỗ trợ xây dựng thuyết minh Thư tịch Phật giáo Việt Nam thư mục quan yếu (Hợp phần Phật điển Việt Nam)	f	2026-01-31 03:38:33.330615+00	\N
-4f336eaa-b786-eb5d-f0d7-29fd8bd5ed4f	fa3da8df-1bc3-43fb-be3f-25bbfdf3113b	task_assigned	task-1769829472741-5iu316h	9fbd569c-2961-4b58-bdc9-8701f9f6b23f	Công việc mới được giao	Bạn được giao: Phối hợp xây dựng Kế hoạch và Dự toán Kinh phí in ấn xuất bản	f	2026-01-31 03:38:47.762167+00	\N
-2185915f-0c1e-7c5c-5a06-0fa5bee45d58	6cd0ecee-eb79-463b-84a8-9932c54c7cc2	task_assigned	task-1769829472741-5iu316h	aea75303-36b4-444a-8cac-fab6e0ad087e	Công việc mới được giao	Bạn được giao: Phối hợp xây dựng Kế hoạch và Dự toán Kinh phí in ấn xuất bản	f	2026-01-31 03:38:47.816862+00	\N
-c3c355e8-bebe-a79f-ef7f-6c20241c9467	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1769829472741-5iu316h	215bb07a-7c3c-4a8c-8815-ae6a2ef6bef0	Công việc mới được giao	Bạn được giao: Phối hợp xây dựng Kế hoạch và Dự toán Kinh phí in ấn xuất bản	f	2026-01-31 03:38:47.871443+00	\N
-745bd29e-2c28-2669-2663-74f4a088878b	0607714e-e265-4ed1-a36f-39cedd66f10f	task_assigned	task-1769830334378-679953r	86074d8c-31ff-4a1f-a10e-0eb1161862dc	Công việc mới được giao	Bạn được giao: Hỗ trợ Dịch giả đọc đối chiếu Vân đài loại ngữ	f	2026-01-31 03:39:03.817144+00	\N
-eaecac37-c4fc-9755-18ea-da8192c5827f	94025b61-6607-4f2f-b2b4-f4567f14f0b8	task_assigned	task-1769830334378-679953r	266a79c6-9e25-4c3e-b5c6-acb0263db34e	Công việc mới được giao	Bạn được giao: Hỗ trợ Dịch giả đọc đối chiếu Vân đài loại ngữ	f	2026-01-31 03:39:03.86238+00	\N
-c1daa316-6474-d50e-7a4c-3637bc75d3fa	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1769830334378-679953r	dfd3639b-b279-4761-b318-430ca8549d5b	Công việc mới được giao	Bạn được giao: Hỗ trợ Dịch giả đọc đối chiếu Vân đài loại ngữ	f	2026-01-31 03:39:03.905883+00	\N
-bc928958-31d5-0d8b-9ebb-9692afd79295	e0f74135-4578-4c1c-9944-55f17046607b	task_assigned	task-1769917584523-1rj9w3a	1ce45d62-974f-4465-9cb4-baa9cecedd30	Công việc mới được giao	Bạn được giao: Hoàn thành HS Quyết toán HĐ dịch thuật - tài liệu Dị bộ tông luân luận (GĐ2)	f	2026-02-01 03:51:12.364621+00	\N
-01cc327e-d488-a147-7014-f57c72a1fb4b	f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	task_assigned	task-1769917584523-1rj9w3a	f0c51923-e424-40fe-abec-8a5efd01e8fa	Công việc mới được giao	Bạn được giao: Hoàn thành HS Quyết toán HĐ dịch thuật - tài liệu Dị bộ tông luân luận (GĐ2)	f	2026-02-01 03:51:12.420137+00	\N
-d7ae0a98-522f-3274-ba3b-f43df0fb5586	e0f74135-4578-4c1c-9944-55f17046607b	task_assigned	task-1769919533177-lpq21pi	fa2efd7b-abd9-4898-9635-ce15a7c8a78e	Công việc mới được giao	Bạn được giao: Chuẩn bị Phiếu đề nghị (bổ sung 02 thành viên) + Phụ lục Hợp đồng dịch thuật tài liệu Tỳ kheo Ni truyện (GĐ 2)	f	2026-02-01 04:18:44.892628+00	\N
-877bd265-bddf-df8f-e924-7563a24c6b00	f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	task_assigned	task-1769919533177-lpq21pi	8dd6af9c-7672-4c9f-82af-42faeb507358	Công việc mới được giao	Bạn được giao: Chuẩn bị Phiếu đề nghị (bổ sung 02 thành viên) + Phụ lục Hợp đồng dịch thuật tài liệu Tỳ kheo Ni truyện (GĐ 2)	f	2026-02-01 04:18:44.942702+00	\N
-9a79e7ca-4ad3-1706-8a72-a04c2b89832d	99434b30-4982-48e9-8c81-b3466309537e	task_assigned	task-1769776824967-rb9mw3u	b1987a5d-f4d9-4180-9186-ea876fa30355	Công việc mới được giao	Bạn được giao: Sửa bông 7 Na Tiên tỳ kheo kinh 19x27	f	2026-02-01 04:21:32.741766+00	\N
-c200c777-72d3-3997-08ca-1eae0bb01a6a	99434b30-4982-48e9-8c81-b3466309537e	task_assigned	task-1769778057465-3hgvw9g	f3e21b59-9854-41cf-b8f7-556d34882d90	Công việc mới được giao	Bạn được giao: Sửa bông 4 Tịnh Độ tam kinh 19x27	f	2026-01-30 13:12:05.207551+00	\N
-21bab0cd-c995-7180-200e-2b816b092e72	f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	task_assigned	task-1769780386538-0jvd1hm	2f657443-aa24-4000-abf5-cdf778b3c972	Công việc mới được giao	Bạn được giao: Điều chỉnh và hoàn thành Thuyết minh và Dự toán Đề án Diệu Liên GĐ2	f	2026-01-30 13:41:02.423731+00	\N
-87758c68-4ba1-f44d-8a6c-9b9bce9dfc25	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1769780386538-0jvd1hm	a2a30cea-56bc-4ad9-b6c2-2d75cb98fc96	Công việc mới được giao	Bạn được giao: Điều chỉnh và hoàn thành Thuyết minh và Dự toán Đề án Diệu Liên GĐ2	f	2026-01-30 13:41:02.48064+00	\N
-9bd43677-9a47-8b21-e10d-73bc9fc4fc65	52fa58ae-5f0a-4687-9d47-b0e5d3a210d3	task_assigned	task-1769829631251-rx6sotb	ed0fcf29-990f-47dd-a437-7e782e4ca3a0	Công việc mới được giao	Bạn được giao: Đọc thẩm định bản dịch NTCDA - tài liệu Trung dung - Đại học tiết yếu 	f	2026-01-31 03:20:24.024789+00	\N
+ec35bd0c-eaad-4cde-bf3e-b2373d740001	f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	task_overdue	task-1769780386538-0jvd1hm	2f657443-aa24-4000-abf5-cdf778b3c972	Công việc đã quá hạn	Đã quá hạn (2025-05-31): Điều chỉnh và hoàn thành Thuyết minh và Dự toán Đề án Diệu Liên GĐ2	t	2026-02-02 09:41:34.363+00	2026-02-02 09:42:22.291+00
+b7524300-5ebc-44c5-b6dc-ef2f074cf201	fa3da8df-1bc3-43fb-be3f-25bbfdf3113b	task_assigned	task-1770092467619-0etmrjo	fe9a2aeb-f830-44ff-832f-0d45912d8138	Công việc mới được giao	Bạn được giao: Biên tập B1 Thành Duy thức luận	f	2026-02-03 04:21:07.816+00	\N
+e8b15de5-f61c-41f4-8120-adef8c589b4b	02cfd1a3-7a97-4187-914c-55fee83f380e	task_assigned	task-1770092467619-0etmrjo	628b90c0-efb0-4c21-b6ad-b34f0ea93061	Công việc mới được giao	Bạn được giao: Biên tập B1 Thành Duy thức luận	f	2026-02-03 04:21:07.966+00	\N
+17f6108a-f2be-4302-ad89-a4e0b70d197c	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770092467619-0etmrjo	aae311b9-5b86-4f2f-8576-9f87af6154ca	Công việc mới được giao	Bạn được giao: Biên tập B1 Thành Duy thức luận	f	2026-02-03 04:21:08.103+00	\N
+10eeeab2-b0ac-4f7e-9720-177f9400ecf0	11817e25-7e55-4b0d-82ef-9ff26de11efa	task_assigned	task-1770093058832-pauzos1	d0002af7-0b97-410c-aead-62401b88ebc3	Công việc mới được giao	Bạn được giao: Biên tập B1 thô Đại Tuệ Phổ Giác thiền sư ngữ lục	f	2026-02-03 04:31:41.244+00	\N
+f576304e-4e16-4b3f-b275-5f686f326a5f	e177e33b-2720-4a23-ac89-a8a4c93857b3	task_assigned	task-1770093058832-pauzos1	c448c2cb-2334-4166-8c96-df95b9062290	Công việc mới được giao	Bạn được giao: Biên tập B1 thô Đại Tuệ Phổ Giác thiền sư ngữ lục	f	2026-02-03 04:31:41.418+00	\N
+dbb3adc8-917e-4178-afd2-db782a4b713f	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770093058832-pauzos1	52b45432-bdf2-4f1a-af5f-331ab147f611	Công việc mới được giao	Bạn được giao: Biên tập B1 thô Đại Tuệ Phổ Giác thiền sư ngữ lục	f	2026-02-03 04:31:41.594+00	\N
+f4929ca7-c99d-4bdf-9fbf-322750a11cfe	50ee08d4-15aa-406a-98c5-d2b26ce1a83b	task_assigned	task-1770093413097-qt9ornw	b7ecdb9c-e317-4b29-9f3b-f6c99bdd5a9e	Công việc mới được giao	Bạn được giao: Biên tập B1 Lục Tổ đàn kinh	f	2026-02-03 04:39:59.045+00	\N
+b8f743be-dde4-422a-8199-946db6e36984	9f59f810-2c2a-4242-b56c-77d4bdf73391	task_assigned	task-1770093413097-qt9ornw	3c94df9e-d900-4ccf-8cdd-db22ba37718c	Công việc mới được giao	Bạn được giao: Biên tập B1 Lục Tổ đàn kinh	f	2026-02-03 04:39:59.183+00	\N
+a9379836-f483-4027-b13f-a03e4240459b	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770093413097-qt9ornw	3bad8702-203e-45dd-9740-f17cfd80711e	Công việc mới được giao	Bạn được giao: Biên tập B1 Lục Tổ đàn kinh	f	2026-02-03 04:39:59.32+00	\N
+96c98086-6797-4623-94a3-cdb52fdc079a	f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	task_assigned	task-1770025265225-4p44sml	d07ff5b9-9c99-44e2-939d-94fe04f9c8cc	Công việc mới được giao	Bạn được giao: Test thông báo	f	2026-02-03 07:54:00.963+00	\N
+787597d8-7f22-4ba5-bd50-fd9e60b24c71	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770025265225-4p44sml	a4091b1c-e6e7-4f77-b6ab-04f58e22af23	Công việc mới được giao	Bạn được giao: Test thông báo	f	2026-02-03 07:54:01.131+00	\N
+e5308157-1601-415f-8022-879bdc3315c4	0607714e-e265-4ed1-a36f-39cedd66f10f	task_assigned	task-1770106613228-echz1v7	a9309c4c-5bce-4c36-84e1-1447a724708f	Công việc mới được giao	Bạn được giao: Biên tập B1 Đại Đường Tây Vực ký	f	2026-02-03 08:16:53.394+00	\N
+30326f87-a37f-48dc-8cdc-2414fddd9391	02cfd1a3-7a97-4187-914c-55fee83f380e	task_assigned	task-1770106613228-echz1v7	b9ff0d15-904e-41ec-98bc-806e24bf7afd	Công việc mới được giao	Bạn được giao: Biên tập B1 Đại Đường Tây Vực ký	f	2026-02-03 08:16:53.555+00	\N
+5339b64c-68bc-4087-8d2e-2d04c8b1f2e5	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770106613228-echz1v7	7c40ff93-b693-4d8b-bd5e-16306fb8cd41	Công việc mới được giao	Bạn được giao: Biên tập B1 Đại Đường Tây Vực ký	f	2026-02-03 08:16:53.716+00	\N
+7858aec4-8be8-457b-a2d5-ddc4ab1c6045	02cfd1a3-7a97-4187-914c-55fee83f380e	task_assigned	task-1770107115223-ivlwesu	1c81a35c-e4ab-4494-824c-dfc25927d114	Công việc mới được giao	Bạn được giao: Biên tập bông thô Phật quốc ký	f	2026-02-03 08:25:15.659+00	\N
+be318fad-8f14-48a1-9409-4e96230883c7	fa3da8df-1bc3-43fb-be3f-25bbfdf3113b	task_assigned	task-1770107115223-ivlwesu	b890362f-3f82-4d2d-8658-f256665e3015	Công việc mới được giao	Bạn được giao: Biên tập bông thô Phật quốc ký	f	2026-02-03 08:25:15.835+00	\N
+7d5071b1-d92f-45ea-bfea-9895018bb133	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770107115223-ivlwesu	5dcd73cc-8c64-4dc5-ab9f-17e732797ea5	Công việc mới được giao	Bạn được giao: Biên tập bông thô Phật quốc ký	f	2026-02-03 08:25:16.012+00	\N
+0d786b3e-1c06-4d72-b9f8-3ba034968ef7	e177e33b-2720-4a23-ac89-a8a4c93857b3	task_assigned	task-1770107984593-w0ia255	24babcd9-cf95-497d-878c-6e8f10336489	Công việc mới được giao	Bạn được giao: BT bông 3 + 4 tinh Triệu luận khổ 19x27cm	f	2026-02-03 08:39:45.54+00	\N
+e2abed27-d5fa-4d98-9ebc-11bbeadf6c97	11817e25-7e55-4b0d-82ef-9ff26de11efa	task_assigned	task-1770107984593-w0ia255	497cbfbe-b552-452e-88c5-d0e7b29a8bb4	Công việc mới được giao	Bạn được giao: BT bông 3 + 4 tinh Triệu luận khổ 19x27cm	f	2026-02-03 08:39:45.701+00	\N
+8772b8af-23a4-4f25-b548-390b7dcb552b	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770107984593-w0ia255	97f66d10-4b76-480b-967e-52f0f526d74d	Công việc mới được giao	Bạn được giao: BT bông 3 + 4 tinh Triệu luận khổ 19x27cm	f	2026-02-03 08:39:45.864+00	\N
+422d9101-5fed-4148-9b18-b5193989fb01	e177e33b-2720-4a23-ac89-a8a4c93857b3	task_assigned	task-1770108155026-gn5e2ar	92c29508-2fae-45eb-8856-0e6b97d8c39b	Công việc mới được giao	Bạn được giao: BT bông 3 tinh Biện trung biên luận khổ 19x27cm	f	2026-02-03 08:42:35.164+00	\N
+7cdf6bfc-fb96-45d4-84e9-31d7dadb860e	11817e25-7e55-4b0d-82ef-9ff26de11efa	task_assigned	task-1770108155026-gn5e2ar	907f66e9-4b15-401a-a809-dacd7407785e	Công việc mới được giao	Bạn được giao: BT bông 3 tinh Biện trung biên luận khổ 19x27cm	f	2026-02-03 08:42:35.3+00	\N
+b1dc495e-044d-47d2-95e9-09fb761e8d5e	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770108155026-gn5e2ar	d1185d81-47f6-44f8-b9cd-8bdb45282174	Công việc mới được giao	Bạn được giao: BT bông 3 tinh Biện trung biên luận khổ 19x27cm	f	2026-02-03 08:42:35.436+00	\N
+447581b5-49e2-461f-ba2d-df38385b2c0f	02cfd1a3-7a97-4187-914c-55fee83f380e	task_assigned	task-1770108296334-wszsl91	c5f469d8-eab5-476b-8bef-f953f956932a	Công việc mới được giao	Bạn được giao: BT bông thô Nam Hải ký quy nội pháp truyện	f	2026-02-03 08:44:56.502+00	\N
+496dd57d-415a-4c70-a06e-1152b10149e6	6cd0ecee-eb79-463b-84a8-9932c54c7cc2	task_assigned	task-1770108296334-wszsl91	6edbe089-670d-495d-9d92-f9ce118c0880	Công việc mới được giao	Bạn được giao: BT bông thô Nam Hải ký quy nội pháp truyện	f	2026-02-03 08:44:56.671+00	\N
+724de370-9049-49d6-a4bf-3c78ba3ef868	e177e33b-2720-4a23-ac89-a8a4c93857b3	task_assigned	task-1770107398548-5p1cgro	897f94d0-ede7-4d4c-86f4-7b491f31a299	Công việc mới được giao	Bạn được giao: BT Bông 2 tinh Biện trung biên luận khổ 19x27cm	f	2026-02-03 09:04:14.898+00	\N
+4979802c-57bf-4ea6-b97b-36d47fcf79b0	11817e25-7e55-4b0d-82ef-9ff26de11efa	task_assigned	task-1770107398548-5p1cgro	b8136734-1162-4c69-a167-b992acb6a9f4	Công việc mới được giao	Bạn được giao: BT Bông 2 tinh Biện trung biên luận khổ 19x27cm	f	2026-02-03 09:04:15.034+00	\N
+ec50eac6-a0a4-4f38-8c54-b961fa27a75c	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770107398548-5p1cgro	a6cd4aa4-0964-4927-877f-bda82ca85e67	Công việc mới được giao	Bạn được giao: BT Bông 2 tinh Biện trung biên luận khổ 19x27cm	f	2026-02-03 09:04:15.166+00	\N
+94ae8117-58b9-4501-abc1-4709a1f0d534	ccedb4bb-b523-4a4e-a628-ccdcdb1cdef2	task_assigned	task-1770116220103-mo0p10t	7c79a7ca-2447-4889-abf9-a55ea1462a1a	Công việc mới được giao	Bạn được giao: Biên tập bông chuyển in Quan Âm tế độ diễn nghĩa kinh	f	2026-02-03 10:57:00.243+00	\N
+121d7eba-5ed1-4af6-9190-5b55dbf2e0f3	6cd0ecee-eb79-463b-84a8-9932c54c7cc2	task_assigned	task-1770116220103-mo0p10t	bec22bef-8013-4bb6-86cf-866becb07055	Công việc mới được giao	Bạn được giao: Biên tập bông chuyển in Quan Âm tế độ diễn nghĩa kinh	f	2026-02-03 10:57:00.384+00	\N
+24d4e98e-ecc5-41f8-b177-d89973ef97fb	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770116220103-mo0p10t	38658ebf-e9fd-41b0-a306-31f88a6f53ed	Công việc mới được giao	Bạn được giao: Biên tập bông chuyển in Quan Âm tế độ diễn nghĩa kinh	f	2026-02-03 10:57:00.519+00	\N
+848c3025-e103-4be2-90f4-c3d0b0618c75	19c6c15c-c249-4410-9c37-2f19ca885bee	task_assigned	task-1770116361929-fw0sq35	99d1cccd-08c4-449a-8d52-a4e500647bbd	Công việc mới được giao	Bạn được giao: Biên tập B2 thô Thánh đăng lục	f	2026-02-03 10:59:22.09+00	\N
+ae9a49d8-c2e9-447b-9737-2dc4b23fbdd4	a45f4e87-1449-4cd3-a32c-9b16b315b1f7	task_assigned	task-1770116361929-fw0sq35	01559ba9-a1c0-4801-aeeb-9a13a86c7ed4	Công việc mới được giao	Bạn được giao: Biên tập B2 thô Thánh đăng lục	f	2026-02-03 10:59:22.251+00	\N
+3797bb2f-6c9d-481c-84d4-b0c564a6ef73	732a44be-0c38-4334-8897-63e49094c6e5	task_assigned	task-1770116361929-fw0sq35	1487ba0a-32ca-442c-89b5-77e56999a952	Công việc mới được giao	Bạn được giao: Biên tập B2 thô Thánh đăng lục	f	2026-02-03 10:59:22.413+00	\N
 \.
 
 
 --
--- TOC entry 3680 (class 0 OID 65562)
+-- TOC entry 3717 (class 0 OID 81943)
+-- Dependencies: 250
+-- Data for Name: proofreading_contract_members; Type: TABLE DATA; Schema: public; Owner: neondb_owner
+--
+
+COPY public.proofreading_contract_members (id, proofreading_contract_id, user_id, created_at, updated_at) FROM stdin;
+25e4b13b-b306-4425-ae85-5bc3ad0153c5	f9e4a990-ddcf-4a0c-9e2f-3c985d976e31	f1970916-c6fd-4be6-b11d-e3e1f3b91156	2026-02-04 11:28:02.44887+00	2026-02-04 11:28:02.44887+00
+\.
+
+
+--
+-- TOC entry 3712 (class 0 OID 65562)
 -- Dependencies: 245
 -- Data for Name: proofreading_contracts; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
-COPY public.proofreading_contracts (id, contract_number, work_id, translation_contract_id, proofreader_name, page_count, rate_ratio, contract_value, start_date, end_date, actual_completion_date, note, component_id) FROM stdin;
+COPY public.proofreading_contracts (id, contract_number, work_id, translation_contract_id, page_count, rate_ratio, contract_value, start_date, end_date, actual_completion_date, note, component_id) FROM stdin;
+f9e4a990-ddcf-4a0c-9e2f-3c985d976e31	52/HĐ-VPKĐ	342b21b4-615b-4904-ba88-e423f3157de3	d08e3dfc-dc51-4fe4-9512-1336cc7d23b0	277	0.3	30930000	2024-01-02	2025-01-01	2024-12-10	Dịch giả tự hiệu đính	32037af6-b306-4ea7-af9d-ae766e67dde6
 \.
 
 
 --
--- TOC entry 3676 (class 0 OID 57493)
+-- TOC entry 3708 (class 0 OID 57493)
 -- Dependencies: 241
 -- Data for Name: roles; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -983,28 +1064,30 @@ c702c5e5-49f5-4570-af59-e0a9e5471794	editor	Biên tập viên	Biên tập viên	
 75f7b60f-bb13-40ff-a066-b72cf82dacc1	tbtk\t	Trưởng ban Thư ký	Quản lý	2026-01-29 05:12:54.692382+00	2026-01-29 10:30:44.987074+00
 83004138-2d9d-4ced-9510-cc77eac41299	employee	Thông thường	Nhân sự Dự án nói chung	2026-01-29 10:28:41.370051+00	2026-01-29 10:31:00.356345+00
 5a2218d6-1a6e-4d37-99ed-b8d9f5dce15b	leader	Trưởng nhóm	Trưởng các nhóm công việc	2026-02-02 07:56:03.268189+00	2026-02-02 07:56:03.268189+00
+b7a18021-605d-44bb-93e8-f127dcadae57	partner	Cộng tác viên	Cộng tác viên	2026-02-04 10:45:04.841492+00	2026-02-04 10:45:04.841492+00
 \.
 
 
 --
--- TOC entry 3669 (class 0 OID 49238)
+-- TOC entry 3701 (class 0 OID 49238)
 -- Dependencies: 234
 -- Data for Name: session; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
 COPY public.session (sid, sess, expire) FROM stdin;
-vFi2OqLV_YN2j3V7ZG3BPMrXjWsgIYNO	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-04T15:44:40.034Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"88d7b1cf-5818-4202-aa28-a36912e3c3ed"}}	2026-02-08 09:35:40
-Y5gVamoJx_1xhTsprFtIJNrmIoPaybXt	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-09T09:09:31.359Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"f8b8d9ad-fac3-4bfc-8f09-88de3e255e00"}}	2026-02-09 09:11:49
+eltor8JXac49UggH4qxhxAFDq0xQRrvb	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-06T04:58:50.122Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"88d7b1cf-5818-4202-aa28-a36912e3c3ed"}}	2026-02-10 12:48:18
+GpixT9aLXT-bXXkVX8dqmjHGZ67UFgm5	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-10T04:11:21.466Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"88d7b1cf-5818-4202-aa28-a36912e3c3ed"}}	2026-02-10 04:55:30
 yy3hBBhEe-siIz5VVAFtgbYG0LWhdREM	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-06T04:57:30.059Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"88d7b1cf-5818-4202-aa28-a36912e3c3ed"}}	2026-02-06 04:57:31
 RpgYFxP63CTJIsHj-379lPytqokKEV7P	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-06T04:57:45.332Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"88d7b1cf-5818-4202-aa28-a36912e3c3ed"}}	2026-02-06 04:57:46
 yaCw5C1PgGm-7xSqc5X8s8_TwRj2buQZ	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-04T11:57:51.208Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"88d7b1cf-5818-4202-aa28-a36912e3c3ed"}}	2026-02-04 12:42:32
-eltor8JXac49UggH4qxhxAFDq0xQRrvb	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-06T04:58:50.122Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"88d7b1cf-5818-4202-aa28-a36912e3c3ed"}}	2026-02-09 09:13:20
 8FTT_s434T5JGSdxpW7J9JMzdcYqjbYf	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-06T10:39:23.015Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"11817e25-7e55-4b0d-82ef-9ff26de11efa"}}	2026-02-06 14:00:22
+Y5gVamoJx_1xhTsprFtIJNrmIoPaybXt	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-09T09:09:31.359Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"f8b8d9ad-fac3-4bfc-8f09-88de3e255e00"}}	2026-02-10 11:26:09
+vFi2OqLV_YN2j3V7ZG3BPMrXjWsgIYNO	{"cookie":{"originalMaxAge":604800000,"expires":"2026-02-04T15:44:40.034Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"passport":{"user":"88d7b1cf-5818-4202-aa28-a36912e3c3ed"}}	2026-02-11 11:37:09
 \.
 
 
 --
--- TOC entry 3670 (class 0 OID 57344)
+-- TOC entry 3702 (class 0 OID 57344)
 -- Dependencies: 235
 -- Data for Name: task_assignments; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -1028,47 +1111,104 @@ f0c51923-e424-40fe-abec-8a5efd01e8fa	task-1769917584523-1rj9w3a	f8b8d9ad-fac3-4b
 fa2efd7b-abd9-4898-9635-ce15a7c8a78e	task-1769919533177-lpq21pi	e0f74135-4578-4c1c-9944-55f17046607b	nhan_su_1	1	2025-12-04	2026-01-20	2026-01-23 00:00:00+00	not_started	0	\N	2026-02-01 04:18:44.892628+00	2026-02-01 04:18:44.892628+00
 8dd6af9c-7672-4c9f-82af-42faeb507358	task-1769919533177-lpq21pi	f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	kiem_soat	1	\N	\N	\N	not_started	0	\N	2026-02-01 04:18:44.942702+00	2026-02-01 04:18:44.942702+00
 b1987a5d-f4d9-4180-9186-ea876fa30355	task-1769776824967-rb9mw3u	99434b30-4982-48e9-8c81-b3466309537e	ktv_chinh	1	2026-01-07	2026-01-08	2026-01-08 00:00:00+00	completed	100	\N	2026-02-01 04:21:32.741766+00	2026-02-01 04:21:32.741766+00
+fe9a2aeb-f830-44ff-832f-0d45912d8138	task-1770092467619-0etmrjo	fa3da8df-1bc3-43fb-be3f-25bbfdf3113b	btv2	1	2024-06-30	2024-11-15	\N	not_started	0	\N	2026-02-03 04:21:08.162496+00	2026-02-03 04:21:08.162496+00
+628b90c0-efb0-4c21-b6ad-b34f0ea93061	task-1770092467619-0etmrjo	02cfd1a3-7a97-4187-914c-55fee83f380e	btv1	1	\N	\N	\N	not_started	0	\N	2026-02-03 04:21:08.313273+00	2026-02-03 04:21:08.313273+00
+aae311b9-5b86-4f2f-8576-9f87af6154ca	task-1770092467619-0etmrjo	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	1	\N	\N	\N	not_started	0	\N	2026-02-03 04:21:08.450851+00	2026-02-03 04:21:08.450851+00
+d0002af7-0b97-410c-aead-62401b88ebc3	task-1770093058832-pauzos1	11817e25-7e55-4b0d-82ef-9ff26de11efa	btv2	1	2025-09-03	\N	\N	in_progress	0	\N	2026-02-03 04:31:41.585774+00	2026-02-03 04:31:41.585774+00
+c448c2cb-2334-4166-8c96-df95b9062290	task-1770093058832-pauzos1	e177e33b-2720-4a23-ac89-a8a4c93857b3	btv1	1	2025-03-10	2025-08-15	2026-02-03 00:00:00+00	completed	100	\N	2026-02-03 04:31:41.760368+00	2026-02-03 04:31:41.760368+00
+52b45432-bdf2-4f1a-af5f-331ab147f611	task-1770093058832-pauzos1	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	1	\N	\N	\N	not_started	0	\N	2026-02-03 04:31:41.934859+00	2026-02-03 04:31:41.934859+00
+b7ecdb9c-e317-4b29-9f3b-f6c99bdd5a9e	task-1770093413097-qt9ornw	50ee08d4-15aa-406a-98c5-d2b26ce1a83b	btv2	1	\N	\N	\N	not_started	0	\N	2026-02-03 04:39:59.403253+00	2026-02-03 04:39:59.403253+00
 f3e21b59-9854-41cf-b8f7-556d34882d90	task-1769778057465-3hgvw9g	99434b30-4982-48e9-8c81-b3466309537e	ktv_chinh	1	2026-01-08	2026-01-08	2026-01-08 00:00:00+00	completed	100	\N	2026-01-30 13:12:05.207551+00	2026-01-30 13:12:05.207551+00
+3c94df9e-d900-4ccf-8cdd-db22ba37718c	task-1770093413097-qt9ornw	9f59f810-2c2a-4242-b56c-77d4bdf73391	btv1	1	\N	\N	\N	not_started	0	\N	2026-02-03 04:39:59.540253+00	2026-02-03 04:39:59.540253+00
 2f657443-aa24-4000-abf5-cdf778b3c972	task-1769780386538-0jvd1hm	f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	nhan_su_1	1	2025-05-20	2025-05-31	\N	not_started	0	\N	2026-01-30 13:41:02.423731+00	2026-01-30 13:41:02.423731+00
 a2a30cea-56bc-4ad9-b6c2-2d75cb98fc96	task-1769780386538-0jvd1hm	732a44be-0c38-4334-8897-63e49094c6e5	kiem_soat	1	\N	\N	\N	not_started	0	\N	2026-01-30 13:41:02.48064+00	2026-01-30 13:41:02.48064+00
+3bad8702-203e-45dd-9740-f17cfd80711e	task-1770093413097-qt9ornw	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	1	\N	\N	\N	not_started	0	\N	2026-02-03 04:39:59.677663+00	2026-02-03 04:39:59.677663+00
+d07ff5b9-9c99-44e2-939d-94fe04f9c8cc	task-1770025265225-4p44sml	f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	nhan_su_1	1	2026-02-02	2026-02-02	\N	not_started	0	\N	2026-02-03 07:54:01.406702+00	2026-02-03 07:54:01.406702+00
+a4091b1c-e6e7-4f77-b6ab-04f58e22af23	task-1770025265225-4p44sml	732a44be-0c38-4334-8897-63e49094c6e5	kiem_soat	1	\N	\N	\N	not_started	0	\N	2026-02-03 07:54:01.574391+00	2026-02-03 07:54:01.574391+00
+a9309c4c-5bce-4c36-84e1-1447a724708f	task-1770106613228-echz1v7	0607714e-e265-4ed1-a36f-39cedd66f10f	btv2	1	2025-08-28	2026-01-31	\N	in_progress	0	\N	2026-02-03 08:16:53.84977+00	2026-02-03 08:16:53.84977+00
+b9ff0d15-904e-41ec-98bc-806e24bf7afd	task-1770106613228-echz1v7	02cfd1a3-7a97-4187-914c-55fee83f380e	btv1	1	2025-08-28	2026-01-31	\N	in_progress	0	\N	2026-02-03 08:16:54.01186+00	2026-02-03 08:16:54.01186+00
+7c40ff93-b693-4d8b-bd5e-16306fb8cd41	task-1770106613228-echz1v7	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	1	\N	\N	\N	not_started	0	\N	2026-02-03 08:16:54.172017+00	2026-02-03 08:16:54.172017+00
+1c81a35c-e4ab-4494-824c-dfc25927d114	task-1770107115223-ivlwesu	02cfd1a3-7a97-4187-914c-55fee83f380e	btv2	1	2025-09-20	2026-01-31	\N	in_progress	0	\N	2026-02-03 08:25:15.869908+00	2026-02-03 08:25:15.869908+00
+b890362f-3f82-4d2d-8658-f256665e3015	task-1770107115223-ivlwesu	fa3da8df-1bc3-43fb-be3f-25bbfdf3113b	btv1	1	2025-09-20	2026-01-31	\N	not_started	0	\N	2026-02-03 08:25:16.303989+00	2026-02-03 08:25:16.303989+00
+5dcd73cc-8c64-4dc5-ab9f-17e732797ea5	task-1770107115223-ivlwesu	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	1	\N	\N	\N	not_started	0	\N	2026-02-03 08:25:16.434944+00	2026-02-03 08:25:16.434944+00
 ed0fcf29-990f-47dd-a437-7e782e4ca3a0	task-1769829631251-rx6sotb	52fa58ae-5f0a-4687-9d47-b0e5d3a210d3	nhan_su_1	1	2025-09-29	2025-10-29	\N	not_started	0	\N	2026-01-31 03:20:24.024789+00	2026-01-31 03:20:24.024789+00
+24babcd9-cf95-497d-878c-6e8f10336489	task-1770107984593-w0ia255	e177e33b-2720-4a23-ac89-a8a4c93857b3	btv2	4	2025-12-01	2025-12-20	\N	completed	0	\N	2026-02-03 08:39:46.006547+00	2026-02-03 08:39:46.006547+00
+497cbfbe-b552-452e-88c5-d0e7b29a8bb4	task-1770107984593-w0ia255	11817e25-7e55-4b0d-82ef-9ff26de11efa	btv1	4	2025-12-01	2025-12-20	\N	completed	0	\N	2026-02-03 08:39:46.168408+00	2026-02-03 08:39:46.168408+00
+97f66d10-4b76-480b-967e-52f0f526d74d	task-1770107984593-w0ia255	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	4	2025-12-20	\N	\N	completed	0	\N	2026-02-03 08:39:46.330795+00	2026-02-03 08:39:46.330795+00
+92c29508-2fae-45eb-8856-0e6b97d8c39b	task-1770108155026-gn5e2ar	e177e33b-2720-4a23-ac89-a8a4c93857b3	btv2	3	2025-12-26	\N	\N	in_progress	0	\N	2026-02-03 08:42:35.637517+00	2026-02-03 08:42:35.637517+00
+907f66e9-4b15-401a-a809-dacd7407785e	task-1770108155026-gn5e2ar	11817e25-7e55-4b0d-82ef-9ff26de11efa	btv1	3	2025-12-26	\N	\N	in_progress	0	\N	2026-02-03 08:42:35.774489+00	2026-02-03 08:42:35.774489+00
+d1185d81-47f6-44f8-b9cd-8bdb45282174	task-1770108155026-gn5e2ar	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	3	\N	\N	\N	not_started	0	\N	2026-02-03 08:42:35.910434+00	2026-02-03 08:42:35.910434+00
+c5f469d8-eab5-476b-8bef-f953f956932a	task-1770108296334-wszsl91	02cfd1a3-7a97-4187-914c-55fee83f380e	btv2	1	2026-01-10	2026-01-25	\N	not_started	0	\N	2026-02-03 08:44:56.964192+00	2026-02-03 08:44:56.964192+00
+6edbe089-670d-495d-9d92-f9ce118c0880	task-1770108296334-wszsl91	6cd0ecee-eb79-463b-84a8-9932c54c7cc2	btv1	1	2026-01-26	2026-03-31	\N	not_started	0	\N	2026-02-03 08:44:57.132856+00	2026-02-03 08:44:57.132856+00
+897f94d0-ede7-4d4c-86f4-7b491f31a299	task-1770107398548-5p1cgro	e177e33b-2720-4a23-ac89-a8a4c93857b3	btv2	4	2025-11-04	2025-12-26	2025-12-18 00:00:00+00	completed	100	\N	2026-02-03 09:04:15.385602+00	2026-02-03 09:04:15.385602+00
+b8136734-1162-4c69-a167-b992acb6a9f4	task-1770107398548-5p1cgro	11817e25-7e55-4b0d-82ef-9ff26de11efa	btv1	4	2025-11-04	2025-12-26	2025-12-18 00:00:00+00	completed	100	\N	2026-02-03 09:04:15.521294+00	2026-02-03 09:04:15.521294+00
+a6cd4aa4-0964-4927-877f-bda82ca85e67	task-1770107398548-5p1cgro	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	4	2025-12-18	2025-12-26	2025-12-26 00:00:00+00	completed	100	\N	2026-02-03 09:04:15.654276+00	2026-02-03 09:04:15.654276+00
+7c79a7ca-2447-4889-abf9-a55ea1462a1a	task-1770116220103-mo0p10t	ccedb4bb-b523-4a4e-a628-ccdcdb1cdef2	btv2	3	2025-09-01	2026-01-20	2026-01-20 00:00:00+00	completed	100	\N	2026-02-03 10:57:00.782166+00	2026-02-03 10:57:00.782166+00
+bec22bef-8013-4bb6-86cf-866becb07055	task-1770116220103-mo0p10t	6cd0ecee-eb79-463b-84a8-9932c54c7cc2	btv1	3	2025-09-01	2026-01-20	2026-01-20 00:00:00+00	completed	100	\N	2026-02-03 10:57:00.9242+00	2026-02-03 10:57:00.9242+00
+38658ebf-e9fd-41b0-a306-31f88a6f53ed	task-1770116220103-mo0p10t	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	3	2026-01-26	\N	\N	in_progress	0	\N	2026-02-03 10:57:01.059537+00	2026-02-03 10:57:01.059537+00
+99d1cccd-08c4-449a-8d52-a4e500647bbd	task-1770116361929-fw0sq35	19c6c15c-c249-4410-9c37-2f19ca885bee	btv2	4	2025-06-30	2025-11-26	2025-11-26 00:00:00+00	completed	100	\N	2026-02-03 10:59:22.625495+00	2026-02-03 10:59:22.625495+00
+01559ba9-a1c0-4801-aeeb-9a13a86c7ed4	task-1770116361929-fw0sq35	a45f4e87-1449-4cd3-a32c-9b16b315b1f7	btv1	4	2025-11-27	\N	\N	in_progress	0	\N	2026-02-03 10:59:22.785964+00	2026-02-03 10:59:22.785964+00
+1487ba0a-32ca-442c-89b5-77e56999a952	task-1770116361929-fw0sq35	732a44be-0c38-4334-8897-63e49094c6e5	doc_duyet	4	\N	\N	\N	not_started	0	\N	2026-02-03 10:59:22.949698+00	2026-02-03 10:59:22.949698+00
 \.
 
 
 --
--- TOC entry 3667 (class 0 OID 49176)
+-- TOC entry 3699 (class 0 OID 49176)
 -- Dependencies: 232
 -- Data for Name: tasks; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
 COPY public.tasks (id, title, description, "group", status, priority, progress, notes, workflow, source_sheet_id, source_sheet_name, contract_id, created_at, updated_at, task_type, related_work_id, related_contract_id, vote) FROM stdin;
+task-1770092467619-0etmrjo	Biên tập B1 Thành Duy thức luận	\N	Biên tập	Pending	High	0	Tạm dừng, chờ quyết định của Hội đồng và Trưởng ban thư ký	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Bông 1 (thô)\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Võ Thị Tú Oanh\\",\\"status\\":\\"not_started\\",\\"startDate\\":\\"2024-06-30\\",\\"dueDate\\":\\"2024-11-15\\",\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Nguyễn Cẩm Thi\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 04:21:07.619+00	2026-02-03 04:21:07.619+00	PROOFREADING	2007c5c4-b5c5-4d2f-8b27-960e30bdc472	\N	\N
 task-1769829631251-rx6sotb	Đọc thẩm định bản dịch NTCDA - tài liệu Trung dung - Đại học tiết yếu 	\N	CV chung	In Progress	High	0	\N	\N	\N	\N	\N	2026-01-31 03:20:31.251+00	2026-01-31 03:20:31.251+00	GENERAL	\N	\N	\N
+task-1770093058832-pauzos1	Biên tập B1 thô Đại Tuệ Phổ Giác thiền sư ngữ lục	\N	Biên tập	In Progress	High	33	BTV1 và BTV2 cùng rà soát bông thô	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Bông 1 (thô)\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Cung Thị Kim Thành\\",\\"status\\":\\"in_progress\\",\\"startDate\\":\\"2025-09-03\\",\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Nghiêm Thị Mai\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-03-10\\",\\"dueDate\\":\\"2025-08-15\\",\\"completedDate\\":\\"2026-02-03\\",\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":100},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 04:30:58.832+00	2026-02-03 04:31:41.458892+00	PROOFREADING	6e5710f4-12dc-4732-bf61-d14152b31388	\N	\N
 task-1769830674576-78moydp	Đọc rà soát bản thảo chuyển in + Xây dựng Quy trình rà soát bản thảo chuyển in	\N	CV chung	Completed	Medium	100	\N	\N	\N	\N	\N	2026-01-31 03:37:54.576+00	2026-01-31 03:37:54.576+00	GENERAL	\N	\N	\N
+task-1770093413097-qt9ornw	Biên tập B1 Lục Tổ đàn kinh	\N	Biên tập	Pending	Low	0	Tạm dừng, chờ hiệu đính	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Tiền biên tập\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Nguyễn Thị Vân Giang\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Trần Minh Ánh\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 04:36:53.097+00	2026-02-03 04:39:59.31219+00	PROOFREADING	0e498c92-5661-4e64-9d19-78fd997b01ee	\N	\N
 task-1769829273381-go74zqy	Xây dựng Sơ thảo Đề án định mức biên tập	\N	CV chung	In Progress	Medium	0	Tạm dừng	\N	\N	\N	\N	2026-01-31 03:14:33.381+00	2026-01-31 03:38:09.575253+00	GENERAL	\N	\N	\N
+task-1770025265225-4p44sml	Test thông báo	\N	Công việc chung	Not Started	Medium	0	Test thông báo	\N	\N	\N	\N	2026-02-02 09:41:05.225+00	2026-02-03 07:54:01.289305+00	GENERAL	\N	\N	khong_hoan_thanh
 task-1769829346523-mj93dpe	Hỗ trợ xây dựng thuyết minh Thư tịch Phật giáo Việt Nam thư mục quan yếu (Hợp phần Phật điển Việt Nam)	\N	CV chung	In Progress	Medium	0	Tạm dừng	\N	\N	\N	\N	2026-01-31 03:15:46.523+00	2026-01-31 03:38:33.171003+00	GENERAL	\N	\N	\N
 task-1769829472741-5iu316h	Phối hợp xây dựng Kế hoạch và Dự toán Kinh phí in ấn xuất bản	\N	CV chung	Completed	Medium	100	\N	\N	\N	\N	\N	2026-01-31 03:17:52.741+00	2026-01-31 03:38:47.657324+00	GENERAL	\N	\N	\N
 task-1769778057465-3hgvw9g	Sửa bông 4 Tịnh Độ tam kinh 19x27	\N	Thiết kế	Completed	Medium	100	\N	\N	\N	\N	\N	2026-01-30 13:00:57.465+00	2026-01-30 13:12:05.096041+00	DESIGN	123eaa2b-84df-4da4-b244-fff1a49243a2	\N	\N
 task-1769830334378-679953r	Hỗ trợ Dịch giả đọc đối chiếu Vân đài loại ngữ	\N	CV chung	In Progress	Medium	0	\N	\N	\N	\N	\N	2026-01-31 03:32:14.378+00	2026-01-31 03:39:03.73045+00	GENERAL	\N	\N	\N
 task-1769780386538-0jvd1hm	Điều chỉnh và hoàn thành Thuyết minh và Dự toán Đề án Diệu Liên GĐ2	\N	CNTT	In Progress	High	0	\N	\N	\N	\N	\N	2026-01-30 13:39:46.538+00	2026-01-30 13:41:02.31011+00	IT	\N	\N	\N
+task-1770106613228-echz1v7	Biên tập B1 Đại Đường Tây Vực ký	\N	Biên tập	In Progress	High	0	Chờ dịch giả phản hồi	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Bông 1 (thô)\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Nguyễn Thị Thuỷ Tiên\\",\\"status\\":\\"in_progress\\",\\"startDate\\":\\"2025-08-28\\",\\"dueDate\\":\\"2026-01-31\\",\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Nguyễn Cẩm Thi\\",\\"status\\":\\"in_progress\\",\\"startDate\\":\\"2025-08-28\\",\\"dueDate\\":\\"2026-01-31\\",\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 08:16:53.228+00	2026-02-03 08:16:53.228+00	PROOFREADING	44a33467-286b-424f-95e9-3a1fb33e2df5	\N	\N
 task-1769917584523-1rj9w3a	Hoàn thành HS Quyết toán HĐ dịch thuật - tài liệu Dị bộ tông luân luận (GĐ2)	\N	Thư ký hợp phần	Pending	Medium	0	Chưa quyết toán, đợi xem xét	\N	\N	\N	\N	2026-02-01 03:46:24.523+00	2026-02-01 03:51:12.202536+00	GENERAL	45ac2ea6-afd2-4f49-963d-44865d9e41d5	\N	\N
 task-1769919533177-lpq21pi	Chuẩn bị Phiếu đề nghị (bổ sung 02 thành viên) + Phụ lục Hợp đồng dịch thuật tài liệu Tỳ kheo Ni truyện (GĐ 2)	\N	Thư ký hợp phần	Completed	Medium	100	- 16/12/2025: VP đang chỉnh sửa\n- 29/12/2025: gửi 02 phiếu xin chữ ký DG\n- 12/1/2026: DG gửi lại 02 phiếu, đợi xin chữ ký thầy Quảng Đại"	\N	\N	\N	\N	2026-02-01 04:18:53.177+00	2026-02-01 04:18:53.177+00	GENERAL	a1c0c896-0c43-471e-83c1-d010ac0d1a1b	\N	\N
 task-1769776824967-rb9mw3u	Sửa bông 7 Na Tiên tỳ kheo kinh 19x27	\N	Thiết kế	Completed	High	100	\N	\N	\N	\N	\N	2026-01-30 12:40:24.967+00	2026-02-01 04:21:32.656468+00	DESIGN	342b21b4-615b-4904-ba88-e423f3157de3	\N	\N
+task-1770107115223-ivlwesu	Biên tập bông thô Phật quốc ký	\N	Biên tập	In Progress	High	0	\N	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Tiền biên tập\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Nguyễn Cẩm Thi\\",\\"status\\":\\"in_progress\\",\\"startDate\\":\\"2025-09-20\\",\\"dueDate\\":\\"2026-01-31\\",\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Võ Thị Tú Oanh\\",\\"status\\":\\"not_started\\",\\"startDate\\":\\"2025-09-20\\",\\"dueDate\\":\\"2026-01-31\\",\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 08:25:15.223+00	2026-02-03 08:25:15.223+00	PROOFREADING	6dfd18f2-5bb9-4afb-aa8b-34b9798064e4	\N	\N
+task-1770107398548-5p1cgro	BT Bông 2 tinh Biện trung biên luận khổ 19x27cm	\N	Biên tập	Completed	High	100	BTV đang đọc lại bông chế bản gửi lại, dự kiến nộp lại Trưởng ban đọc duyệt ngày 13/01/2026	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Bông 2 (tinh)\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Nghiêm Thị Mai\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-11-04\\",\\"dueDate\\":\\"2025-12-26\\",\\"completedDate\\":\\"2025-12-18\\",\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":100},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Cung Thị Kim Thành\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-11-04\\",\\"dueDate\\":\\"2025-12-26\\",\\"completedDate\\":\\"2025-12-18\\",\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":100},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-12-18\\",\\"dueDate\\":\\"2025-12-26\\",\\"completedDate\\":\\"2025-12-26\\",\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":100}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 08:29:58.548+00	2026-02-03 09:04:15.294406+00	PROOFREADING	de60a453-2afc-4c30-bc71-7fede28e2406	\N	\N
+task-1770107984593-w0ia255	BT bông 3 + 4 tinh Triệu luận khổ 19x27cm	\N	Biên tập	In Progress	High	100	TBTK trả bông đọc duyệt ngày 26/12/202, BTV đang sửa bông 4	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Bông 4 (tinh)\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Nghiêm Thị Mai\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-12-01\\",\\"dueDate\\":\\"2025-12-20\\",\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Cung Thị Kim Thành\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-12-01\\",\\"dueDate\\":\\"2025-12-20\\",\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-12-20\\",\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 08:39:44.593+00	2026-02-03 08:39:44.593+00	PROOFREADING	6d758280-76b5-495c-9cbe-316e673c5889	\N	\N
+task-1770108155026-gn5e2ar	BT bông 3 tinh Biện trung biên luận khổ 19x27cm	\N	Biên tập	In Progress	Medium	0	\N	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Bông 3 (tinh)\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Nghiêm Thị Mai\\",\\"status\\":\\"in_progress\\",\\"startDate\\":\\"2025-12-26\\",\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Cung Thị Kim Thành\\",\\"status\\":\\"in_progress\\",\\"startDate\\":\\"2025-12-26\\",\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 08:42:35.026+00	2026-02-03 08:42:35.026+00	PROOFREADING	de60a453-2afc-4c30-bc71-7fede28e2406	\N	\N
+task-1770108296334-wszsl91	BT bông thô Nam Hải ký quy nội pháp truyện	\N	Biên tập	In Progress	High	0	\N	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Bông 1 (thô)\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Nguyễn Cẩm Thi\\",\\"status\\":\\"not_started\\",\\"startDate\\":\\"2026-01-10\\",\\"dueDate\\":\\"2026-01-25\\",\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Ngô Ánh Dung\\",\\"status\\":\\"not_started\\",\\"startDate\\":\\"2026-01-26\\",\\"dueDate\\":\\"2026-03-31\\",\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":null,\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 08:44:56.334+00	2026-02-03 08:44:56.334+00	PROOFREADING	b0b8a7c9-d8aa-419d-94c1-61adcdcb343d	\N	\N
+task-1770116220103-mo0p10t	Biên tập bông chuyển in Quan Âm tế độ diễn nghĩa kinh	\N	Biên tập	In Progress	High	67	chờ đọc duyệt	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Bông chuyển in\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Lê Thị Minh Hoài\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-09-01\\",\\"dueDate\\":\\"2026-01-20\\",\\"completedDate\\":\\"2026-01-20\\",\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":100},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Ngô Ánh Dung\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-09-01\\",\\"dueDate\\":\\"2026-01-20\\",\\"completedDate\\":\\"2026-01-20\\",\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":100},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"in_progress\\",\\"startDate\\":\\"2026-01-26\\",\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 10:57:00.103+00	2026-02-03 10:57:00.103+00	PROOFREADING	7c1a761a-dc0e-488b-b22c-1ad6a74069a4	\N	\N
+task-1770116361929-fw0sq35	Biên tập B2 thô Thánh đăng lục	\N	Biên tập	Not Started	High	33	BTV chỉnh sửa theo góp ý của DG và biên tập bông 2 thô	"{\\"rounds\\":[{\\"roundNumber\\":1,\\"roundType\\":\\"Bông 2 (thô)\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"completedDate\\":null,\\"stages\\":[{\\"type\\":\\"btv2\\",\\"assignee\\":\\"Lê Đình Sơn\\",\\"status\\":\\"completed\\",\\"startDate\\":\\"2025-06-30\\",\\"dueDate\\":\\"2025-11-26\\",\\"completedDate\\":\\"2025-11-26\\",\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":100},{\\"type\\":\\"btv1\\",\\"assignee\\":\\"Nghiêm Thuỳ Dung\\",\\"status\\":\\"in_progress\\",\\"startDate\\":\\"2025-11-27\\",\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0},{\\"type\\":\\"doc_duyet\\",\\"assignee\\":\\"Vũ Thị Hương\\",\\"status\\":\\"not_started\\",\\"startDate\\":null,\\"dueDate\\":null,\\"completedDate\\":null,\\"cancelReason\\":null,\\"notes\\":null,\\"progress\\":0}]}],\\"currentRound\\":1,\\"totalRounds\\":1}"	\N	\N	\N	2026-02-03 10:59:21.929+00	2026-02-03 10:59:21.929+00	PROOFREADING	c5bedfe2-92bb-4f35-aa8f-7375a5327832	\N	\N
 \.
 
 
 --
--- TOC entry 3679 (class 0 OID 65547)
+-- TOC entry 3716 (class 0 OID 81920)
+-- Dependencies: 249
+-- Data for Name: translation_contract_members; Type: TABLE DATA; Schema: public; Owner: neondb_owner
+--
+
+COPY public.translation_contract_members (id, translation_contract_id, user_id, created_at, updated_at) FROM stdin;
+797f4605-93b5-4256-ad26-59ca12f43c61	d08e3dfc-dc51-4fe4-9512-1336cc7d23b0	f1970916-c6fd-4be6-b11d-e3e1f3b91156	2026-02-04 11:36:56.791939+00	2026-02-04 11:36:56.791939+00
+\.
+
+
+--
+-- TOC entry 3711 (class 0 OID 65547)
 -- Dependencies: 244
 -- Data for Name: translation_contracts; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
-COPY public.translation_contracts (id, contract_number, work_id, unit_price, contract_value, start_date, end_date, extension_start_date, extension_end_date, actual_completion_date, actual_word_count, actual_page_count, completion_rate, settlement_value, note, component_id, overview_value, translation_value) FROM stdin;
-d08e3dfc-dc51-4fe4-9512-1336cc7d23b0	67/HĐ-VPKĐ	342b21b4-615b-4904-ba88-e423f3157de3	300000	101900000	2023-11-29	2023-11-28	\N	\N	2023-11-08	96964	277	1.0147	103100000	\N	32037af6-b306-4ea7-af9d-ae766e67dde6	20000000.00	81900000.00
+COPY public.translation_contracts (id, contract_number, work_id, unit_price, contract_value, start_date, end_date, extension_start_date, extension_end_date, actual_completion_date, actual_word_count, actual_page_count, completion_rate, settlement_value, note, component_id, overview_value, translation_value, progress_check_date, expert_review_date, project_acceptance_date, status, cancelled_at, proofreading_in_progress, editing_in_progress, print_transfer_date, published_date, proofreading_completed, editing_completed) FROM stdin;
+d08e3dfc-dc51-4fe4-9512-1336cc7d23b0	67/HĐ-VPKĐ	342b21b4-615b-4904-ba88-e423f3157de3	300000	101900000	2023-11-29	2023-11-28	\N	\N	2023-11-08	96964	277	1.0147	103100000	\N	32037af6-b306-4ea7-af9d-ae766e67dde6	20000000.00	81900000.00	\N	2023-10-08	2023-10-23	Active	\N	f	f	\N	\N	t	f
 \.
 
 
 --
--- TOC entry 3675 (class 0 OID 57470)
+-- TOC entry 3707 (class 0 OID 57470)
 -- Dependencies: 240
 -- Data for Name: user_groups; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -1140,7 +1280,7 @@ d8a6097c-361c-4a2d-ba52-ca221eb82072	e0f74135-4578-4c1c-9944-55f17046607b	d4b167
 
 
 --
--- TOC entry 3677 (class 0 OID 57507)
+-- TOC entry 3709 (class 0 OID 57507)
 -- Dependencies: 242
 -- Data for Name: user_roles; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -1217,11 +1357,12 @@ a485fb73-940c-41e1-b01a-ec4c16cf87a4	5a3dc6e5-c7d4-467b-aa3f-673312685b82	0b4374
 427b171f-4088-4bf1-a866-0b73e2ad7a67	b5b30517-5c9c-4036-afd9-4e2948651238	0b4374d3-c74d-40a1-91e9-ac54d9d07033	2026-02-02 07:32:52.594178+00	2026-02-02 07:32:52.594178+00	25aed873-6915-4d53-9354-5f9704364fb1
 e1ade932-4c0c-4174-8ebf-35b9e7d0ab80	b5b30517-5c9c-4036-afd9-4e2948651238	83004138-2d9d-4ced-9510-cc77eac41299	2026-02-02 07:32:52.594178+00	2026-02-02 07:32:52.594178+00	\N
 db90d919-fd85-4e42-a836-ceff9d909dec	88d7b1cf-5818-4202-aa28-a36912e3c3ed	b5a3a01b-77f5-447a-aeee-096edfdd36f5	2026-02-02 08:09:58.159874+00	2026-02-02 08:09:58.159874+00	\N
+bd76f300-8a2a-46d0-9907-d16e012d7ca3	f1970916-c6fd-4be6-b11d-e3e1f3b91156	b7a18021-605d-44bb-93e8-f127dcadae57	2026-02-04 11:17:21.313886+00	2026-02-04 11:17:21.313886+00	\N
 \.
 
 
 --
--- TOC entry 3665 (class 0 OID 49152)
+-- TOC entry 3697 (class 0 OID 49152)
 -- Dependencies: 230
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -1234,6 +1375,7 @@ a45f4e87-1449-4cd3-a32c-9b16b315b1f7	nghiemdung.vtnt@vnu.edu.vn	$2b$10$G50Nq.M09
 9f59f810-2c2a-4242-b56c-77d4bdf73391	anhtm@vnu.edu.vn	$2b$10$G50Nq.M0929JTemSIUBfCuIiZeHl3Jd/y0dZA8YjM9VwysX/V5EHK	Trần Minh Ánh	Ánh	Trần Minh	Ban Thư ký	t	2026-01-28 11:19:12.44656+00	2026-02-02 07:32:18.333747+00
 5a3dc6e5-c7d4-467b-aa3f-673312685b82	chauvm.vtnt@vnu.edu.vn	$2b$10$G50Nq.M0929JTemSIUBfCuIiZeHl3Jd/y0dZA8YjM9VwysX/V5EHK	Vũ Minh Châu	Châu	Vũ Minh	Ban Thư ký	t	2026-01-28 11:19:12.44656+00	2026-02-02 07:32:41.806121+00
 88d7b1cf-5818-4202-aa28-a36912e3c3ed	admin@kdpd.local	$2b$10$Qw2yKYN4QZOOKU5LRpQABOGbTB1RKc0FGM9QoUNmgdnhQXPK2KWMO	admin	Admin	KDPD	Ban Thư ký	t	2026-01-28 11:19:24.186555+00	2026-02-02 08:09:58.048224+00
+f1970916-c6fd-4be6-b11d-e3e1f3b91156	partner_25943e71-c094-45f7-836d-3e09c8ffebf4@system.local	\N	Nguyễn Minh Tiến	\N	\N	\N	t	2026-02-04 11:17:21.313886+00	2026-02-04 11:17:21.313886+00
 99434b30-4982-48e9-8c81-b3466309537e	ngochant.vtnt@vnu.edu.vn	$2b$10$G50Nq.M0929JTemSIUBfCuIiZeHl3Jd/y0dZA8YjM9VwysX/V5EHK	Nguyễn Ngọc Hà	Hà	Nguyễn Ngọc	Ban Thư ký	t	2026-01-28 11:19:12.44656+00	2026-01-29 11:02:45.534957+00
 6845e494-d1b9-40ae-b36f-2cdb09291747	linhntt.vtnt@vnu.edu.vn	$2b$10$G50Nq.M0929JTemSIUBfCuIiZeHl3Jd/y0dZA8YjM9VwysX/V5EHK	Nguyễn Thị Thuỳ Linh	Linh	Nguyễn Thị Thuỳ	Ban Thư ký	t	2026-01-28 11:19:12.44656+00	2026-01-30 02:41:15.38138+00
 b5b30517-5c9c-4036-afd9-4e2948651238	hoangvq.vtnt@vnu.edu.vn	$2b$10$G50Nq.M0929JTemSIUBfCuIiZeHl3Jd/y0dZA8YjM9VwysX/V5EHK	Vũ Quốc Hoàng	Hoàng	Vũ Quốc	Ban Thư ký	t	2026-01-28 11:19:12.44656+00	2026-02-02 07:32:52.475749+00
@@ -1259,7 +1401,7 @@ f8b8d9ad-fac3-4bfc-8f09-88de3e255e00	vinhnv.vtnt@vnu.edu.vn	$2b$10$G50Nq.M0929JT
 
 
 --
--- TOC entry 3678 (class 0 OID 65536)
+-- TOC entry 3710 (class 0 OID 65536)
 -- Dependencies: 243
 -- Data for Name: works; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
@@ -1377,11 +1519,119 @@ c14e8eeb-9a62-4449-8157-8270ba623af5	4	Thiếu Thất lục môn	少室六門	T4
 3290f0f9-9c3c-4c82-9059-7fe8d083ef9e	4	Quán Vô Lượng Thọ Phật kinh sớ diệu tông sao	觀無量壽佛經疏妙宗鈔	T37n1751	56400	161	2	112800	322	\N	2026-01-31 11:38:02.049724+00	32037af6-b306-4ea7-af9d-ae766e67dde6
 8b7a4664-8c67-4191-b130-4ff39837655c	4	A Di Đà kinh sớ sao	阿彌陀經疏鈔	X22n2404	125100	357	2	250200	715	\N	2026-01-31 11:38:02.100012+00	32037af6-b306-4ea7-af9d-ae766e67dde6
 019de380-4589-4cc1-8659-645bbf6f50b2	4	Pháp hoa văn cú ký	法華文句記	T34n1719	351600	1005	2	703200	2009	\N	2026-01-31 11:38:02.151928+00	32037af6-b306-4ea7-af9d-ae766e67dde6
+a22f3752-58b9-4d17-8866-9063060cb114	1	Đơn bản Trường A hàm - Giai đoạn 1 (T0002-T0015)	\N	T0002 - T0015	163250	466	1.5	244875	700	\N	2026-02-03 05:02:22.577521+00	58786d42-3079-4d1e-b2f7-b160208c2293
+aaf6da5e-11dd-4223-beae-f89129ad3e76	1	Đơn bản Trường A hàm - Giai đoạn 2 (T0016-T0024)	\N	T0016-T0024	185600	530	1.5	278400	795	\N	2026-02-03 05:02:22.682538+00	58786d42-3079-4d1e-b2f7-b160208c2293
+6d5a09eb-9411-4d8f-b05d-2c4896283c65	1	Đơn bản Trường A hàm - Giai đoạn 3 (T0025)	\N	T0025	89700	256	1.5	134550	384	Bài tổng quan hoàn thành sau cùng	2026-02-03 05:02:22.733949+00	58786d42-3079-4d1e-b2f7-b160208c2293
+879247c9-8082-43c0-ac6b-365e110b3ff7	1	A Di Đà Cổ Âm Thanh Vương đà la ni kinh	阿彌陀鼓音聲王陀羅尼經	T0370	1674	5	1.5	2511	7	\N	2026-02-03 05:02:22.785892+00	58786d42-3079-4d1e-b2f7-b160208c2293
+00d5be71-070b-45bf-95cb-081b13d949d4	1	Phật thuyết Di Lặc lai thời kinh	佛說彌勒來時經	T0457	1278	4	1.5	1917	5	\N	2026-02-03 05:02:22.836581+00	58786d42-3079-4d1e-b2f7-b160208c2293
+689fedd6-c42d-41f4-bab0-73941f638ca7	1	Phật thuyết Vô Lượng Thọ kinh	佛說無量壽經	T0360	20806	59	1.5	31209	89	\N	2026-02-03 05:02:22.888033+00	58786d42-3079-4d1e-b2f7-b160208c2293
+b143da1a-c25d-4c6a-afe7-dd01afc38d41	1	A Súc Phật quốc kinh	阿閦佛國經	T0313	21042	60	1.5	31563	90	\N	2026-02-03 05:02:22.940134+00	58786d42-3079-4d1e-b2f7-b160208c2293
+99bc0633-acb3-456a-8bdc-7ac5e4e152cf	1	Đại Thánh Văn Thù Sư Lợi Bồ tát Phật sát công đức trang nghiêm kinh	大聖文殊師利菩薩佛剎功德莊嚴經	T0319	26791	77	1.5	40187	115	\N	2026-02-03 05:02:22.991458+00	58786d42-3079-4d1e-b2f7-b160208c2293
+9a549e68-5cad-41d7-acd5-d8b371267e92	1	Phật thuyết quán Phật tam muội hải kinh	佛說觀佛三昧海經	T0643	82764	236	1.5	124146	355	\N	2026-02-03 05:02:23.042662+00	58786d42-3079-4d1e-b2f7-b160208c2293
+f821b268-443a-424d-93b7-038805b1189a	1	Hậu xuất A Di Đà Phật kệ	後出阿彌陀佛偈	T0373	364	1	1.5	546	2	\N	2026-02-03 05:02:23.094608+00	58786d42-3079-4d1e-b2f7-b160208c2293
+b1b070d3-7506-465d-8f0a-0ab62dfd48f4	1	Phật thuyết Di Lặc đại thành Phật kinh	佛說彌勒大成佛經	T0456	9125	26	1.5	13688	39	\N	2026-02-03 05:02:23.146019+00	58786d42-3079-4d1e-b2f7-b160208c2293
+43da0a0f-1385-431c-a3ba-24acd883751a	1	Nhất Thiết Trí Quang Minh tiên nhân từ tâm nhân duyên bất thực nhục kinh	一切智光明仙人慈心因緣不食肉經	T0183	2288	7	1.5	3432	10	\N	2026-02-03 05:02:23.197695+00	58786d42-3079-4d1e-b2f7-b160208c2293
+0fee4dc0-4b67-49c6-a494-0c8e3588246b	1	Di Lặc Bồ tát sở vấn bản nguyện kinh	彌勒菩薩所問本願經	T0349	4198	12	1.5	6297	18	\N	2026-02-03 05:02:23.24947+00	58786d42-3079-4d1e-b2f7-b160208c2293
+327c1c40-2875-4aa5-a078-f09456f8e8d9	1	Phật thuyết như huyễn tam ma địa vô lượng ấn pháp môn kinh	佛說如幻三摩地無量印法門經	T0372	10390	30	1.5	15585	45	\N	2026-02-03 05:02:23.301087+00	58786d42-3079-4d1e-b2f7-b160208c2293
+e31e3b45-4775-4907-9916-a9877e930b9c	1	Thuyết vô cấu xưng kinh	說無垢稱經	T0476	48063	137	1.5	72095	206	\N	2026-02-03 05:02:23.352511+00	58786d42-3079-4d1e-b2f7-b160208c2293
+57ebe0f6-d63a-42fa-a99e-1d8a4f1a334b	1	Phật thuyết Ban chu tam muội kinh	佛說般舟三昧經	T0417	7890	23	1.5	11835	34	\N	2026-02-03 05:02:23.403766+00	58786d42-3079-4d1e-b2f7-b160208c2293
+3caa6fa3-ea89-4022-8aad-1b5d3d07ea9c	1	Phật thuyết A Di Đà kinh	佛說阿彌陀經	T0366	2500	7	1.5	3750	11	\N	2026-02-03 05:02:23.455148+00	58786d42-3079-4d1e-b2f7-b160208c2293
+cb54495b-107e-4ef0-b503-0c90f0cb575c	1	Phật thuyết Quán Vô Lượng Thọ Phật kinh	佛說觀無量壽佛經	T0365	9400	27	1.5	14100	40	\N	2026-02-03 05:02:23.506066+00	58786d42-3079-4d1e-b2f7-b160208c2293
+f83fb7e6-2180-496d-b9bf-8d9f703c7526	1	Dược Sư Lưu Ly Quang Như Lai bản nguyện công đức kinh	藥師琉璃光如來本願功德經	T0450	7000	20	1.5	10500	30	\N	2026-02-03 05:02:23.55768+00	58786d42-3079-4d1e-b2f7-b160208c2293
+25ff082b-787b-405a-908d-bfab32435bd6	1	Phật thuyết Di Lặc hạ sinh kinh	佛說彌勒下生經	T0453	4100	12	1.5	6150	18	\N	2026-02-03 05:02:23.608654+00	58786d42-3079-4d1e-b2f7-b160208c2293
+a9d979ac-15a9-4f52-ac22-1c4df3bf54fb	1	Phật thuyết Quán Di Lặc Bồ tát thượng sinh Đâu Suất thiên kinh	佛說觀彌勒菩薩上生兜率天經	T0452	4100	12	1.5	6150	18	\N	2026-02-03 05:02:23.660875+00	58786d42-3079-4d1e-b2f7-b160208c2293
+677a2765-9ce8-41eb-bf0f-f4d69350581e	1	Tịnh độ cảnh quán yếu môn	淨土境觀要門	T1971	3497	10	1.5	5246	15	\N	2026-02-03 05:02:23.711667+00	58786d42-3079-4d1e-b2f7-b160208c2293
+8f5d7d33-9372-47c4-9d08-103be014bcf0	1	Vạn thiện đồng quy tập	萬善同歸集	T2017	65000	186	1.5	97500	279	\N	2026-02-03 05:02:23.762595+00	58786d42-3079-4d1e-b2f7-b160208c2293
+f7237849-2e03-4317-9cc6-a0a442f22dba	1	Bi hoa kinh	悲華經	T0157	105087	300	1.5	157631	450	\N	2026-02-03 05:02:23.813831+00	58786d42-3079-4d1e-b2f7-b160208c2293
+91338029-0105-4b75-8c3b-697f7f72ab6a	1	Trung Phong Tam thời hệ niệm Phật sự	中峰三時繫念佛事	X1464	7787	22	1.5	11681	33	\N	2026-02-03 05:02:23.865095+00	58786d42-3079-4d1e-b2f7-b160208c2293
+a050fa4f-746f-412a-bdc2-e17c131aac54	1	Triệt ngộ Thiền sư ngữ lục	徹悟禪師語錄	X1182	30425	87	1.5	45638	130	\N	2026-02-03 05:02:23.916595+00	58786d42-3079-4d1e-b2f7-b160208c2293
+58dc3723-eb55-44b3-9d7b-d698aee2a6ae	1	Vô Lượng Thọ kinh Ưu bà đề xá nguyện sinh kệ	無量壽經優波提舍願生偈	T1524	3723	11	1.5	5585	16	\N	2026-02-03 05:02:23.96806+00	58786d42-3079-4d1e-b2f7-b160208c2293
+2b1de017-b57c-4751-9ac3-9f85854d0ffc	1	Phật thuyết A Di Đà kinh nghĩa sớ	佛說阿彌陀經義疏	T1761	13330	38	1.5	19995	57	\N	2026-02-03 05:02:24.020126+00	58786d42-3079-4d1e-b2f7-b160208c2293
+dec6e9c2-bb50-4887-9e09-d54c1d7f22d7	1	Di Lặc thượng sinh kinh liệu giản kí	彌勒上生經料簡記	T1774.1	28580	82	1.5	42870	122	\N	2026-02-03 05:02:24.071425+00	58786d42-3079-4d1e-b2f7-b160208c2293
+71817cd9-bd27-4c09-8154-a8db4252a006	1	Di Lặc hạ sinh kinh sớ	彌勒下生經疏	T1774.2	7850	22	1.5	11775	34	\N	2026-02-03 05:02:24.12272+00	58786d42-3079-4d1e-b2f7-b160208c2293
+f4077d77-12b5-4a59-9dbd-e81b3118e887	1	Phật thuyết Di Lặc thành Phật kinh sớ	佛說彌勒成佛經疏	T1774.3	4380	13	1.5	6570	19	\N	2026-02-03 05:02:24.174133+00	58786d42-3079-4d1e-b2f7-b160208c2293
+9d547fdc-42de-4b77-a8ec-df334d446789	1	A Di Đà kinh ước luận	阿彌陀經約論	X0433	2711	8	1.5	4067	12	\N	2026-02-03 05:02:24.225231+00	58786d42-3079-4d1e-b2f7-b160208c2293
+6b44ba4a-7bbd-4666-bde4-837a1ccb322f	1	Tây phương nguyện văn giải	西方願文解	X1160	2706	8	1.5	4059	12	\N	2026-02-03 05:02:24.276663+00	58786d42-3079-4d1e-b2f7-b160208c2293
+478fc7e8-de08-43a1-bc75-53ff916d4244	1	Phật thuyết Quán Vô Lượng Thọ Phật kinh lược luận	佛說觀無量壽佛經略論	B0157	12040	34	1.5	18060	52	\N	2026-02-03 05:02:24.327641+00	58786d42-3079-4d1e-b2f7-b160208c2293
+70f08578-0027-475f-995c-c603e3d334bb	1	Quán Vô Lượng Thọ kinh nghĩa sớ	觀無量壽經義疏	T1749	24737	71	1.5	37106	106	\N	2026-02-03 05:02:24.378596+00	58786d42-3079-4d1e-b2f7-b160208c2293
+9d305a98-7681-43db-af2f-005e428cf0d6	1	Quán Vô Lượng Thọ Phật kinh sớ diệu tông sao	觀無量壽佛經疏玅宗鈔	X0407	80433	230	1.5	120650	345	\N	2026-02-03 05:02:24.430366+00	58786d42-3079-4d1e-b2f7-b160208c2293
+a24de126-6b94-4cc8-873b-7ac99a4842eb	1	Tây phương phát nguyện văn chú	西方發願文註	X1161	11018	31	1.5	16527	47	\N	2026-02-03 05:02:24.482736+00	58786d42-3079-4d1e-b2f7-b160208c2293
+0049801e-fabf-41ac-b8d7-f60157891ecd	1	Quán Di Lặc thượng sinh Đâu Suất thiên kinh tán	觀彌勒上生兜率天經贊	T1772	45380	130	1.5	68070	194	\N	2026-02-03 05:02:24.534134+00	58786d42-3079-4d1e-b2f7-b160208c2293
+00a25776-df86-475d-b033-6543b2bda9a2	1	Thán dị sao	歎異抄	T2661	11151	32	1.5	16727	48	\N	2026-02-03 05:02:24.585597+00	58786d42-3079-4d1e-b2f7-b160208c2293
+5f5b78f6-b16a-43d4-9426-3892cd02097d	1	Phật thuyết A Di Đà kinh sớ	佛說阿彌陀經疏	T1760	9977	29	1.5	14966	43	\N	2026-02-03 05:02:24.636115+00	58786d42-3079-4d1e-b2f7-b160208c2293
+ef5fac35-417c-4d83-80fa-d21839313b02	1	Giác hổ tập	角虎集	X1177	61497	176	1.5	92246	264	\N	2026-02-03 05:02:24.687091+00	58786d42-3079-4d1e-b2f7-b160208c2293
+032551d1-38e8-4dc3-a513-86ab180f7045	1	Hám Sơn đại sư Tịnh tông pháp yếu	憨山大師淨宗法要	X1456	9361	27	1.5	14042	40	\N	2026-02-03 05:02:24.737574+00	58786d42-3079-4d1e-b2f7-b160208c2293
+61c61452-34f0-475a-8af5-c4cb48dbdeb6	1	Lư Sơn Liên tông bảo giám	廬山蓮宗寶鑑	T1973	75547	216	1.5	113321	324	\N	2026-02-03 05:02:24.788549+00	58786d42-3079-4d1e-b2f7-b160208c2293
+c1d76abd-f66e-43d8-b32c-c9435cfdea7e	1	Hoa Nghiêm niệm Phật	華嚴念佛	X1030	7661	22	1.5	11492	33	\N	2026-02-03 05:02:24.840466+00	58786d42-3079-4d1e-b2f7-b160208c2293
+4e5b1a82-50e0-4e41-a4fd-283147a9c622	1	Vân Thê Tịnh độ vựng ngữ	雲棲淨土彙語	X1170	28168	80	1.5	42252	121	\N	2026-02-03 05:02:24.891641+00	58786d42-3079-4d1e-b2f7-b160208c2293
+059e45ab-67e2-4d4f-b806-93d0a8489823	1	Vô Lượng Thọ kinh Ưu Bà Đề Xá nguyện sinh kệ chú	無量壽經優婆提舍願生偈註	T1819	28976	83	1.5	43464	124	\N	2026-02-03 05:02:24.942293+00	58786d42-3079-4d1e-b2f7-b160208c2293
+3dd2f449-cd5d-44f5-8c8c-08a316f0758e	2	Văn Thù Sư Lợi Phật độ nghiêm tịnh kinh	文殊師利佛土嚴淨經	T11n0318	18198	52	1.5	27297	78	\N	2026-02-03 05:06:00.367791+00	58786d42-3079-4d1e-b2f7-b160208c2293
+84ef28b6-2233-4ba4-a5a6-679b73704cb7	2	Văn Thù Sư Lợi sở thuyết bất tư nghì Phật cảnh giới kinh	文殊師利所說不思議佛境界經	T12n0340	12397	35	1.5	18596	53	\N	2026-02-03 05:06:00.41434+00	58786d42-3079-4d1e-b2f7-b160208c2293
+926919ad-27c5-4456-8f02-5b28e36c0bb7	2	Văn Thù Sư Lợi vấn Bồ tát thự kinh	文殊師利問菩薩署經	T14n0458	11263	32	1.5	16895	48	\N	2026-02-03 05:06:00.461443+00	58786d42-3079-4d1e-b2f7-b160208c2293
+2cd2f041-15f7-4429-9724-d9c96eb3430d	2	Phật thuyết Văn Thù hối quá kinh	佛說文殊悔過經	T14n0459	10991	31	1.5	16487	47	\N	2026-02-03 05:06:00.509632+00	58786d42-3079-4d1e-b2f7-b160208c2293
+b9cc7aca-2116-4218-b5a2-077735bfce17	2	Phật thuyết Văn Thù Sư Lợi tịnh luật kinh	佛說文殊師利淨律經	T14n0460	7073	20	1.5	10610	30	\N	2026-02-03 05:06:00.557861+00	58786d42-3079-4d1e-b2f7-b160208c2293
+4e1389e1-642c-4e99-9922-30adfc0281ad	2	Phật thuyết Văn Thù Sư Lợi hiện bảo tạng kinh	佛說文殊師利現寶藏經	T14n0461	23418	67	1.5	35127	100	\N	2026-02-03 05:06:00.604301+00	58786d42-3079-4d1e-b2f7-b160208c2293
+26e453f9-1442-4df4-a799-46c5eec62227	2	Đại phương quảng bảo khiếp kinh	大方廣寶篋經	T14n0462	23428	67	1.5	35142	100	\N	2026-02-03 05:06:00.650757+00	58786d42-3079-4d1e-b2f7-b160208c2293
+81d1ee03-0da8-4e35-9bd5-ffe156153c05	2	Phật thuyết Văn Thù Sư Lợi Bát Niết bàn kinh	佛說文殊師利般涅槃經	T14n0463	2009	6	1.5	3014	9	\N	2026-02-03 05:06:00.696789+00	58786d42-3079-4d1e-b2f7-b160208c2293
+225a2c43-bc77-46da-92a7-d5f8bdc26cbb	2	Văn Thù Sư Lợi vấn bồ đề kinh	文殊師利問菩提經	T14n0464	3642	10	1.5	5463	16	\N	2026-02-03 05:06:00.742757+00	58786d42-3079-4d1e-b2f7-b160208c2293
+a9f61532-1cae-4cfa-9dbf-52ab895676ce	2	Già Da sơn đỉnh kinh	伽耶山頂經	T14n0465	5377	15	1.5	8066	23	\N	2026-02-03 05:06:00.789428+00	58786d42-3079-4d1e-b2f7-b160208c2293
+c9dc076d-db00-46fa-b79d-3600a75ef782	2	Phật thuyết tượng đầu tinh xá kinh	佛說象頭精舍經	T14n0466	5064	14	1.5	7596	22	\N	2026-02-03 05:06:00.836346+00	58786d42-3079-4d1e-b2f7-b160208c2293
+29cc0578-0050-45f1-81d5-9b3c9a4dcd34	2	Đại thừa Già Da sơn đỉnh kinh	大乘伽耶山頂經	T14n0467	4339	12	1.5	6509	19	\N	2026-02-03 05:06:00.882741+00	58786d42-3079-4d1e-b2f7-b160208c2293
+4db59d81-1d27-4e80-8b77-2664960aebd6	2	Văn Thù Sư Lợi vấn kinh	文殊師利問經	T14n0468	27916	80	1.5	41874	120	\N	2026-02-03 05:06:00.928881+00	58786d42-3079-4d1e-b2f7-b160208c2293
+f51ca2e0-92a0-4a11-b422-e2a345254d2c	2	Văn Thù vấn kinh tự mẫu phẩm đệ thập tứ	文殊問經字母品第十四	T14n0469	921	3	1.5	1382	4	\N	2026-02-03 05:06:00.974748+00	58786d42-3079-4d1e-b2f7-b160208c2293
+7f578f9d-def0-435e-bb34-e2b209f7e927	2	Phật thuyết Văn Thù Sư Lợi tuần hành kinh	佛說文殊師利巡行經	T14n0470	3171	9	1.5	4757	14	\N	2026-02-03 05:06:01.021126+00	58786d42-3079-4d1e-b2f7-b160208c2293
+76c5148e-741e-4107-89c3-fc765bde4cb2	2	Phật thuyết Văn Thù Sư Lợi hành kinh	佛說文殊師利行經	T14n0471	4108	12	1.5	6162	18	\N	2026-02-03 05:06:01.067812+00	58786d42-3079-4d1e-b2f7-b160208c2293
+daeb56b6-4114-4557-94bd-3c1a3af80725	2	Phật thuyết Đại thừa thiện kiến biến hoá Văn Thù Sư Lợi vấn pháp kinh	佛說大乘善見變化文殊師利問法經	T14n0472	3184	9	1.5	4776	14	\N	2026-02-03 05:06:01.11465+00	58786d42-3079-4d1e-b2f7-b160208c2293
+1b1b52ee-08ab-426e-9370-d702884a49cd	2	Phật thuyết Diệu Cát Tường Bồ tát sở vấn Đại thừa Pháp Loa kinh	佛說妙吉祥菩薩所問大乘法螺經	T14n0473	2732	8	1.5	4098	12	\N	2026-02-03 05:06:01.162168+00	58786d42-3079-4d1e-b2f7-b160208c2293
+7772492d-9899-4f41-a92e-6819e04a5ab8	2	Vô Lượng Thọ Kinh nghĩa sớ	無量壽經義疏	T37n1745	47348	135	1.5	71022	203	\N	2026-02-03 05:06:01.208302+00	58786d42-3079-4d1e-b2f7-b160208c2293
+5e1bb2c4-aa56-4b98-9275-e2f68ba08b0b	2	Vô Lượng Thọ Kinh nghĩa sớ	無量壽經義疏	T37n1746	16636	48	1.5	24954	71	\N	2026-02-03 05:06:01.254283+00	58786d42-3079-4d1e-b2f7-b160208c2293
+b8e0dcf6-1a7c-4565-949b-b47d672d8a5e	2	Lưỡng quyển Vô Lượng Thọ Kinh tông yếu	兩卷無量壽經宗要	T37n1747	10526	30	1.5	15789	45	\N	2026-02-03 05:06:01.300863+00	58786d42-3079-4d1e-b2f7-b160208c2293
+08b09af3-3932-46d2-8a04-17df72486012	2	Vô Lượng Thọ Kinh liên nghĩa thuật văn tán	無量壽經連義述文贊	T37n1748	67455	193	1.5	101183	289	\N	2026-02-03 05:06:01.346247+00	58786d42-3079-4d1e-b2f7-b160208c2293
+0c644088-5011-4895-9b5e-b043757db3c0	2	Vô Lượng Thọ Kinh nghĩa ký	無量壽經義記	T85n2759	14993	43	1.5	22490	64	\N	2026-02-03 05:06:01.392219+00	58786d42-3079-4d1e-b2f7-b160208c2293
+45045f3f-c044-49a3-9953-b6cb1451e8ec	2	Vô Lượng Thọ Kinh khởi tín luận	無量壽經起信論	X22n0400	33019	94	1.5	49529	142	\N	2026-02-03 05:06:01.43775+00	58786d42-3079-4d1e-b2f7-b160208c2293
+c27ebc57-3368-4a84-b68b-4ec1b9c166a6	2	Xưng tán Tịnh Độ Phật nhiếp thụ Kinh	稱讚淨土佛攝受經	T12n0367	4696	13	1.5	7044	20	\N	2026-02-03 05:06:01.485862+00	58786d42-3079-4d1e-b2f7-b160208c2293
+6c63584e-f192-429d-bbb6-36db6a1b8a21	2	A Di Đà Kinh sớ	阿彌陀經疏	T37n1757	31681	91	1.5	47522	136	\N	2026-02-03 05:06:01.532229+00	58786d42-3079-4d1e-b2f7-b160208c2293
+d64d05ec-877b-4e7c-8fc8-e96950874dbc	2	Phật thuyết A Di Đà Kinh sớ	佛說阿彌陀經疏	T37n1759	4454	13	1.5	6681	19	\N	2026-02-03 05:06:01.578235+00	58786d42-3079-4d1e-b2f7-b160208c2293
+f9b9b4b1-8726-4fe4-8c49-d9e51896c2fd	2	Thuyết A Di Đà Kinh nghĩa sớ	說阿彌陀經義疏	T37n1761	13330	38	1.5	19995	57	\N	2026-02-03 05:06:01.624789+00	58786d42-3079-4d1e-b2f7-b160208c2293
+a0441d36-f1ff-4052-bd4f-272ec8fc1ba9	2	Phật thuyết A Di Đà Kinh sớ sao	佛說阿彌陀經疏鈔	X22n0424	100454	287	1.5	150681	431	\N	2026-02-03 05:06:01.671254+00	58786d42-3079-4d1e-b2f7-b160208c2293
+871d9acc-eb4c-406d-b586-80a1e2695eb1	2	Phật thuyết Quán Vô Lượng Thọ Phật Kinh sớ	佛說觀無量壽佛經疏	T37n1750	15149	43	1.5	22724	65	\N	2026-02-03 05:06:01.717296+00	58786d42-3079-4d1e-b2f7-b160208c2293
+41926cf7-2dca-4451-b230-d8e989a598ec	2	Quán Vô Lượng Thọ Kinh nghĩa sớ	觀無量壽經義疏	T37n1752	21230	61	1.5	31845	91	\N	2026-02-03 05:06:01.763731+00	58786d42-3079-4d1e-b2f7-b160208c2293
+2139cc07-af6c-4e50-82d0-d0a3bf186dd1	2	Quán Vô Lượng Thọ Phật Kinh sớ	觀無量壽佛經疏	T37n1753	53946	154	1.5	80919	231	\N	2026-02-03 05:06:01.810877+00	58786d42-3079-4d1e-b2f7-b160208c2293
+6dcd3380-3c06-44d8-92ca-4d9ab33813e4	2	Quán Vô Lượng Thọ Phật Kinh nghĩa sớ	觀無量壽佛經義疏	T37n1754	46736	134	1.5	70104	200	\N	2026-02-03 05:06:01.857268+00	58786d42-3079-4d1e-b2f7-b160208c2293
+f283c1ec-b6a0-43d0-b8d9-c942c5610d6f	2	Linh Chi quán Kinh nghĩa sớ chính quán ký	靈芝觀經義疏正觀記	X22n0411	56827	162	1.5	85241	244	\N	2026-02-03 05:06:01.903259+00	58786d42-3079-4d1e-b2f7-b160208c2293
+5c27a026-4376-48d7-ac6f-365137953351	2	Phật thuyết Quán Vô Lượng Thọ Phật Kinh trực chỉ sớ	佛說觀無量壽佛經直指疏	X22n0413	30417	87	1.5	45626	130	\N	2026-02-03 05:06:01.950717+00	58786d42-3079-4d1e-b2f7-b160208c2293
+e539474b-faec-4e63-83bb-d5ec1c2a9da9	2	Trường A hàm kinh	長阿含經	\N	247900	708	1.5	371850	1062	\N	2026-02-03 05:09:21.786066+00	58786d42-3079-4d1e-b2f7-b160208c2293
+d137386f-057d-45e6-a360-8de6e5e0b956	1	Thiền tông khoá hư ngữ lục	禪宗課虛語錄	AB.268	42000	120	\N	\N	\N	- Số trang sách gốc: 120 trang\r\n- Hán + Nôm	2026-02-03 10:49:56.02439+00	25aed873-6915-4d53-9354-5f9704364fb1
+b9e807bf-ebab-47ce-acd3-23d73c164a6b	1	Tam Tổ thực lục	三祖實錄	A.786	18000	51	\N	\N	\N	- Số trang sách gốc: 51 trang\r\n- Hán	2026-02-03 10:49:56.068693+00	25aed873-6915-4d53-9354-5f9704364fb1
+c5bedfe2-92bb-4f35-aa8f-7375a5327832	1	Thánh đăng lục	聖燈錄	A.2569	9000	26	\N	\N	\N	- Số trang sách gốc: 26 trang\r\n- Hán	2026-02-03 10:49:56.112235+00	25aed873-6915-4d53-9354-5f9704364fb1
+4290fae9-79e5-4746-b8ff-baff91f1385c	1	Thiền uyển tập anh	禪苑集英	VHV.1267	15000	43	\N	\N	\N	- Số trang sách gốc: 43 trang\r\n- Hán	2026-02-03 10:49:56.156218+00	25aed873-6915-4d53-9354-5f9704364fb1
+5cfc9d7e-9668-462c-8e79-7d5d5d42033d	1	Tam giáo chính độ thực lục	三教正度實籙	A.3025	22000	63	\N	\N	\N	- Số trang sách gốc: 63 trang\r\n- Hán	2026-02-03 10:49:56.19978+00	25aed873-6915-4d53-9354-5f9704364fb1
+957e73b4-3704-4670-951c-b70a551f1412	1	Di Đà cảnh giới hạnh	彌陀境界行	AB.371	11300	32	\N	\N	\N	- Số trang sách gốc: 32 trang\r\n- Nôm	2026-02-03 10:49:56.243158+00	25aed873-6915-4d53-9354-5f9704364fb1
+f4b45751-70ac-4a78-86d3-a973fc7e64fa	1	Nam Hải Quan Âm bản hạnh quốc ngữ diệu soạn	南海觀音本行國語妙譔	AB.550	11494	33	\N	\N	\N	'- Số trang sách gốc: 33 trang\r\n- Nôm	2026-02-03 10:49:56.287539+00	25aed873-6915-4d53-9354-5f9704364fb1
+297a8e9d-e93f-4949-944c-0a5a5ecb3aa5	1	Thiền lâm bảo huấn	禪林寶訓	File cá nhân (Nguyễn Văn Thanh)	40000	114	\N	\N	\N	- Số trang sách gốc: 114 trang\r\n- Hán + Nôm	2026-02-03 10:49:56.331526+00	25aed873-6915-4d53-9354-5f9704364fb1
+6a63a508-b2a4-4095-8dfa-3e98ac085ee4	2	Đại học chi thư tái trị yếu tập	大學之書再治要集	File cá nhân (Nguyễn Tứ Tuyệt)	30000	86	4	120000	343	- Số trang sách gốc: 86 trang	2026-02-03 10:49:56.375681+00	25aed873-6915-4d53-9354-5f9704364fb1
+53a6672c-0fa9-4e6e-ae6a-96692c069263	2	Hàm Long sơn chí	含龍山志	File cá nhân (Nguyễn Hà)	100000	286	4	400000	1143	- Số trang sách gốc: 286 trang	2026-02-03 10:49:56.420321+00	25aed873-6915-4d53-9354-5f9704364fb1
+7c1a761a-dc0e-488b-b22c-1ad6a74069a4	2	Quan Âm tế độ diễn nghĩa kinh	觀音濟度演義經	File cá nhân (Nguyễn Văn Sâm)	56000	160	3	168000	480	- Số trang sách gốc: 160 trang\r\n- Nôm	2026-02-03 10:49:56.464701+00	25aed873-6915-4d53-9354-5f9704364fb1
+90c6fdd5-34f6-4d1f-bf11-578693aae890	2	Phật tâm luận	佛心論	File cá nhân (Nguyễn Anh Tú)	26000	74	4	104000	297	- Số trang sách gốc: 74 trang	2026-02-03 10:49:56.508483+00	25aed873-6915-4d53-9354-5f9704364fb1
+a7c90066-6d83-46a4-9886-8daaba1ecf04	2	Tuệ Trung Thượng Sĩ ngữ lục	慧忠上士語録	A.1932	13000	37	4	52000	149	- Số trang sách gốc: 37 trang	2026-02-03 10:49:56.567752+00	25aed873-6915-4d53-9354-5f9704364fb1
+70715a25-400a-4c82-8772-72ba060396e1	2	Diệu pháp liên hoa kinh yếu giải hoa ngôn	玅法蓮華經要解華言	AB.488	284784	814	4	1139136	3255	- Số trang sách gốc: 814 trang	2026-02-03 10:49:56.611653+00	25aed873-6915-4d53-9354-5f9704364fb1
+4adc740c-2bc3-4ea6-a7da-c01e8e11b267	3	Đạo giáo nguyên lưu	道教源流	A.2675	150850	431	4	603400	1724	- Số trang sách gốc: 431 trang	2026-02-03 10:49:56.655315+00	25aed873-6915-4d53-9354-5f9704364fb1
+fbd64917-a276-4710-8e43-5f15b520f458	3	Tam Tổ cúng Tổ khoa	三祖供祖科	File cá nhân (Nguyễn Hải Anh)	6715	19	4	26860	77	- Số trang sách gốc: 19 trang	2026-02-03 10:49:56.700005+00	25aed873-6915-4d53-9354-5f9704364fb1
+6bc14e46-7ec1-4b46-9bbf-780e34b19d0f	3	Chư kinh diễn âm	諸經演音	File cá nhân (Mai Văn Lâm)	32982	94	3	98946	283	- Số trang sách gốc: 94 trang	2026-02-03 10:49:56.743222+00	25aed873-6915-4d53-9354-5f9704364fb1
+24d9c9aa-f577-43ef-8087-5d80d901361e	3	Địa tạng kinh thích giải Hoa ngôn	地藏經釋解華言	File cá nhân (Mai Văn Lâm)	44544	127	4	178176	509	- Số trang sách gốc: 127 trang	2026-02-03 10:49:56.78783+00	25aed873-6915-4d53-9354-5f9704364fb1
+29657658-a9c1-450c-a24b-a9e89ca7243f	3	Ngự chế thiền điển thống yếu kế đăng lục	御製禪典統要繼燈錄	AC.158a	54200	155	4.5	243900	697	- Số trang sách gốc: 155 trang	2026-02-03 10:49:56.831523+00	25aed873-6915-4d53-9354-5f9704364fb1
+8a8adbc3-e743-4224-8d93-43860ec8939a	3	Hương Hải thiền sư ngữ lục	香海禪師語錄	VHV.2379	10080	29	4	40320	115	- Số trang sách gốc: 29 trang	2026-02-03 10:49:56.875462+00	25aed873-6915-4d53-9354-5f9704364fb1
+fdc584ae-6e47-4caf-8c5d-e6daffe2561f	3	Tam bảo biện hoặc luận	三寳辯惑論	File cá nhân (Nguyễn Ngọc Phỉ)	70771	202	5	353855	1011	- Số trang sách gốc: 202 trang	2026-02-03 10:49:56.919915+00	25aed873-6915-4d53-9354-5f9704364fb1
+7355b3b0-302d-4c0f-b480-6e43aa627cd2	4	Ngũ Hành Sơn lục	五行山录	File cá nhân (Ngô Đức Chí)	19926	57	4	79704	228	- Số trang sách gốc: 57 trang	2026-02-03 10:49:56.964443+00	25aed873-6915-4d53-9354-5f9704364fb1
+b04cc7e3-518c-43f4-aa71-da650bdc1f32	4	Đại Điên Am Chủ chú giải Bát nhã tâm kinh	大顛庵主註解八若心經	AB.530	32680	93	4	130720	373	- Số trang sách gốc: 93 trang	2026-02-03 10:49:57.01015+00	25aed873-6915-4d53-9354-5f9704364fb1
+35812c2e-3a09-4f1a-9d9e-b0951d7c53e3	4	Phật thuyết nhân quả bản hạnh	佛說因果本行	AB.177	15660	45	3.5	54810	157	- Số trang sách gốc: 45 trang	2026-02-03 10:49:57.053097+00	25aed873-6915-4d53-9354-5f9704364fb1
+dc31ce98-bd6d-411e-a7d9-67e1585466a2	4	Tại gia tu trì Thích giáo nguyên lưu	在家修持釋教源流	A.3156	81000	231	4	324000	926	- Số trang sách gốc: 231 trang	2026-02-03 10:49:57.096693+00	25aed873-6915-4d53-9354-5f9704364fb1
+5fb2a28c-71cc-4a27-98ba-a0864f96b0ff	4	Phật quốc ký truyện	佛國記傳	File cá nhân (Nguyễn Tuấn Cường)	26712	76	3	80136	229	- Số trang sách gốc: 76 trang	2026-02-03 10:49:57.140627+00	25aed873-6915-4d53-9354-5f9704364fb1
 \.
 
 
 --
--- TOC entry 3465 (class 2606 OID 65602)
+-- TOC entry 3483 (class 2606 OID 65602)
 -- Name: components components_code_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1390,7 +1640,7 @@ ALTER TABLE ONLY public.components
 
 
 --
--- TOC entry 3467 (class 2606 OID 65600)
+-- TOC entry 3485 (class 2606 OID 65600)
 -- Name: components components_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1399,7 +1649,7 @@ ALTER TABLE ONLY public.components
 
 
 --
--- TOC entry 3409 (class 2606 OID 57384)
+-- TOC entry 3427 (class 2606 OID 57384)
 -- Name: contract_members contract_members_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1408,7 +1658,7 @@ ALTER TABLE ONLY public.contract_members
 
 
 --
--- TOC entry 3411 (class 2606 OID 57386)
+-- TOC entry 3429 (class 2606 OID 57386)
 -- Name: contract_members contract_members_unique; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1417,7 +1667,7 @@ ALTER TABLE ONLY public.contract_members
 
 
 --
--- TOC entry 3471 (class 2606 OID 65614)
+-- TOC entry 3489 (class 2606 OID 65614)
 -- Name: contract_stages contract_stages_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1426,7 +1676,7 @@ ALTER TABLE ONLY public.contract_stages
 
 
 --
--- TOC entry 3381 (class 2606 OID 49175)
+-- TOC entry 3399 (class 2606 OID 49175)
 -- Name: contracts contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1435,7 +1685,7 @@ ALTER TABLE ONLY public.contracts
 
 
 --
--- TOC entry 3421 (class 2606 OID 57436)
+-- TOC entry 3439 (class 2606 OID 57436)
 -- Name: document_contracts document_contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1444,7 +1694,7 @@ ALTER TABLE ONLY public.document_contracts
 
 
 --
--- TOC entry 3423 (class 2606 OID 57438)
+-- TOC entry 3441 (class 2606 OID 57438)
 -- Name: document_contracts document_contracts_unique; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1453,7 +1703,7 @@ ALTER TABLE ONLY public.document_contracts
 
 
 --
--- TOC entry 3415 (class 2606 OID 57411)
+-- TOC entry 3433 (class 2606 OID 57411)
 -- Name: document_tasks document_tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1462,7 +1712,7 @@ ALTER TABLE ONLY public.document_tasks
 
 
 --
--- TOC entry 3417 (class 2606 OID 57413)
+-- TOC entry 3435 (class 2606 OID 57413)
 -- Name: document_tasks document_tasks_unique; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1471,7 +1721,7 @@ ALTER TABLE ONLY public.document_tasks
 
 
 --
--- TOC entry 3393 (class 2606 OID 49205)
+-- TOC entry 3411 (class 2606 OID 49205)
 -- Name: documents documents_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1480,7 +1730,7 @@ ALTER TABLE ONLY public.documents
 
 
 --
--- TOC entry 3427 (class 2606 OID 57467)
+-- TOC entry 3445 (class 2606 OID 57467)
 -- Name: groups groups_code_unique; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1489,7 +1739,7 @@ ALTER TABLE ONLY public.groups
 
 
 --
--- TOC entry 3429 (class 2606 OID 57465)
+-- TOC entry 3447 (class 2606 OID 57465)
 -- Name: groups groups_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1498,7 +1748,7 @@ ALTER TABLE ONLY public.groups
 
 
 --
--- TOC entry 3478 (class 2606 OID 73745)
+-- TOC entry 3496 (class 2606 OID 73745)
 -- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1507,7 +1757,16 @@ ALTER TABLE ONLY public.notifications
 
 
 --
--- TOC entry 3463 (class 2606 OID 65569)
+-- TOC entry 3504 (class 2606 OID 81952)
+-- Name: proofreading_contract_members proofreading_contract_members_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.proofreading_contract_members
+    ADD CONSTRAINT proofreading_contract_members_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 3481 (class 2606 OID 65569)
 -- Name: proofreading_contracts proofreading_contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1516,7 +1775,7 @@ ALTER TABLE ONLY public.proofreading_contracts
 
 
 --
--- TOC entry 3439 (class 2606 OID 57504)
+-- TOC entry 3457 (class 2606 OID 57504)
 -- Name: roles roles_code_unique; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1525,7 +1784,7 @@ ALTER TABLE ONLY public.roles
 
 
 --
--- TOC entry 3441 (class 2606 OID 57502)
+-- TOC entry 3459 (class 2606 OID 57502)
 -- Name: roles roles_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1534,7 +1793,7 @@ ALTER TABLE ONLY public.roles
 
 
 --
--- TOC entry 3399 (class 2606 OID 49244)
+-- TOC entry 3417 (class 2606 OID 49244)
 -- Name: session session_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1543,7 +1802,7 @@ ALTER TABLE ONLY public.session
 
 
 --
--- TOC entry 3405 (class 2606 OID 57357)
+-- TOC entry 3423 (class 2606 OID 57357)
 -- Name: task_assignments task_assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1552,7 +1811,7 @@ ALTER TABLE ONLY public.task_assignments
 
 
 --
--- TOC entry 3407 (class 2606 OID 57359)
+-- TOC entry 3425 (class 2606 OID 57359)
 -- Name: task_assignments task_assignments_unique_assignment; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1561,7 +1820,7 @@ ALTER TABLE ONLY public.task_assignments
 
 
 --
--- TOC entry 3391 (class 2606 OID 49185)
+-- TOC entry 3409 (class 2606 OID 49185)
 -- Name: tasks tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1570,7 +1829,16 @@ ALTER TABLE ONLY public.tasks
 
 
 --
--- TOC entry 3458 (class 2606 OID 65554)
+-- TOC entry 3500 (class 2606 OID 81929)
+-- Name: translation_contract_members translation_contract_members_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.translation_contract_members
+    ADD CONSTRAINT translation_contract_members_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 3476 (class 2606 OID 65554)
 -- Name: translation_contracts translation_contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1579,7 +1847,7 @@ ALTER TABLE ONLY public.translation_contracts
 
 
 --
--- TOC entry 3434 (class 2606 OID 57477)
+-- TOC entry 3452 (class 2606 OID 57477)
 -- Name: user_groups user_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1588,7 +1856,7 @@ ALTER TABLE ONLY public.user_groups
 
 
 --
--- TOC entry 3436 (class 2606 OID 57479)
+-- TOC entry 3454 (class 2606 OID 57479)
 -- Name: user_groups user_groups_unique; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1597,7 +1865,7 @@ ALTER TABLE ONLY public.user_groups
 
 
 --
--- TOC entry 3446 (class 2606 OID 57514)
+-- TOC entry 3464 (class 2606 OID 57514)
 -- Name: user_roles user_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1606,7 +1874,7 @@ ALTER TABLE ONLY public.user_roles
 
 
 --
--- TOC entry 3377 (class 2606 OID 49165)
+-- TOC entry 3395 (class 2606 OID 49165)
 -- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1615,7 +1883,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3379 (class 2606 OID 49163)
+-- TOC entry 3397 (class 2606 OID 49163)
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1624,7 +1892,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3453 (class 2606 OID 65544)
+-- TOC entry 3471 (class 2606 OID 65544)
 -- Name: works works_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -1633,7 +1901,7 @@ ALTER TABLE ONLY public.works
 
 
 --
--- TOC entry 3397 (class 1259 OID 49245)
+-- TOC entry 3415 (class 1259 OID 49245)
 -- Name: IDX_session_expire; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1641,7 +1909,7 @@ CREATE INDEX "IDX_session_expire" ON public.session USING btree (expire);
 
 
 --
--- TOC entry 3468 (class 1259 OID 65603)
+-- TOC entry 3486 (class 1259 OID 65603)
 -- Name: idx_components_code; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1649,7 +1917,7 @@ CREATE INDEX idx_components_code ON public.components USING btree (code);
 
 
 --
--- TOC entry 3469 (class 1259 OID 65604)
+-- TOC entry 3487 (class 1259 OID 65604)
 -- Name: idx_components_display_order; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1657,7 +1925,7 @@ CREATE INDEX idx_components_display_order ON public.components USING btree (disp
 
 
 --
--- TOC entry 3412 (class 1259 OID 57397)
+-- TOC entry 3430 (class 1259 OID 57397)
 -- Name: idx_contract_members_contract_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1665,7 +1933,7 @@ CREATE INDEX idx_contract_members_contract_id ON public.contract_members USING b
 
 
 --
--- TOC entry 3413 (class 1259 OID 57398)
+-- TOC entry 3431 (class 1259 OID 57398)
 -- Name: idx_contract_members_user_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1673,7 +1941,7 @@ CREATE INDEX idx_contract_members_user_id ON public.contract_members USING btree
 
 
 --
--- TOC entry 3472 (class 1259 OID 65626)
+-- TOC entry 3490 (class 1259 OID 65626)
 -- Name: idx_contract_stages_proofreading; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1681,7 +1949,7 @@ CREATE INDEX idx_contract_stages_proofreading ON public.contract_stages USING bt
 
 
 --
--- TOC entry 3473 (class 1259 OID 65625)
+-- TOC entry 3491 (class 1259 OID 65625)
 -- Name: idx_contract_stages_translation; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1689,7 +1957,7 @@ CREATE INDEX idx_contract_stages_translation ON public.contract_stages USING btr
 
 
 --
--- TOC entry 3382 (class 1259 OID 49225)
+-- TOC entry 3400 (class 1259 OID 49225)
 -- Name: idx_contracts_status; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1697,7 +1965,7 @@ CREATE INDEX idx_contracts_status ON public.contracts USING btree (status);
 
 
 --
--- TOC entry 3383 (class 1259 OID 49224)
+-- TOC entry 3401 (class 1259 OID 49224)
 -- Name: idx_contracts_type; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1705,7 +1973,7 @@ CREATE INDEX idx_contracts_type ON public.contracts USING btree (type);
 
 
 --
--- TOC entry 3424 (class 1259 OID 57450)
+-- TOC entry 3442 (class 1259 OID 57450)
 -- Name: idx_document_contracts_contract_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1713,7 +1981,7 @@ CREATE INDEX idx_document_contracts_contract_id ON public.document_contracts USI
 
 
 --
--- TOC entry 3425 (class 1259 OID 57449)
+-- TOC entry 3443 (class 1259 OID 57449)
 -- Name: idx_document_contracts_document_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1721,7 +1989,7 @@ CREATE INDEX idx_document_contracts_document_id ON public.document_contracts USI
 
 
 --
--- TOC entry 3418 (class 1259 OID 57424)
+-- TOC entry 3436 (class 1259 OID 57424)
 -- Name: idx_document_tasks_document_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1729,7 +1997,7 @@ CREATE INDEX idx_document_tasks_document_id ON public.document_tasks USING btree
 
 
 --
--- TOC entry 3419 (class 1259 OID 57425)
+-- TOC entry 3437 (class 1259 OID 57425)
 -- Name: idx_document_tasks_task_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1737,7 +2005,7 @@ CREATE INDEX idx_document_tasks_task_id ON public.document_tasks USING btree (ta
 
 
 --
--- TOC entry 3394 (class 1259 OID 49230)
+-- TOC entry 3412 (class 1259 OID 49230)
 -- Name: idx_documents_contract_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1745,7 +2013,7 @@ CREATE INDEX idx_documents_contract_id ON public.documents USING btree (contract
 
 
 --
--- TOC entry 3395 (class 1259 OID 49231)
+-- TOC entry 3413 (class 1259 OID 49231)
 -- Name: idx_documents_task_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1753,7 +2021,7 @@ CREATE INDEX idx_documents_task_id ON public.documents USING btree (task_id) WHE
 
 
 --
--- TOC entry 3396 (class 1259 OID 49232)
+-- TOC entry 3414 (class 1259 OID 49232)
 -- Name: idx_documents_uploaded_by; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1761,7 +2029,7 @@ CREATE INDEX idx_documents_uploaded_by ON public.documents USING btree (uploaded
 
 
 --
--- TOC entry 3430 (class 1259 OID 57468)
+-- TOC entry 3448 (class 1259 OID 57468)
 -- Name: idx_groups_code; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1769,7 +2037,7 @@ CREATE INDEX idx_groups_code ON public.groups USING btree (code);
 
 
 --
--- TOC entry 3474 (class 1259 OID 73763)
+-- TOC entry 3492 (class 1259 OID 73763)
 -- Name: idx_notifications_assignment_type; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1777,7 +2045,7 @@ CREATE INDEX idx_notifications_assignment_type ON public.notifications USING btr
 
 
 --
--- TOC entry 3475 (class 1259 OID 73761)
+-- TOC entry 3493 (class 1259 OID 73761)
 -- Name: idx_notifications_user_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1785,7 +2053,7 @@ CREATE INDEX idx_notifications_user_id ON public.notifications USING btree (user
 
 
 --
--- TOC entry 3476 (class 1259 OID 73762)
+-- TOC entry 3494 (class 1259 OID 73762)
 -- Name: idx_notifications_user_read; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1793,7 +2061,23 @@ CREATE INDEX idx_notifications_user_read ON public.notifications USING btree (us
 
 
 --
--- TOC entry 3459 (class 1259 OID 65644)
+-- TOC entry 3501 (class 1259 OID 81963)
+-- Name: idx_proofreading_contract_members_proofreading_contract_id; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_proofreading_contract_members_proofreading_contract_id ON public.proofreading_contract_members USING btree (proofreading_contract_id);
+
+
+--
+-- TOC entry 3502 (class 1259 OID 81964)
+-- Name: idx_proofreading_contract_members_user_id; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_proofreading_contract_members_user_id ON public.proofreading_contract_members USING btree (user_id);
+
+
+--
+-- TOC entry 3477 (class 1259 OID 65644)
 -- Name: idx_proofreading_contracts_component_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1801,7 +2085,7 @@ CREATE INDEX idx_proofreading_contracts_component_id ON public.proofreading_cont
 
 
 --
--- TOC entry 3460 (class 1259 OID 65581)
+-- TOC entry 3478 (class 1259 OID 65581)
 -- Name: idx_proofreading_contracts_translation_contract_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1809,7 +2093,7 @@ CREATE INDEX idx_proofreading_contracts_translation_contract_id ON public.proofr
 
 
 --
--- TOC entry 3461 (class 1259 OID 65580)
+-- TOC entry 3479 (class 1259 OID 65580)
 -- Name: idx_proofreading_contracts_work_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1817,7 +2101,7 @@ CREATE INDEX idx_proofreading_contracts_work_id ON public.proofreading_contracts
 
 
 --
--- TOC entry 3437 (class 1259 OID 57505)
+-- TOC entry 3455 (class 1259 OID 57505)
 -- Name: idx_roles_code; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1825,7 +2109,7 @@ CREATE INDEX idx_roles_code ON public.roles USING btree (code);
 
 
 --
--- TOC entry 3400 (class 1259 OID 57372)
+-- TOC entry 3418 (class 1259 OID 57372)
 -- Name: idx_task_assignments_due_date; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1833,7 +2117,7 @@ CREATE INDEX idx_task_assignments_due_date ON public.task_assignments USING btre
 
 
 --
--- TOC entry 3401 (class 1259 OID 57373)
+-- TOC entry 3419 (class 1259 OID 57373)
 -- Name: idx_task_assignments_status; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1841,7 +2125,7 @@ CREATE INDEX idx_task_assignments_status ON public.task_assignments USING btree 
 
 
 --
--- TOC entry 3402 (class 1259 OID 57370)
+-- TOC entry 3420 (class 1259 OID 57370)
 -- Name: idx_task_assignments_task_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1849,7 +2133,7 @@ CREATE INDEX idx_task_assignments_task_id ON public.task_assignments USING btree
 
 
 --
--- TOC entry 3403 (class 1259 OID 57371)
+-- TOC entry 3421 (class 1259 OID 57371)
 -- Name: idx_task_assignments_user_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1857,7 +2141,7 @@ CREATE INDEX idx_task_assignments_user_id ON public.task_assignments USING btree
 
 
 --
--- TOC entry 3384 (class 1259 OID 49229)
+-- TOC entry 3402 (class 1259 OID 49229)
 -- Name: idx_tasks_contract_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1865,7 +2149,7 @@ CREATE INDEX idx_tasks_contract_id ON public.tasks USING btree (contract_id) WHE
 
 
 --
--- TOC entry 3385 (class 1259 OID 49227)
+-- TOC entry 3403 (class 1259 OID 49227)
 -- Name: idx_tasks_group; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1873,7 +2157,7 @@ CREATE INDEX idx_tasks_group ON public.tasks USING btree ("group");
 
 
 --
--- TOC entry 3386 (class 1259 OID 65589)
+-- TOC entry 3404 (class 1259 OID 65589)
 -- Name: idx_tasks_related_contract; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1881,7 +2165,7 @@ CREATE INDEX idx_tasks_related_contract ON public.tasks USING btree (related_con
 
 
 --
--- TOC entry 3387 (class 1259 OID 65588)
+-- TOC entry 3405 (class 1259 OID 65588)
 -- Name: idx_tasks_related_work; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1889,7 +2173,7 @@ CREATE INDEX idx_tasks_related_work ON public.tasks USING btree (related_work_id
 
 
 --
--- TOC entry 3388 (class 1259 OID 49228)
+-- TOC entry 3406 (class 1259 OID 49228)
 -- Name: idx_tasks_status; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1897,7 +2181,7 @@ CREATE INDEX idx_tasks_status ON public.tasks USING btree (status);
 
 
 --
--- TOC entry 3389 (class 1259 OID 65590)
+-- TOC entry 3407 (class 1259 OID 65590)
 -- Name: idx_tasks_task_type; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1905,7 +2189,23 @@ CREATE INDEX idx_tasks_task_type ON public.tasks USING btree (task_type) WHERE (
 
 
 --
--- TOC entry 3454 (class 1259 OID 65643)
+-- TOC entry 3497 (class 1259 OID 81940)
+-- Name: idx_translation_contract_members_translation_contract_id; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_translation_contract_members_translation_contract_id ON public.translation_contract_members USING btree (translation_contract_id);
+
+
+--
+-- TOC entry 3498 (class 1259 OID 81941)
+-- Name: idx_translation_contract_members_user_id; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_translation_contract_members_user_id ON public.translation_contract_members USING btree (user_id);
+
+
+--
+-- TOC entry 3472 (class 1259 OID 65643)
 -- Name: idx_translation_contracts_component_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1913,7 +2213,7 @@ CREATE INDEX idx_translation_contracts_component_id ON public.translation_contra
 
 
 --
--- TOC entry 3455 (class 1259 OID 65561)
+-- TOC entry 3473 (class 1259 OID 65561)
 -- Name: idx_translation_contracts_contract_number; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1921,7 +2221,7 @@ CREATE INDEX idx_translation_contracts_contract_number ON public.translation_con
 
 
 --
--- TOC entry 3456 (class 1259 OID 65560)
+-- TOC entry 3474 (class 1259 OID 65560)
 -- Name: idx_translation_contracts_work_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1929,7 +2229,7 @@ CREATE INDEX idx_translation_contracts_work_id ON public.translation_contracts U
 
 
 --
--- TOC entry 3431 (class 1259 OID 57491)
+-- TOC entry 3449 (class 1259 OID 57491)
 -- Name: idx_user_groups_group_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1937,7 +2237,7 @@ CREATE INDEX idx_user_groups_group_id ON public.user_groups USING btree (group_i
 
 
 --
--- TOC entry 3432 (class 1259 OID 57490)
+-- TOC entry 3450 (class 1259 OID 57490)
 -- Name: idx_user_groups_user_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1945,7 +2245,7 @@ CREATE INDEX idx_user_groups_user_id ON public.user_groups USING btree (user_id)
 
 
 --
--- TOC entry 3442 (class 1259 OID 73735)
+-- TOC entry 3460 (class 1259 OID 73735)
 -- Name: idx_user_roles_component_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1953,7 +2253,7 @@ CREATE INDEX idx_user_roles_component_id ON public.user_roles USING btree (compo
 
 
 --
--- TOC entry 3443 (class 1259 OID 57528)
+-- TOC entry 3461 (class 1259 OID 57528)
 -- Name: idx_user_roles_role_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1961,7 +2261,7 @@ CREATE INDEX idx_user_roles_role_id ON public.user_roles USING btree (role_id);
 
 
 --
--- TOC entry 3444 (class 1259 OID 57527)
+-- TOC entry 3462 (class 1259 OID 57527)
 -- Name: idx_user_roles_user_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1969,7 +2269,7 @@ CREATE INDEX idx_user_roles_user_id ON public.user_roles USING btree (user_id);
 
 
 --
--- TOC entry 3375 (class 1259 OID 49221)
+-- TOC entry 3393 (class 1259 OID 49221)
 -- Name: idx_users_email; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1977,7 +2277,7 @@ CREATE INDEX idx_users_email ON public.users USING btree (email);
 
 
 --
--- TOC entry 3449 (class 1259 OID 65642)
+-- TOC entry 3467 (class 1259 OID 65642)
 -- Name: idx_works_component_id; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1985,7 +2285,7 @@ CREATE INDEX idx_works_component_id ON public.works USING btree (component_id) W
 
 
 --
--- TOC entry 3450 (class 1259 OID 65546)
+-- TOC entry 3468 (class 1259 OID 65546)
 -- Name: idx_works_document_code; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -1993,7 +2293,7 @@ CREATE INDEX idx_works_document_code ON public.works USING btree (document_code)
 
 
 --
--- TOC entry 3451 (class 1259 OID 65545)
+-- TOC entry 3469 (class 1259 OID 65545)
 -- Name: idx_works_stage; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -2001,7 +2301,7 @@ CREATE INDEX idx_works_stage ON public.works USING btree (stage) WHERE (stage IS
 
 
 --
--- TOC entry 3447 (class 1259 OID 73734)
+-- TOC entry 3465 (class 1259 OID 73734)
 -- Name: user_roles_user_role_component_key; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -2009,7 +2309,7 @@ CREATE UNIQUE INDEX user_roles_user_role_component_key ON public.user_roles USIN
 
 
 --
--- TOC entry 3448 (class 1259 OID 73733)
+-- TOC entry 3466 (class 1259 OID 73733)
 -- Name: user_roles_user_role_global_key; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -2017,7 +2317,7 @@ CREATE UNIQUE INDEX user_roles_user_role_global_key ON public.user_roles USING b
 
 
 --
--- TOC entry 3513 (class 2620 OID 57531)
+-- TOC entry 3543 (class 2620 OID 57531)
 -- Name: contract_members contract_members_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2025,7 +2325,7 @@ CREATE TRIGGER contract_members_updated_at BEFORE UPDATE ON public.contract_memb
 
 
 --
--- TOC entry 3509 (class 2620 OID 49234)
+-- TOC entry 3539 (class 2620 OID 49234)
 -- Name: contracts contracts_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2033,7 +2333,7 @@ CREATE TRIGGER contracts_updated_at BEFORE UPDATE ON public.contracts FOR EACH R
 
 
 --
--- TOC entry 3515 (class 2620 OID 57533)
+-- TOC entry 3545 (class 2620 OID 57533)
 -- Name: document_contracts document_contracts_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2041,7 +2341,7 @@ CREATE TRIGGER document_contracts_updated_at BEFORE UPDATE ON public.document_co
 
 
 --
--- TOC entry 3514 (class 2620 OID 57532)
+-- TOC entry 3544 (class 2620 OID 57532)
 -- Name: document_tasks document_tasks_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2049,7 +2349,7 @@ CREATE TRIGGER document_tasks_updated_at BEFORE UPDATE ON public.document_tasks 
 
 
 --
--- TOC entry 3511 (class 2620 OID 49236)
+-- TOC entry 3541 (class 2620 OID 49236)
 -- Name: documents documents_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2057,7 +2357,7 @@ CREATE TRIGGER documents_updated_at BEFORE UPDATE ON public.documents FOR EACH R
 
 
 --
--- TOC entry 3516 (class 2620 OID 57534)
+-- TOC entry 3546 (class 2620 OID 57534)
 -- Name: groups groups_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2065,7 +2365,15 @@ CREATE TRIGGER groups_updated_at BEFORE UPDATE ON public.groups FOR EACH ROW EXE
 
 
 --
--- TOC entry 3518 (class 2620 OID 57536)
+-- TOC entry 3551 (class 2620 OID 81971)
+-- Name: proofreading_contract_members proofreading_contract_members_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
+--
+
+CREATE TRIGGER proofreading_contract_members_updated_at BEFORE UPDATE ON public.proofreading_contract_members FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- TOC entry 3548 (class 2620 OID 57536)
 -- Name: roles roles_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2073,7 +2381,7 @@ CREATE TRIGGER roles_updated_at BEFORE UPDATE ON public.roles FOR EACH ROW EXECU
 
 
 --
--- TOC entry 3512 (class 2620 OID 57530)
+-- TOC entry 3542 (class 2620 OID 57530)
 -- Name: task_assignments task_assignments_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2081,7 +2389,7 @@ CREATE TRIGGER task_assignments_updated_at BEFORE UPDATE ON public.task_assignme
 
 
 --
--- TOC entry 3510 (class 2620 OID 49235)
+-- TOC entry 3540 (class 2620 OID 49235)
 -- Name: tasks tasks_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2089,7 +2397,15 @@ CREATE TRIGGER tasks_updated_at BEFORE UPDATE ON public.tasks FOR EACH ROW EXECU
 
 
 --
--- TOC entry 3517 (class 2620 OID 57535)
+-- TOC entry 3550 (class 2620 OID 81970)
+-- Name: translation_contract_members translation_contract_members_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
+--
+
+CREATE TRIGGER translation_contract_members_updated_at BEFORE UPDATE ON public.translation_contract_members FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- TOC entry 3547 (class 2620 OID 57535)
 -- Name: user_groups user_groups_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2097,7 +2413,7 @@ CREATE TRIGGER user_groups_updated_at BEFORE UPDATE ON public.user_groups FOR EA
 
 
 --
--- TOC entry 3519 (class 2620 OID 57537)
+-- TOC entry 3549 (class 2620 OID 57537)
 -- Name: user_roles user_roles_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2105,7 +2421,7 @@ CREATE TRIGGER user_roles_updated_at BEFORE UPDATE ON public.user_roles FOR EACH
 
 
 --
--- TOC entry 3508 (class 2620 OID 49233)
+-- TOC entry 3538 (class 2620 OID 49233)
 -- Name: users users_updated_at; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
@@ -2113,7 +2429,7 @@ CREATE TRIGGER users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECU
 
 
 --
--- TOC entry 3486 (class 2606 OID 57387)
+-- TOC entry 3512 (class 2606 OID 57387)
 -- Name: contract_members contract_members_contract_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2122,7 +2438,7 @@ ALTER TABLE ONLY public.contract_members
 
 
 --
--- TOC entry 3487 (class 2606 OID 57392)
+-- TOC entry 3513 (class 2606 OID 57392)
 -- Name: contract_members contract_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2131,7 +2447,7 @@ ALTER TABLE ONLY public.contract_members
 
 
 --
--- TOC entry 3503 (class 2606 OID 65620)
+-- TOC entry 3529 (class 2606 OID 65620)
 -- Name: contract_stages contract_stages_proofreading_contract_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2140,7 +2456,7 @@ ALTER TABLE ONLY public.contract_stages
 
 
 --
--- TOC entry 3504 (class 2606 OID 65615)
+-- TOC entry 3530 (class 2606 OID 65615)
 -- Name: contract_stages contract_stages_translation_contract_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2149,7 +2465,7 @@ ALTER TABLE ONLY public.contract_stages
 
 
 --
--- TOC entry 3490 (class 2606 OID 57444)
+-- TOC entry 3516 (class 2606 OID 57444)
 -- Name: document_contracts document_contracts_contract_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2158,7 +2474,7 @@ ALTER TABLE ONLY public.document_contracts
 
 
 --
--- TOC entry 3491 (class 2606 OID 57439)
+-- TOC entry 3517 (class 2606 OID 57439)
 -- Name: document_contracts document_contracts_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2167,7 +2483,7 @@ ALTER TABLE ONLY public.document_contracts
 
 
 --
--- TOC entry 3488 (class 2606 OID 57414)
+-- TOC entry 3514 (class 2606 OID 57414)
 -- Name: document_tasks document_tasks_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2176,7 +2492,7 @@ ALTER TABLE ONLY public.document_tasks
 
 
 --
--- TOC entry 3489 (class 2606 OID 57419)
+-- TOC entry 3515 (class 2606 OID 57419)
 -- Name: document_tasks document_tasks_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2185,7 +2501,7 @@ ALTER TABLE ONLY public.document_tasks
 
 
 --
--- TOC entry 3481 (class 2606 OID 49206)
+-- TOC entry 3507 (class 2606 OID 49206)
 -- Name: documents documents_contract_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2194,7 +2510,7 @@ ALTER TABLE ONLY public.documents
 
 
 --
--- TOC entry 3482 (class 2606 OID 49211)
+-- TOC entry 3508 (class 2606 OID 49211)
 -- Name: documents documents_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2203,7 +2519,7 @@ ALTER TABLE ONLY public.documents
 
 
 --
--- TOC entry 3483 (class 2606 OID 49216)
+-- TOC entry 3509 (class 2606 OID 49216)
 -- Name: documents documents_uploaded_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2212,7 +2528,7 @@ ALTER TABLE ONLY public.documents
 
 
 --
--- TOC entry 3505 (class 2606 OID 73756)
+-- TOC entry 3531 (class 2606 OID 73756)
 -- Name: notifications notifications_task_assignment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2221,7 +2537,7 @@ ALTER TABLE ONLY public.notifications
 
 
 --
--- TOC entry 3506 (class 2606 OID 73751)
+-- TOC entry 3532 (class 2606 OID 73751)
 -- Name: notifications notifications_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2230,7 +2546,7 @@ ALTER TABLE ONLY public.notifications
 
 
 --
--- TOC entry 3507 (class 2606 OID 73746)
+-- TOC entry 3533 (class 2606 OID 73746)
 -- Name: notifications notifications_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2239,7 +2555,25 @@ ALTER TABLE ONLY public.notifications
 
 
 --
--- TOC entry 3500 (class 2606 OID 65637)
+-- TOC entry 3536 (class 2606 OID 81953)
+-- Name: proofreading_contract_members proofreading_contract_members_proofreading_contract_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.proofreading_contract_members
+    ADD CONSTRAINT proofreading_contract_members_proofreading_contract_id_fkey FOREIGN KEY (proofreading_contract_id) REFERENCES public.proofreading_contracts(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 3537 (class 2606 OID 81958)
+-- Name: proofreading_contract_members proofreading_contract_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.proofreading_contract_members
+    ADD CONSTRAINT proofreading_contract_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 3526 (class 2606 OID 65637)
 -- Name: proofreading_contracts proofreading_contracts_component_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2248,7 +2582,7 @@ ALTER TABLE ONLY public.proofreading_contracts
 
 
 --
--- TOC entry 3501 (class 2606 OID 65575)
+-- TOC entry 3527 (class 2606 OID 65575)
 -- Name: proofreading_contracts proofreading_contracts_translation_contract_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2257,7 +2591,7 @@ ALTER TABLE ONLY public.proofreading_contracts
 
 
 --
--- TOC entry 3502 (class 2606 OID 65570)
+-- TOC entry 3528 (class 2606 OID 65570)
 -- Name: proofreading_contracts proofreading_contracts_work_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2266,7 +2600,7 @@ ALTER TABLE ONLY public.proofreading_contracts
 
 
 --
--- TOC entry 3484 (class 2606 OID 57360)
+-- TOC entry 3510 (class 2606 OID 57360)
 -- Name: task_assignments task_assignments_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2275,7 +2609,7 @@ ALTER TABLE ONLY public.task_assignments
 
 
 --
--- TOC entry 3485 (class 2606 OID 57365)
+-- TOC entry 3511 (class 2606 OID 57365)
 -- Name: task_assignments task_assignments_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2284,7 +2618,7 @@ ALTER TABLE ONLY public.task_assignments
 
 
 --
--- TOC entry 3479 (class 2606 OID 49191)
+-- TOC entry 3505 (class 2606 OID 49191)
 -- Name: tasks tasks_contract_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2293,7 +2627,7 @@ ALTER TABLE ONLY public.tasks
 
 
 --
--- TOC entry 3480 (class 2606 OID 65583)
+-- TOC entry 3506 (class 2606 OID 65583)
 -- Name: tasks tasks_related_work_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2302,7 +2636,25 @@ ALTER TABLE ONLY public.tasks
 
 
 --
--- TOC entry 3498 (class 2606 OID 65632)
+-- TOC entry 3534 (class 2606 OID 81930)
+-- Name: translation_contract_members translation_contract_members_translation_contract_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.translation_contract_members
+    ADD CONSTRAINT translation_contract_members_translation_contract_id_fkey FOREIGN KEY (translation_contract_id) REFERENCES public.translation_contracts(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 3535 (class 2606 OID 81935)
+-- Name: translation_contract_members translation_contract_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.translation_contract_members
+    ADD CONSTRAINT translation_contract_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 3524 (class 2606 OID 65632)
 -- Name: translation_contracts translation_contracts_component_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2311,7 +2663,7 @@ ALTER TABLE ONLY public.translation_contracts
 
 
 --
--- TOC entry 3499 (class 2606 OID 65555)
+-- TOC entry 3525 (class 2606 OID 65555)
 -- Name: translation_contracts translation_contracts_work_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2320,7 +2672,7 @@ ALTER TABLE ONLY public.translation_contracts
 
 
 --
--- TOC entry 3492 (class 2606 OID 57485)
+-- TOC entry 3518 (class 2606 OID 57485)
 -- Name: user_groups user_groups_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2329,7 +2681,7 @@ ALTER TABLE ONLY public.user_groups
 
 
 --
--- TOC entry 3493 (class 2606 OID 57480)
+-- TOC entry 3519 (class 2606 OID 57480)
 -- Name: user_groups user_groups_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2338,7 +2690,7 @@ ALTER TABLE ONLY public.user_groups
 
 
 --
--- TOC entry 3494 (class 2606 OID 73728)
+-- TOC entry 3520 (class 2606 OID 73728)
 -- Name: user_roles user_roles_component_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2347,7 +2699,7 @@ ALTER TABLE ONLY public.user_roles
 
 
 --
--- TOC entry 3495 (class 2606 OID 57522)
+-- TOC entry 3521 (class 2606 OID 57522)
 -- Name: user_roles user_roles_role_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2356,7 +2708,7 @@ ALTER TABLE ONLY public.user_roles
 
 
 --
--- TOC entry 3496 (class 2606 OID 57517)
+-- TOC entry 3522 (class 2606 OID 57517)
 -- Name: user_roles user_roles_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2365,7 +2717,7 @@ ALTER TABLE ONLY public.user_roles
 
 
 --
--- TOC entry 3497 (class 2606 OID 65627)
+-- TOC entry 3523 (class 2606 OID 65627)
 -- Name: works works_component_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -2374,7 +2726,7 @@ ALTER TABLE ONLY public.works
 
 
 --
--- TOC entry 2155 (class 826 OID 16394)
+-- TOC entry 2163 (class 826 OID 16394)
 -- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: cloud_admin
 --
 
@@ -2382,18 +2734,18 @@ ALTER DEFAULT PRIVILEGES FOR ROLE cloud_admin IN SCHEMA public GRANT ALL ON SEQU
 
 
 --
--- TOC entry 2154 (class 826 OID 16393)
+-- TOC entry 2162 (class 826 OID 16393)
 -- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: cloud_admin
 --
 
 ALTER DEFAULT PRIVILEGES FOR ROLE cloud_admin IN SCHEMA public GRANT ALL ON TABLES TO neon_superuser WITH GRANT OPTION;
 
 
--- Completed on 2026-02-02 16:14:22
+-- Completed on 2026-02-04 18:38:40
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lJQZniL8e1jEzLcuVw7iWuZrYDE3UUrH9e71oIp0dPhjYfRgyqNY7QZ9W6Agfyd
+\unrestrict sRdptsdAS09x2CjgftCKbMBeIwzda5GTBQf2KNImsZbymse5J4xAKTfv4gmtBKb
 

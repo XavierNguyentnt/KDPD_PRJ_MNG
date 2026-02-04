@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, CheckSquare, Users, Settings, LogOut, ChevronDown, Bell, Languages, Shield, UserCog, FileText, Menu, X, Clipboard, Edit, Palette, Code, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -62,10 +62,44 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [notificationStatusFilter, setNotificationStatusFilter] = useState<"all" | "unread" | "read">("all");
   const [notificationGroupFilter, setNotificationGroupFilter] = useState("all");
   const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
+  
+  // Refs for click outside detection
+  const sidebarRef = useRef<HTMLElement>(null);
+  const mainContentRef = useRef<HTMLElement>(null);
 
   // Save sidebar state to localStorage
   useEffect(() => {
     localStorage.setItem("sidebarOpen", String(sidebarOpen));
+  }, [sidebarOpen]);
+
+  // Auto-hide sidebar when clicking on main content (desktop only)
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Only on desktop (md and up) and when sidebar is open
+      if (window.innerWidth >= 768 && sidebarOpen) {
+        const target = event.target as HTMLElement;
+        // Check if click is outside sidebar and inside main content
+        if (
+          sidebarRef.current &&
+          mainContentRef.current &&
+          !sidebarRef.current.contains(target) &&
+          mainContentRef.current.contains(target)
+        ) {
+          // Don't hide if clicking on interactive elements (buttons, dropdowns, links, etc.)
+          const isInteractiveElement = target.closest('button, [role="button"], a, input, select, textarea, [role="menu"], [role="menuitem"], [role="dialog"], [role="combobox"]');
+          // Don't hide if clicking on header area (where menu button is)
+          const isHeaderArea = target.closest('header');
+          if (!isInteractiveElement && !isHeaderArea) {
+            setSidebarOpen(false);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [sidebarOpen]);
 
   const normalizeGroupName = (g?: string | null) => {
@@ -128,6 +162,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-gray-50/50 flex">
       {/* Sidebar */}
       <aside 
+        ref={sidebarRef}
         className={`
           fixed inset-y-0 left-0 z-50 bg-card border-r border-border/50 hidden md:flex flex-col
           transition-transform duration-300 ease-in-out
@@ -225,6 +260,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main 
+        ref={mainContentRef}
         className={`flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300 ml-0 ${sidebarOpen ? "md:ml-64" : "md:ml-0"}`}
       >
         {/* Header */}

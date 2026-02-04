@@ -7,6 +7,8 @@ import {
   documents,
   taskAssignments,
   contractMembers,
+  translationContractMembers,
+  proofreadingContractMembers,
   documentTasks,
   documentContracts,
   groups,
@@ -35,6 +37,10 @@ import {
   type InsertNotification,
   type ContractMember,
   type InsertContractMember,
+  type TranslationContractMember,
+  type InsertTranslationContractMember,
+  type ProofreadingContractMember,
+  type InsertProofreadingContractMember,
   type DocumentTask,
   type InsertDocumentTask,
   type DocumentContract,
@@ -457,12 +463,60 @@ export async function deleteTranslationContract(id: string): Promise<Translation
 // Proofreading contracts CRUD
 // -----------------------------------------------------------------------------
 export async function getProofreadingContractsFromDb(): Promise<ProofreadingContract[]> {
-  return requireDb().select().from(proofreadingContracts).orderBy(asc(proofreadingContracts.contractNumber));
+  try {
+    // Select only columns defined in schema (explicitly exclude proofreader_name if it exists in DB)
+    return requireDb()
+      .select({
+        id: proofreadingContracts.id,
+        contractNumber: proofreadingContracts.contractNumber,
+        componentId: proofreadingContracts.componentId,
+        workId: proofreadingContracts.workId,
+        translationContractId: proofreadingContracts.translationContractId,
+        pageCount: proofreadingContracts.pageCount,
+        rateRatio: proofreadingContracts.rateRatio,
+        contractValue: proofreadingContracts.contractValue,
+        startDate: proofreadingContracts.startDate,
+        endDate: proofreadingContracts.endDate,
+        actualCompletionDate: proofreadingContracts.actualCompletionDate,
+        note: proofreadingContracts.note,
+      })
+      .from(proofreadingContracts)
+      .orderBy(asc(proofreadingContracts.contractNumber));
+  } catch (error) {
+    console.error("Error in getProofreadingContractsFromDb:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes("proofreader_name") || errorMessage.includes("column") || errorMessage.includes("does not exist")) {
+      throw new Error("Database schema mismatch: proofreader_name column may still exist in database. Please run migration: KDPD_DB_migration_drop_proofreader_name.sql");
+    }
+    throw error;
+  }
 }
 
 export async function getProofreadingContractById(id: string): Promise<ProofreadingContract | undefined> {
-  const rows = await requireDb().select().from(proofreadingContracts).where(eq(proofreadingContracts.id, id)).limit(1);
-  return rows[0];
+  try {
+    const rows = await requireDb()
+      .select({
+        id: proofreadingContracts.id,
+        contractNumber: proofreadingContracts.contractNumber,
+        componentId: proofreadingContracts.componentId,
+        workId: proofreadingContracts.workId,
+        translationContractId: proofreadingContracts.translationContractId,
+        pageCount: proofreadingContracts.pageCount,
+        rateRatio: proofreadingContracts.rateRatio,
+        contractValue: proofreadingContracts.contractValue,
+        startDate: proofreadingContracts.startDate,
+        endDate: proofreadingContracts.endDate,
+        actualCompletionDate: proofreadingContracts.actualCompletionDate,
+        note: proofreadingContracts.note,
+      })
+      .from(proofreadingContracts)
+      .where(eq(proofreadingContracts.id, id))
+      .limit(1);
+    return rows[0];
+  } catch (error) {
+    console.error("Error in getProofreadingContractById:", error);
+    throw error;
+  }
 }
 
 export async function createProofreadingContract(data: InsertProofreadingContract): Promise<ProofreadingContract> {
@@ -701,6 +755,124 @@ export async function deleteContractMember(id: string): Promise<void> {
   const existing = await getContractMemberById(id);
   if (!existing) throw new Error(`Contract member ${id} not found`);
   await requireDb().delete(contractMembers).where(eq(contractMembers.id, id));
+}
+
+// -----------------------------------------------------------------------------
+// Translation contract members CRUD
+// -----------------------------------------------------------------------------
+export async function getTranslationContractMembers(): Promise<TranslationContractMember[]> {
+  return requireDb().select().from(translationContractMembers).orderBy(asc(translationContractMembers.createdAt));
+}
+
+export async function getTranslationContractMembersByContractId(
+  translationContractId: string
+): Promise<TranslationContractMember[]> {
+  return requireDb()
+    .select()
+    .from(translationContractMembers)
+    .where(eq(translationContractMembers.translationContractId, translationContractId))
+    .orderBy(asc(translationContractMembers.createdAt));
+}
+
+export async function getTranslationContractMemberById(id: string): Promise<TranslationContractMember | undefined> {
+  const rows = await requireDb()
+    .select()
+    .from(translationContractMembers)
+    .where(eq(translationContractMembers.id, id))
+    .limit(1);
+  return rows[0];
+}
+
+export async function createTranslationContractMember(
+  data: Omit<InsertTranslationContractMember, "id">
+): Promise<TranslationContractMember> {
+  const rows = await requireDb().insert(translationContractMembers).values(data).returning();
+  if (!rows[0]) throw new Error("Failed to create translation contract member");
+  return rows[0];
+}
+
+export async function updateTranslationContractMember(
+  id: string,
+  data: Partial<Omit<InsertTranslationContractMember, "id">>
+): Promise<TranslationContractMember> {
+  const rows = await requireDb()
+    .update(translationContractMembers)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(translationContractMembers.id, id))
+    .returning();
+  if (!rows[0]) throw new Error(`Translation contract member ${id} not found`);
+  return rows[0];
+}
+
+export async function deleteTranslationContractMember(id: string): Promise<void> {
+  const existing = await getTranslationContractMemberById(id);
+  if (!existing) throw new Error(`Translation contract member ${id} not found`);
+  await requireDb().delete(translationContractMembers).where(eq(translationContractMembers.id, id));
+}
+
+export async function deleteTranslationContractMembersByContractId(translationContractId: string): Promise<void> {
+  await requireDb()
+    .delete(translationContractMembers)
+    .where(eq(translationContractMembers.translationContractId, translationContractId));
+}
+
+// -----------------------------------------------------------------------------
+// Proofreading contract members CRUD
+// -----------------------------------------------------------------------------
+export async function getProofreadingContractMembers(): Promise<ProofreadingContractMember[]> {
+  return requireDb().select().from(proofreadingContractMembers).orderBy(asc(proofreadingContractMembers.createdAt));
+}
+
+export async function getProofreadingContractMembersByContractId(
+  proofreadingContractId: string
+): Promise<ProofreadingContractMember[]> {
+  return requireDb()
+    .select()
+    .from(proofreadingContractMembers)
+    .where(eq(proofreadingContractMembers.proofreadingContractId, proofreadingContractId))
+    .orderBy(asc(proofreadingContractMembers.createdAt));
+}
+
+export async function getProofreadingContractMemberById(id: string): Promise<ProofreadingContractMember | undefined> {
+  const rows = await requireDb()
+    .select()
+    .from(proofreadingContractMembers)
+    .where(eq(proofreadingContractMembers.id, id))
+    .limit(1);
+  return rows[0];
+}
+
+export async function createProofreadingContractMember(
+  data: Omit<InsertProofreadingContractMember, "id">
+): Promise<ProofreadingContractMember> {
+  const rows = await requireDb().insert(proofreadingContractMembers).values(data).returning();
+  if (!rows[0]) throw new Error("Failed to create proofreading contract member");
+  return rows[0];
+}
+
+export async function updateProofreadingContractMember(
+  id: string,
+  data: Partial<Omit<InsertProofreadingContractMember, "id">>
+): Promise<ProofreadingContractMember> {
+  const rows = await requireDb()
+    .update(proofreadingContractMembers)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(proofreadingContractMembers.id, id))
+    .returning();
+  if (!rows[0]) throw new Error(`Proofreading contract member ${id} not found`);
+  return rows[0];
+}
+
+export async function deleteProofreadingContractMember(id: string): Promise<void> {
+  const existing = await getProofreadingContractMemberById(id);
+  if (!existing) throw new Error(`Proofreading contract member ${id} not found`);
+  await requireDb().delete(proofreadingContractMembers).where(eq(proofreadingContractMembers.id, id));
+}
+
+export async function deleteProofreadingContractMembersByContractId(proofreadingContractId: string): Promise<void> {
+  await requireDb()
+    .delete(proofreadingContractMembers)
+    .where(eq(proofreadingContractMembers.proofreadingContractId, proofreadingContractId));
 }
 
 // -----------------------------------------------------------------------------

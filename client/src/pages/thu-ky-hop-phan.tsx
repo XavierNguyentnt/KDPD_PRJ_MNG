@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
 import { useUsers } from "@/hooks/use-works-and-components";
+import { TranslatorPicker } from "@/components/translator-picker";
 import {
   TaskTable,
   sortTasks,
@@ -144,7 +145,6 @@ export type TranslationContractSortColumn =
 export type ProofreadingContractSortColumn =
   | "contractNumber"
   | "component"
-  | "proofreaderName"
   | "contractValue"
   | "startDate"
   | "endDate"
@@ -727,6 +727,33 @@ export default function ThuKyHopPhanPage() {
     queryKey: ["proofreading-contracts"],
     queryFn: fetchProofreadingContracts,
   });
+  
+  // Load all proofreading contract members to map with contracts
+  const { data: allProofreadingContractMembers = [] } = useQuery({
+    queryKey: ["proofreading-contract-members"],
+    queryFn: async () => {
+      const res = await fetch(api.proofreadingContractMembers.list.path, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+  
+  // Helper function to get proofreader name from contract members
+  const getProofreaderName = useMemo(() => {
+    const membersByContractId = new Map(
+      allProofreadingContractMembers.map((m: { proofreadingContractId: string; userId: string }) => [
+        m.proofreadingContractId,
+        m.userId,
+      ])
+    );
+    return (contractId: string | null | undefined): string => {
+      if (!contractId) return "—";
+      const userId = membersByContractId.get(contractId);
+      if (!userId) return "—";
+      const user = users.find((u) => u.id === userId);
+      return user?.displayName ?? "—";
+    };
+  }, [allProofreadingContractMembers, users]);
   const { data: componentsList = [] } = useQuery({
     queryKey: ["components"],
     queryFn: fetchComponents,
@@ -1035,8 +1062,7 @@ export default function ThuKyHopPhanPage() {
       list = list.filter(
         (c) =>
           (c.contractNumber && normalizeSearch(c.contractNumber).includes(q)) ||
-          (c.proofreaderName &&
-            normalizeSearch(c.proofreaderName).includes(q)) ||
+          normalizeSearch(getProofreaderName(c.id)).includes(q) ||
           normalizeSearch(getComponentName(c.componentId)).includes(q) ||
           normalizeSearch(getWorkTitle(c.workId)).includes(q)
       );
@@ -1310,8 +1336,59 @@ export default function ThuKyHopPhanPage() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (contract, variables) => {
       queryClient.invalidateQueries({ queryKey: ["translation-contracts"] });
+      
+      // Lưu translation contract members nếu có translator
+      const translatorUserId = (variables as { _translatorUserId?: string })?._translatorUserId;
+      if (translatorUserId && contract?.id) {
+        try {
+          // Đảm bảo user có role "partner"
+          const rolesRes = await fetch(api.roles.list.path, { credentials: "include" });
+          if (rolesRes.ok) {
+            const rolesList = await rolesRes.json();
+            const partnerRole = rolesList.find((r: { code: string }) => r.code === "partner");
+            if (partnerRole) {
+              // Kiểm tra xem user đã có role "partner" chưa
+              const userRes = await fetch(
+                buildUrl(api.users.get.path, { id: translatorUserId }),
+                { credentials: "include" }
+              );
+              if (userRes.ok) {
+                const user = await userRes.json();
+                const hasPartnerRole = user.roles?.some((r: { id: string }) => r.id === partnerRole.id);
+                if (!hasPartnerRole) {
+                  // Gán role "partner" cho user
+                  await fetch(
+                    buildUrl(api.users.update.path, { id: translatorUserId }),
+                    {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({
+                        roleIds: [...(user.roles?.map((r: { id: string }) => r.id) || []), partnerRole.id],
+                      }),
+                    }
+                  );
+                }
+              }
+            }
+          }
+          
+          await fetch(api.translationContractMembers.create.path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              translationContractId: contract.id,
+              userId: translatorUserId,
+            }),
+          });
+        } catch (error) {
+          console.error("Lỗi khi lưu dịch giả:", error);
+        }
+      }
+      
       setTcDialog({ open: false, contract: null, mode: "edit" });
       toast({
         title: "Thành công",
@@ -1345,8 +1422,79 @@ export default function ThuKyHopPhanPage() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (contract, variables) => {
       queryClient.invalidateQueries({ queryKey: ["translation-contracts"] });
+      
+      // Cập nhật translation contract members nếu có translator
+      const translatorUserId = (variables.data as { _translatorUserId?: string })?._translatorUserId;
+      if (contract?.id) {
+        try {
+          // Xóa các members cũ
+          const membersRes = await fetch(
+            buildUrl(api.translationContractMembers.listByContract.path, { contractId: contract.id }),
+            { credentials: "include" }
+          );
+          if (membersRes.ok) {
+            const members = await membersRes.json();
+            for (const member of members) {
+              await fetch(
+                buildUrl(api.translationContractMembers.delete.path, { id: member.id }),
+                { method: "DELETE", credentials: "include" }
+              );
+            }
+          }
+          
+          // Thêm member mới nếu có
+          if (translatorUserId) {
+            // Đảm bảo user có role "partner"
+            const rolesRes = await fetch(api.roles.list.path, { credentials: "include" });
+            if (rolesRes.ok) {
+              const rolesList = await rolesRes.json();
+              const partnerRole = rolesList.find((r: { code: string }) => r.code === "partner");
+              if (partnerRole) {
+                // Kiểm tra xem user đã có role "partner" chưa
+                const userRes = await fetch(
+                  buildUrl(api.users.get.path, { id: translatorUserId }),
+                  { credentials: "include" }
+                );
+                if (userRes.ok) {
+                  const user = await userRes.json();
+                  const hasPartnerRole = user.roles?.some((r: { id: string }) => r.id === partnerRole.id);
+                  if (!hasPartnerRole) {
+                    // Gán role "partner" cho user
+                    await fetch(
+                      buildUrl(api.users.update.path, { id: translatorUserId }),
+                      {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({
+                          roleIds: [...(user.roles?.map((r: { id: string }) => r.id) || []), partnerRole.id],
+                        }),
+                      }
+                    );
+                  }
+                }
+              }
+            }
+            
+            await fetch(api.translationContractMembers.create.path, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                translationContractId: contract.id,
+                userId: translatorUserId,
+              }),
+            });
+          }
+          
+          queryClient.invalidateQueries({ queryKey: ["translation-contract-members"] });
+        } catch (error) {
+          console.error("Lỗi khi cập nhật dịch giả:", error);
+        }
+      }
+      
       setTcDialog({ open: false, contract: null, mode: "edit" });
       toast({
         title: "Thành công",
@@ -1371,8 +1519,59 @@ export default function ThuKyHopPhanPage() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (contract, variables) => {
       queryClient.invalidateQueries({ queryKey: ["proofreading-contracts"] });
+      
+      // Lưu proofreading contract members nếu có proofreader
+      const proofreaderUserId = (variables as { _proofreaderUserId?: string })?._proofreaderUserId;
+      if (proofreaderUserId && contract?.id) {
+        try {
+          // Đảm bảo user có role "partner"
+          const rolesRes = await fetch(api.roles.list.path, { credentials: "include" });
+          if (rolesRes.ok) {
+            const rolesList = await rolesRes.json();
+            const partnerRole = rolesList.find((r: { code: string }) => r.code === "partner");
+            if (partnerRole) {
+              // Kiểm tra xem user đã có role "partner" chưa
+              const userRes = await fetch(
+                buildUrl(api.users.get.path, { id: proofreaderUserId }),
+                { credentials: "include" }
+              );
+              if (userRes.ok) {
+                const user = await userRes.json();
+                const hasPartnerRole = user.roles?.some((r: { id: string }) => r.id === partnerRole.id);
+                if (!hasPartnerRole) {
+                  // Gán role "partner" cho user
+                  await fetch(
+                    buildUrl(api.users.update.path, { id: proofreaderUserId }),
+                    {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({
+                        roleIds: [...(user.roles?.map((r: { id: string }) => r.id) || []), partnerRole.id],
+                      }),
+                    }
+                  );
+                }
+              }
+            }
+          }
+          
+          await fetch(api.proofreadingContractMembers.create.path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              proofreadingContractId: contract.id,
+              userId: proofreaderUserId,
+            }),
+          });
+        } catch (error) {
+          console.error("Lỗi khi lưu người hiệu đính:", error);
+        }
+      }
+      
       setPcDialog({ open: false, contract: null, mode: "edit" });
       toast({
         title: "Thành công",
@@ -1406,8 +1605,79 @@ export default function ThuKyHopPhanPage() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (contract, variables) => {
       queryClient.invalidateQueries({ queryKey: ["proofreading-contracts"] });
+      
+      // Cập nhật proofreading contract members nếu có proofreader
+      const proofreaderUserId = (variables.data as { _proofreaderUserId?: string })?._proofreaderUserId;
+      if (contract?.id) {
+        try {
+          // Xóa các members cũ
+          const membersRes = await fetch(
+            buildUrl(api.proofreadingContractMembers.listByContract.path, { contractId: contract.id }),
+            { credentials: "include" }
+          );
+          if (membersRes.ok) {
+            const members = await membersRes.json();
+            for (const member of members) {
+              await fetch(
+                buildUrl(api.proofreadingContractMembers.delete.path, { id: member.id }),
+                { method: "DELETE", credentials: "include" }
+              );
+            }
+          }
+          
+          // Thêm member mới nếu có
+          if (proofreaderUserId) {
+            // Đảm bảo user có role "partner"
+            const rolesRes = await fetch(api.roles.list.path, { credentials: "include" });
+            if (rolesRes.ok) {
+              const rolesList = await rolesRes.json();
+              const partnerRole = rolesList.find((r: { code: string }) => r.code === "partner");
+              if (partnerRole) {
+                // Kiểm tra xem user đã có role "partner" chưa
+                const userRes = await fetch(
+                  buildUrl(api.users.get.path, { id: proofreaderUserId }),
+                  { credentials: "include" }
+                );
+                if (userRes.ok) {
+                  const user = await userRes.json();
+                  const hasPartnerRole = user.roles?.some((r: { id: string }) => r.id === partnerRole.id);
+                  if (!hasPartnerRole) {
+                    // Gán role "partner" cho user
+                    await fetch(
+                      buildUrl(api.users.update.path, { id: proofreaderUserId }),
+                      {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({
+                          roleIds: [...(user.roles?.map((r: { id: string }) => r.id) || []), partnerRole.id],
+                        }),
+                      }
+                    );
+                  }
+                }
+              }
+            }
+            
+            await fetch(api.proofreadingContractMembers.create.path, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                proofreadingContractId: contract.id,
+                userId: proofreaderUserId,
+              }),
+            });
+          }
+          
+          queryClient.invalidateQueries({ queryKey: ["proofreading-contract-members"] });
+        } catch (error) {
+          console.error("Lỗi khi cập nhật người hiệu đính:", error);
+        }
+      }
+      
       setPcDialog({ open: false, contract: null, mode: "edit" });
       toast({
         title: "Thành công",
@@ -2635,7 +2905,7 @@ export default function ThuKyHopPhanPage() {
                               <div className="text-muted-foreground">
                                 Biên tập viên
                               </div>
-                              <div>{c.proofreaderName ?? "—"}</div>
+                              <div>{getProofreaderName(c.id)}</div>
                             </div>
                             <div>
                               <div className="text-muted-foreground">
@@ -2869,12 +3139,7 @@ export default function ThuKyHopPhanPage() {
                           onSort={handlePcSort}
                         />
                         <TableHead>Tác phẩm</TableHead>
-                        <SortableHead
-                          label="Biên tập viên"
-                          column="proofreaderName"
-                          sortColumns={pcSortColumns}
-                          onSort={handlePcSort}
-                        />
+                        <TableHead>Người hiệu đính</TableHead>
                         <SortableHead
                           label="Số trang"
                           column="pageCount"
@@ -2945,7 +3210,7 @@ export default function ThuKyHopPhanPage() {
                                 {getWorkTitle(c.workId)}
                               </div>
                             </TableCell>
-                            <TableCell>{c.proofreaderName ?? "—"}</TableCell>
+                            <TableCell>{getProofreaderName(c.id)}</TableCell>
                             <TableCell className="text-right">
                               {formatNumberAccounting(c.pageCount)}
                             </TableCell>
@@ -4048,6 +4313,37 @@ function TranslationContractForm({
   );
   const [note, setNote] = useState(contract?.note ?? "");
   const [status, setStatus] = useState(contract?.status ?? "Active");
+  const [translatorName, setTranslatorName] = useState("");
+  const [translatorUserId, setTranslatorUserId] = useState<string | null>(null);
+  
+  const { data: users = [] } = useUsers();
+  
+  // Load translation contract members when editing
+  const { data: contractMembers = [] } = useQuery({
+    queryKey: ["translation-contract-members", contract?.id],
+    queryFn: async () => {
+      if (!contract?.id) return [];
+      const res = await fetch(
+        buildUrl(api.translationContractMembers.listByContract.path, { contractId: contract.id }),
+        { credentials: "include" }
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!contract?.id,
+  });
+  
+  // Set translator when contract members are loaded
+  useEffect(() => {
+    if (contractMembers.length > 0 && contractMembers[0]?.userId) {
+      const member = contractMembers[0];
+      setTranslatorUserId(member.userId);
+      const user = users.find((u) => u.id === member.userId);
+      if (user) {
+        setTranslatorName(user.displayName);
+      }
+    }
+  }, [contractMembers, users]);
   const [cancelledAt, setCancelledAt] = useState(
     contract?.cancelledAt ? (contract.cancelledAt as string).slice(0, 10) : ""
   );
@@ -4205,9 +4501,13 @@ function TranslationContractForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (readOnly) return;
+    
     // Gửi số dưới dạng chuỗi để API/Zod (drizzle-zod numeric) không báo 400
     const num = (v: string | null) =>
       v != null && v !== "" ? String(Number(v)) : null;
+    
+    // Gọi onSubmit với data hợp đồng
+    // translatorUserId đã được xử lý trong TranslatorPicker
     onSubmit({
       contractNumber: contractNumber || null,
       componentId: componentId || null,
@@ -4239,6 +4539,7 @@ function TranslationContractForm({
       printTransferDate: printTransferDate || null,
       publishedDate: publishedDate || null,
       note: note || null,
+      _translatorUserId: translatorUserId, // Dùng prefix _ để không gửi vào API translation contract
     });
   };
 
@@ -4290,6 +4591,19 @@ function TranslationContractForm({
                 </option>
               ))}
             </select>
+          </div>
+          <div className="grid gap-2">
+            <TranslatorPicker
+              label="Dịch giả"
+              value={translatorName}
+              userId={translatorUserId}
+              onChange={(name, id) => {
+                setTranslatorName(name);
+                setTranslatorUserId(id);
+              }}
+              disabled={readOnly}
+              placeholder="Tìm theo tên hoặc email..."
+            />
           </div>
         </div>
       </div>
@@ -4739,9 +5053,38 @@ function ProofreadingContractForm({
   const [translationContractId, setTranslationContractId] = useState(
     contract?.translationContractId ?? ""
   );
-  const [proofreaderName, setProofreaderName] = useState(
-    contract?.proofreaderName ?? ""
-  );
+  const [proofreaderName, setProofreaderName] = useState("");
+  const [proofreaderUserId, setProofreaderUserId] = useState<string | null>(null);
+  
+  const { data: users = [] } = useUsers();
+  
+  // Load proofreading contract members when editing
+  const { data: contractMembers = [] } = useQuery({
+    queryKey: ["proofreading-contract-members", contract?.id],
+    queryFn: async () => {
+      if (!contract?.id) return [];
+      const res = await fetch(
+        buildUrl(api.proofreadingContractMembers.listByContract.path, { contractId: contract.id }),
+        { credentials: "include" }
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!contract?.id,
+  });
+  
+  // Set proofreader when contract members are loaded
+  useEffect(() => {
+    if (contractMembers.length > 0 && contractMembers[0]?.userId) {
+      const member = contractMembers[0];
+      setProofreaderUserId(member.userId);
+      const user = users.find((u) => u.id === member.userId);
+      if (user) {
+        setProofreaderName(user.displayName);
+      }
+    }
+  }, [contractMembers, users]);
+  
   const [pageCount, setPageCount] = useState(
     contract?.pageCount != null ? String(contract.pageCount) : ""
   );
@@ -4809,7 +5152,6 @@ function ProofreadingContractForm({
       componentId: componentId || null,
       workId: workId || null,
       translationContractId: translationContractId || null,
-      proofreaderName: proofreaderName || null,
       pageCount: pageCount ? parseInt(pageCount, 10) : null,
       rateRatio: rateRatio ? parseFloat(rateRatio) / 100 : null,
       contractValue: contractValue ? parseFloat(contractValue) : null,
@@ -4817,6 +5159,7 @@ function ProofreadingContractForm({
       endDate: endDate || null,
       actualCompletionDate: actualCompletionDate || null,
       note: note || null,
+      _proofreaderUserId: proofreaderUserId, // Dùng prefix _ để không gửi vào API proofreading contract
     });
   };
 
@@ -4850,12 +5193,16 @@ function ProofreadingContractForm({
           </select>
         </div>
         <div className="grid gap-2 sm:col-span-2">
-          <Label>Biên tập viên / Người hiệu đính</Label>
-          <Input
+          <TranslatorPicker
+            label="Biên tập viên / Người hiệu đính"
             value={proofreaderName}
-            onChange={(e) => setProofreaderName(e.target.value)}
-            placeholder="Họ tên"
+            userId={proofreaderUserId}
+            onChange={(name, id) => {
+              setProofreaderName(name);
+              setProofreaderUserId(id);
+            }}
             disabled={readOnly}
+            placeholder="Tìm theo tên hoặc email..."
           />
         </div>
       </div>

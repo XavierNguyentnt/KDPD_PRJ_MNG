@@ -881,7 +881,13 @@ export async function registerRoutes(
       res.json(list);
     } catch (err) {
       console.error("Error fetching proofreading contracts:", err);
-      res.status(500).json({ message: err instanceof Error ? err.message : "Failed to fetch proofreading contracts" });
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error("Full error details:", errorMessage);
+      res.status(500).json({ 
+        message: errorMessage.includes("proofreader_name") 
+          ? "Database schema mismatch: proofreader_name column still exists. Please run migration: KDPD_DB_migration_drop_proofreader_name.sql"
+          : errorMessage || "Failed to fetch proofreading contracts" 
+      });
     }
   });
   app.get(api.proofreadingContracts.get.path, requireAuth, async (req, res) => {
@@ -1534,6 +1540,184 @@ export async function registerRoutes(
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       await dbStorage.deleteContractMember(id);
       res.json({ message: "Contract member deleted successfully" });
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not found")) {
+        return res.status(404).json({ message: err.message });
+      }
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+
+  // ---------- Translation contract members CRUD ----------
+  app.get(api.translationContractMembers.list.path, requireAuth, async (_req, res) => {
+    try {
+      requireDb();
+      res.json(await dbStorage.getTranslationContractMembers());
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.get(api.translationContractMembers.listByContract.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const contractId = Array.isArray(req.params.contractId) ? req.params.contractId[0] : req.params.contractId;
+      res.json(await dbStorage.getTranslationContractMembersByContractId(contractId));
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.get(api.translationContractMembers.get.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const row = await dbStorage.getTranslationContractMemberById(id);
+      if (!row) return res.status(404).json({ message: "Translation contract member not found" });
+      res.json(row);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.post(api.translationContractMembers.create.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const input = api.translationContractMembers.create.input.parse(req.body);
+      res.json(await dbStorage.createTranslationContractMember(input));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.patch(api.translationContractMembers.update.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const input = api.translationContractMembers.update.input.parse(req.body);
+      res.json(await dbStorage.updateTranslationContractMember(id, input));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (err instanceof Error && err.message.includes("not found")) {
+        return res.status(404).json({ message: err.message });
+      }
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.delete(api.translationContractMembers.delete.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      await dbStorage.deleteTranslationContractMember(id);
+      res.json({ message: "OK" });
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not found")) {
+        return res.status(404).json({ message: err.message });
+      }
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+
+  // ---------- Proofreading contract members CRUD ----------
+  app.get(api.proofreadingContractMembers.list.path, requireAuth, async (_req, res) => {
+    try {
+      requireDb();
+      res.json(await dbStorage.getProofreadingContractMembers());
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.get(api.proofreadingContractMembers.listByContract.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const contractId = Array.isArray(req.params.contractId) ? req.params.contractId[0] : req.params.contractId;
+      res.json(await dbStorage.getProofreadingContractMembersByContractId(contractId));
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.get(api.proofreadingContractMembers.get.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const row = await dbStorage.getProofreadingContractMemberById(id);
+      if (!row) return res.status(404).json({ message: "Proofreading contract member not found" });
+      res.json(row);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.post(api.proofreadingContractMembers.create.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const input = api.proofreadingContractMembers.create.input.parse(req.body);
+      res.json(await dbStorage.createProofreadingContractMember(input));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.patch(api.proofreadingContractMembers.update.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const input = api.proofreadingContractMembers.update.input.parse(req.body);
+      res.json(await dbStorage.updateProofreadingContractMember(id, input));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (err instanceof Error && err.message.includes("not found")) {
+        return res.status(404).json({ message: err.message });
+      }
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res.status(500).json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+  app.delete(api.proofreadingContractMembers.delete.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      await dbStorage.deleteProofreadingContractMember(id);
+      res.json({ message: "OK" });
     } catch (err) {
       if (err instanceof Error && err.message.includes("not found")) {
         return res.status(404).json({ message: err.message });
