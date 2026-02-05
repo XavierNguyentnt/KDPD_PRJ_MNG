@@ -99,6 +99,7 @@ import {
   LayoutGrid,
   List,
   Eye,
+  X,
 } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { WorksImport } from "@/components/works-import";
@@ -811,20 +812,22 @@ export default function ThuKyHopPhanPage() {
     };
   }, [allProofreadingContractMembers, users]);
   const getTranslatorName = useMemo(() => {
-    const membersByContractId = new Map(
-      translationContractMembers.map(
-        (m: { translationContractId: string; userId: string }) => [
-          m.translationContractId,
-          m.userId,
-        ]
-      )
+    const membersByContractId = new Map<string, string[]>();
+    translationContractMembers.forEach(
+      (m: { translationContractId: string; userId: string }) => {
+        const list = membersByContractId.get(m.translationContractId) ?? [];
+        if (!list.includes(m.userId)) list.push(m.userId);
+        membersByContractId.set(m.translationContractId, list);
+      }
     );
     return (contractId: string | null | undefined): string => {
       if (!contractId) return "—";
-      const userId = membersByContractId.get(contractId);
-      if (!userId) return "—";
-      const user = users.find((u) => u.id === userId);
-      return user?.displayName ?? "—";
+      const userIds = membersByContractId.get(contractId) ?? [];
+      if (userIds.length === 0) return "—";
+      const names = userIds
+        .map((id) => users.find((u) => u.id === id)?.displayName ?? id)
+        .filter(Boolean);
+      return names.length ? names.join(", ") : "—";
     };
   }, [translationContractMembers, users]);
   const { data: componentsList = [] } = useQuery({
@@ -1407,11 +1410,14 @@ export default function ThuKyHopPhanPage() {
 
   const createTcMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
+      const { _translatorUserIds, ...payload } = data as {
+        _translatorUserIds?: string[];
+      };
       const res = await fetch(api.translationContracts.create.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1420,14 +1426,18 @@ export default function ThuKyHopPhanPage() {
       return res.json();
     },
     onSuccess: async (contract, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["translation-contracts"] });
-
+      await queryClient.refetchQueries({
+        queryKey: ["translation-contracts"],
+      });
       // Lưu translation contract members nếu có translator
-      const translatorUserId = (variables as { _translatorUserId?: string })
-        ?._translatorUserId;
-      if (translatorUserId && contract?.id) {
+      const translatorUserIds = (variables as { _translatorUserIds?: string[] })
+        ?._translatorUserIds;
+      const uniqueTranslatorUserIds = Array.from(
+        new Set((translatorUserIds ?? []).filter(Boolean))
+      );
+      if (uniqueTranslatorUserIds.length > 0 && contract?.id) {
         try {
-          // Đảm bảo user có role "partner"
+          let partnerRoleId: string | null = null;
           const rolesRes = await fetch(api.roles.list.path, {
             credentials: "include",
           });
@@ -1436,48 +1446,47 @@ export default function ThuKyHopPhanPage() {
             const partnerRole = rolesList.find(
               (r: { code: string }) => r.code === "partner"
             );
-            if (partnerRole) {
-              // Kiểm tra xem user đã có role "partner" chưa
+            partnerRoleId = partnerRole?.id ?? null;
+          }
+
+          for (const userId of uniqueTranslatorUserIds) {
+            if (partnerRoleId) {
               const userRes = await fetch(
-                buildUrl(api.users.get.path, { id: translatorUserId }),
+                buildUrl(api.users.get.path, { id: userId }),
                 { credentials: "include" }
               );
               if (userRes.ok) {
                 const user = await userRes.json();
                 const hasPartnerRole = user.roles?.some(
-                  (r: { id: string }) => r.id === partnerRole.id
+                  (r: { id: string }) => r.id === partnerRoleId
                 );
                 if (!hasPartnerRole) {
-                  // Gán role "partner" cho user
-                  await fetch(
-                    buildUrl(api.users.update.path, { id: translatorUserId }),
-                    {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
-                      body: JSON.stringify({
-                        roleIds: [
-                          ...(user.roles?.map((r: { id: string }) => r.id) ||
-                            []),
-                          partnerRole.id,
-                        ],
-                      }),
-                    }
-                  );
+                  await fetch(buildUrl(api.users.update.path, { id: userId }), {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({
+                      roleIds: [
+                        ...(user.roles?.map((r: { id: string }) => r.id) || []),
+                        partnerRoleId,
+                      ],
+                    }),
+                  });
                 }
               }
             }
+
+            await fetch(api.translationContractMembers.create.path, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                translationContractId: contract.id,
+                userId,
+              }),
+            });
           }
 
-          await fetch(api.translationContractMembers.create.path, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              translationContractId: contract.id,
-              userId: translatorUserId,
-            }),
-          });
           queryClient.invalidateQueries({
             queryKey: ["translation-contract-members"],
           });
@@ -1485,7 +1494,6 @@ export default function ThuKyHopPhanPage() {
           console.error("Lỗi khi lưu dịch giả:", error);
         }
       }
-
       setTcDialog({ open: false, contract: null, mode: "edit" });
       toast({
         title: "Thành công",
@@ -1504,13 +1512,16 @@ export default function ThuKyHopPhanPage() {
       id: string;
       data: Record<string, unknown>;
     }) => {
+      const { _translatorUserIds, ...payload } = data as {
+        _translatorUserIds?: string[];
+      };
       const res = await fetch(
         buildUrl(api.translationContracts.update.path, { id }),
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
         }
       );
       if (!res.ok) {
@@ -1520,12 +1531,16 @@ export default function ThuKyHopPhanPage() {
       return res.json();
     },
     onSuccess: async (contract, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["translation-contracts"] });
-
+      await queryClient.refetchQueries({
+        queryKey: ["translation-contracts"],
+      });
       // Cập nhật translation contract members nếu có translator
-      const translatorUserId = (
-        variables.data as { _translatorUserId?: string }
-      )?._translatorUserId;
+      const translatorUserIds = (
+        variables.data as { _translatorUserIds?: string[] }
+      )?._translatorUserIds;
+      const uniqueTranslatorUserIds = Array.from(
+        new Set((translatorUserIds ?? []).filter(Boolean))
+      );
       if (contract?.id) {
         try {
           // Xóa các members cũ
@@ -1547,9 +1562,8 @@ export default function ThuKyHopPhanPage() {
             }
           }
 
-          // Thêm member mới nếu có
-          if (translatorUserId) {
-            // Đảm bảo user có role "partner"
+          if (uniqueTranslatorUserIds.length > 0) {
+            let partnerRoleId: string | null = null;
             const rolesRes = await fetch(api.roles.list.path, {
               credentials: "include",
             });
@@ -1558,21 +1572,23 @@ export default function ThuKyHopPhanPage() {
               const partnerRole = rolesList.find(
                 (r: { code: string }) => r.code === "partner"
               );
-              if (partnerRole) {
-                // Kiểm tra xem user đã có role "partner" chưa
+              partnerRoleId = partnerRole?.id ?? null;
+            }
+
+            for (const userId of uniqueTranslatorUserIds) {
+              if (partnerRoleId) {
                 const userRes = await fetch(
-                  buildUrl(api.users.get.path, { id: translatorUserId }),
+                  buildUrl(api.users.get.path, { id: userId }),
                   { credentials: "include" }
                 );
                 if (userRes.ok) {
                   const user = await userRes.json();
                   const hasPartnerRole = user.roles?.some(
-                    (r: { id: string }) => r.id === partnerRole.id
+                    (r: { id: string }) => r.id === partnerRoleId
                   );
                   if (!hasPartnerRole) {
-                    // Gán role "partner" cho user
                     await fetch(
-                      buildUrl(api.users.update.path, { id: translatorUserId }),
+                      buildUrl(api.users.update.path, { id: userId }),
                       {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
@@ -1581,7 +1597,7 @@ export default function ThuKyHopPhanPage() {
                           roleIds: [
                             ...(user.roles?.map((r: { id: string }) => r.id) ||
                               []),
-                            partnerRole.id,
+                            partnerRoleId,
                           ],
                         }),
                       }
@@ -1589,17 +1605,17 @@ export default function ThuKyHopPhanPage() {
                   }
                 }
               }
-            }
 
-            await fetch(api.translationContractMembers.create.path, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({
-                translationContractId: contract.id,
-                userId: translatorUserId,
-              }),
-            });
+              await fetch(api.translationContractMembers.create.path, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                  translationContractId: contract.id,
+                  userId,
+                }),
+              });
+            }
           }
 
           queryClient.invalidateQueries({
@@ -1609,7 +1625,6 @@ export default function ThuKyHopPhanPage() {
           console.error("Lỗi khi cập nhật dịch giả:", error);
         }
       }
-
       setTcDialog({ open: false, contract: null, mode: "edit" });
       toast({
         title: "Thành công",
@@ -1635,7 +1650,9 @@ export default function ThuKyHopPhanPage() {
       return res.json();
     },
     onSuccess: async (contract, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["proofreading-contracts"] });
+      await queryClient.refetchQueries({
+        queryKey: ["proofreading-contracts"],
+      });
 
       // Lưu proofreading contract members nếu có proofreader
       const proofreaderUserId = (variables as { _proofreaderUserId?: string })
@@ -1732,7 +1749,9 @@ export default function ThuKyHopPhanPage() {
       return res.json();
     },
     onSuccess: async (contract, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["proofreading-contracts"] });
+      await queryClient.refetchQueries({
+        queryKey: ["proofreading-contracts"],
+      });
 
       // Cập nhật proofreading contract members nếu có proofreader
       const proofreaderUserId = (
@@ -3738,6 +3757,7 @@ export default function ThuKyHopPhanPage() {
             contract={pcDialog.contract}
             works={works}
             translationContracts={translationContracts}
+            translationContractMembers={translationContractMembers}
             componentsList={componentsList}
             queryClient={queryClient}
             readOnly={pcDialog.mode === "view"}
@@ -4479,8 +4499,13 @@ function TranslationContractForm({
   );
   const [note, setNote] = useState(contract?.note ?? "");
   const [status, setStatus] = useState(contract?.status ?? "Active");
-  const [translatorName, setTranslatorName] = useState("");
-  const [translatorUserId, setTranslatorUserId] = useState<string | null>(null);
+  const [translatorUsers, setTranslatorUsers] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [translatorPickerName, setTranslatorPickerName] = useState("");
+  const [translatorPickerUserId, setTranslatorPickerUserId] = useState<
+    string | null
+  >(null);
 
   const { data: users = [] } = useUsers();
   const duplicateTranslationContract = useMemo(() => {
@@ -4514,17 +4539,43 @@ function TranslationContractForm({
     enabled: !!contract?.id,
   });
 
-  // Set translator when contract members are loaded
   useEffect(() => {
-    if (contractMembers.length > 0 && contractMembers[0]?.userId) {
-      const member = contractMembers[0];
-      setTranslatorUserId(member.userId);
-      const user = users.find((u) => u.id === member.userId);
-      if (user) {
-        setTranslatorName(user.displayName);
-      }
+    if (!contract?.id) return;
+
+    if (contractMembers.length === 0) {
+      setTranslatorUsers([]);
+      return;
     }
-  }, [contractMembers, users]);
+    const mapped = contractMembers
+      .map((member: { userId?: string | null }) => {
+        if (!member?.userId) return null;
+        const user = users.find((u) => u.id === member.userId);
+        return {
+          id: member.userId,
+          name: user?.displayName ?? member.userId,
+        };
+      })
+      .filter(Boolean) as Array<{ id: string; name: string }>;
+    const unique = Array.from(new Map(mapped.map((u) => [u.id, u])).values());
+    setTranslatorUsers(unique);
+  }, [contract?.id, contractMembers, users]);
+
+  const handleAddTranslator = (name: string, id: string | null) => {
+    if (!id) {
+      setTranslatorPickerName("");
+      setTranslatorPickerUserId(null);
+      return;
+    }
+    setTranslatorUsers((prev) =>
+      prev.some((u) => u.id === id) ? prev : [...prev, { id, name: name || id }]
+    );
+    setTranslatorPickerName("");
+    setTranslatorPickerUserId(null);
+  };
+
+  const handleRemoveTranslator = (id: string) => {
+    setTranslatorUsers((prev) => prev.filter((u) => u.id !== id));
+  };
   const [cancelledAt, setCancelledAt] = useState(
     contract?.cancelledAt ? (contract.cancelledAt as string).slice(0, 10) : ""
   );
@@ -4709,7 +4760,7 @@ function TranslationContractForm({
       v != null && v !== "" ? String(Number(v)) : null;
 
     // Gọi onSubmit với data hợp đồng
-    // translatorUserId đã được xử lý trong TranslatorPicker
+    // translatorUserIds đã được xử lý trong TranslatorPicker
     onSubmit({
       contractNumber: contractNumber || null,
       componentId: componentId || null,
@@ -4741,7 +4792,7 @@ function TranslationContractForm({
       printTransferDate: printTransferDate || null,
       publishedDate: publishedDate || null,
       note: note || null,
-      _translatorUserId: translatorUserId, // Dùng prefix _ để không gửi vào API translation contract
+      _translatorUserIds: translatorUsers.map((u) => u.id), // Dùng prefix _ để không gửi vào API translation contract
     });
   };
 
@@ -4793,16 +4844,38 @@ function TranslationContractForm({
           <div className="grid gap-2">
             <TranslatorPicker
               label="Dịch giả"
-              value={translatorName}
-              userId={translatorUserId}
-              onChange={(name, id) => {
-                setTranslatorName(name);
-                setTranslatorUserId(id);
-              }}
+              value={translatorPickerName}
+              userId={translatorPickerUserId}
+              onChange={handleAddTranslator}
               disabled={readOnly}
               placeholder="Tìm theo tên hoặc email..."
               className="self-start"
             />
+            {translatorUsers.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {translatorUsers.map((u) => (
+                  <Badge
+                    key={u.id}
+                    variant="secondary"
+                    className="flex items-center gap-1">
+                    <span className="truncate max-w-[160px]">{u.name}</span>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTranslator(u.id)}
+                        className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                        aria-label="Xóa">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Chưa chọn dịch giả.
+              </p>
+            )}
           </div>
         </div>
         {!readOnly && duplicateTranslationContract && (
@@ -5249,6 +5322,7 @@ function ProofreadingContractForm({
   contract,
   works,
   translationContracts,
+  translationContractMembers,
   componentsList,
   queryClient,
   onSubmit,
@@ -5258,6 +5332,10 @@ function ProofreadingContractForm({
   contract: ProofreadingContract | null;
   works: Work[];
   translationContracts: TranslationContract[];
+  translationContractMembers: Array<{
+    translationContractId: string;
+    userId: string;
+  }>;
   componentsList: Component[];
   queryClient: ReturnType<typeof useQueryClient>;
   onSubmit: (data: Record<string, unknown>) => void;
@@ -5276,8 +5354,47 @@ function ProofreadingContractForm({
   const [proofreaderUserId, setProofreaderUserId] = useState<string | null>(
     null
   );
+  const [selfProofreading, setSelfProofreading] = useState(false);
+  const [hasUserTouchedProofreader, setHasUserTouchedProofreader] =
+    useState(false);
+
+  const getWorkTitleForContract = (contractId: string | null | undefined) => {
+    if (!contractId) return "";
+    const tc = translationContracts.find((c) => c.id === contractId);
+    if (!tc?.workId) return "";
+    const work = works.find((w) => w.id === tc.workId);
+    return work?.titleVi ?? work?.documentCode ?? "";
+  };
+
+  const filteredTranslationContracts = useMemo(() => {
+    let list = translationContracts;
+    if (componentId) {
+      list = list.filter((c) => c.componentId === componentId);
+    }
+    if (workId) {
+      list = list.filter((c) => c.workId === workId);
+    }
+    return list;
+  }, [translationContracts, componentId, workId]);
+
+  useEffect(() => {
+    if (!translationContractId) return;
+    const exists = filteredTranslationContracts.some(
+      (c) => c.id === translationContractId
+    );
+    if (!exists) setTranslationContractId("");
+  }, [filteredTranslationContracts, translationContractId]);
 
   const { data: users = [] } = useUsers();
+  const translatorForSelectedContract = useMemo(() => {
+    if (!translationContractId) return null;
+    const member = translationContractMembers.find(
+      (m) => m.translationContractId === translationContractId && m.userId
+    );
+    if (!member?.userId) return null;
+    const user = users.find((u) => u.id === member.userId);
+    return { id: member.userId, name: user?.displayName ?? member.userId };
+  }, [translationContractId, translationContractMembers, users]);
 
   // Load proofreading contract members when editing
   const { data: contractMembers = [] } = useQuery({
@@ -5298,6 +5415,7 @@ function ProofreadingContractForm({
 
   // Set proofreader when contract members are loaded
   useEffect(() => {
+    if (hasUserTouchedProofreader || selfProofreading) return;
     if (contractMembers.length > 0 && contractMembers[0]?.userId) {
       const member = contractMembers[0];
       setProofreaderUserId(member.userId);
@@ -5306,7 +5424,28 @@ function ProofreadingContractForm({
         setProofreaderName(user.displayName);
       }
     }
-  }, [contractMembers, users]);
+  }, [contractMembers, users, hasUserTouchedProofreader, selfProofreading]);
+
+  useEffect(() => {
+    if (!selfProofreading) return;
+    if (!translationContractId || !translatorForSelectedContract) {
+      setProofreaderName("");
+      setProofreaderUserId(null);
+      return;
+    }
+    setProofreaderName(translatorForSelectedContract.name);
+    setProofreaderUserId(translatorForSelectedContract.id);
+  }, [selfProofreading, translationContractId, translatorForSelectedContract]);
+
+  const handleSelfProofreadingChange = (checked: boolean) => {
+    const next = !!checked;
+    setSelfProofreading(next);
+    setHasUserTouchedProofreader(true);
+    if (!next) {
+      setProofreaderName("");
+      setProofreaderUserId(null);
+    }
+  };
 
   const [pageCount, setPageCount] = useState(
     contract?.pageCount != null ? String(contract.pageCount) : ""
@@ -5395,8 +5534,8 @@ function ProofreadingContractForm({
     <form
       onSubmit={handleSubmit}
       className="space-y-4 overflow-y-auto pr-2 flex-1 min-h-0">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 gap-4">
-        <div className="grid gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid gap-2 min-w-0">
           <Label>Số hợp đồng</Label>
           <Input
             value={contractNumber}
@@ -5405,14 +5544,14 @@ function ProofreadingContractForm({
             disabled={readOnly}
           />
         </div>
-        <div className="grid gap-2">
+        <div className="grid gap-2 min-w-0">
           <Label>Hợp phần</Label>
           <select
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={componentId}
             onChange={(e) => setComponentId(e.target.value)}
             disabled={readOnly}>
-            <option value="">— Chọn hợp phần —</option>
+            <option value="">Chọn hợp phần</option>
             {componentsList.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -5420,22 +5559,79 @@ function ProofreadingContractForm({
             ))}
           </select>
         </div>
-        <div className="grid gap-2 sm:col-span-2">
+        <div className="grid gap-2 min-w-0">
+          <Label>Tác phẩm</Label>
+          <select
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={workId}
+            onChange={(e) => setWorkId(e.target.value)}
+            disabled={readOnly}>
+            <option value="">Chọn tác phẩm</option>
+            {works.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.titleVi ?? w.documentCode ?? w.id.slice(0, 8)}
+              </option>
+            ))}
+          </select>
+          {selectedWork?.stage && (
+            <p className="text-xs text-muted-foreground">
+              Giai do?n: {formatStageDisplay(selectedWork.stage)}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid gap-2 md:col-span-2 min-w-0">
+          <Label>Hợp đồng dịch thuật (liên kết)</Label>
+          <select
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={translationContractId}
+            onChange={(e) => setTranslationContractId(e.target.value)}
+            disabled={readOnly}>
+            <option value="">Chọn Hợp đồng dịch thuật</option>
+            {filteredTranslationContracts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {(c.contractNumber ?? c.id.slice(0, 8)) +
+                  (getWorkTitleForContract(c.id)
+                    ? ` -- ${getWorkTitleForContract(c.id)}`
+                    : "")}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid gap-2 md:col-span-3 min-w-0">
           <TranslatorPicker
-            label="Biên tập viên / Người hiệu đính"
+            label="Người hiệu đính"
             value={proofreaderName}
             userId={proofreaderUserId}
             onChange={(name, id) => {
               setProofreaderName(name);
               setProofreaderUserId(id);
+              setHasUserTouchedProofreader(true);
+              setSelfProofreading(false);
             }}
-            disabled={readOnly}
+            disabled={readOnly || selfProofreading}
             placeholder="Tìm theo tên hoặc email..."
           />
+          {!readOnly && (
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="self-proofreading-checkbox"
+                checked={selfProofreading}
+                onCheckedChange={handleSelfProofreadingChange}
+                disabled={!translatorForSelectedContract}
+              />
+              <label
+                htmlFor="self-proofreading-checkbox"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Dịch giả tự hiệu đính
+              </label>
+            </div>
+          )}
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="grid gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-8 gap-4">
+        <div className="grid gap-2 md:col-span-2 min-w-0">
           <Label>Số trang</Label>
           <NumberInput
             value={pageCount}
@@ -5446,11 +5642,11 @@ function ProofreadingContractForm({
           />
           {selectedTranslationContract && (
             <p className="text-xs text-muted-foreground">
-              Lấy từ số trang hoàn thành thực tế của HĐ dịch thuật.
+              Lấy từ số trang hoàn thành thực tế của Hợp đồng dịch thuật.
             </p>
           )}
         </div>
-        <div className="grid gap-2">
+        <div className="grid gap-2 md:col-span-2 min-w-0">
           <Label>Tỷ lệ (%)</Label>
           <Input
             type="number"
@@ -5461,8 +5657,8 @@ function ProofreadingContractForm({
             disabled={readOnly}
           />
         </div>
-        <div className="grid gap-2">
-          <Label>Giá trị hợp đồng (VNĐ)</Label>
+        <div className="grid gap-2 md:col-span-4 min-w-0">
+          <Label>Giá trị hợp đồng hiệu đính (VNĐ)</Label>
           <NumberInput
             value={contractValue}
             onChange={setContractValue}
@@ -5479,46 +5675,9 @@ function ProofreadingContractForm({
             )}
           {selectedTranslationContract && (
             <p className="text-xs text-muted-foreground">
-              Tự tính theo tỷ lệ (%) × giá trị quyết toán HĐ dịch thuật.
+              Tính theo tỷ lệ (%) và giá trị quyết toán Hợp đồng dịch thuật.
             </p>
           )}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="grid gap-2">
-          <Label>Tác phẩm</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={workId}
-            onChange={(e) => setWorkId(e.target.value)}
-            disabled={readOnly}>
-            <option value="">— Chọn tác phẩm —</option>
-            {works.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.titleVi ?? w.documentCode ?? w.id.slice(0, 8)}
-              </option>
-            ))}
-          </select>
-          {selectedWork?.stage && (
-            <p className="text-xs text-muted-foreground">
-              Giai đoạn: {formatStageDisplay(selectedWork.stage)}
-            </p>
-          )}
-        </div>
-        <div className="grid gap-2">
-          <Label>Hợp đồng dịch thuật (liên kết)</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={translationContractId}
-            onChange={(e) => setTranslationContractId(e.target.value)}
-            disabled={readOnly}>
-            <option value="">— Chọn HĐ dịch thuật —</option>
-            {translationContracts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.contractNumber ?? c.id.slice(0, 8)}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -5547,8 +5706,8 @@ function ProofreadingContractForm({
           />
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 gap-4">
-        <div className="grid gap-2 sm:col-span-2">
+      <div className="grid grid-cols-1 gap-4">
+        <div className="grid gap-2 min-w-0">
           <Label>Ghi chú</Label>
           <Input
             value={note}
