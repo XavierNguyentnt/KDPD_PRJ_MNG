@@ -1,4 +1,4 @@
-import { eq, asc, inArray, and, desc } from "drizzle-orm";
+import { eq, asc, inArray, and, desc, ne } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -478,6 +478,32 @@ export async function getTranslationContractsFromDb(): Promise<TranslationContra
 
 export async function getTranslationContractById(id: string): Promise<TranslationContract | undefined> {
   const rows = await requireDb().select().from(translationContracts).where(eq(translationContracts.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function findDuplicateTranslationContract(
+  componentId: string,
+  workId: string,
+  contractNumber: string,
+  excludeId?: string
+): Promise<TranslationContract | undefined> {
+  const whereClause = excludeId
+    ? and(
+        eq(translationContracts.componentId, componentId),
+        eq(translationContracts.workId, workId),
+        eq(translationContracts.contractNumber, contractNumber),
+        ne(translationContracts.id, excludeId)
+      )
+    : and(
+        eq(translationContracts.componentId, componentId),
+        eq(translationContracts.workId, workId),
+        eq(translationContracts.contractNumber, contractNumber)
+      );
+  const rows = await requireDb()
+    .select()
+    .from(translationContracts)
+    .where(whereClause)
+    .limit(1);
   return rows[0];
 }
 

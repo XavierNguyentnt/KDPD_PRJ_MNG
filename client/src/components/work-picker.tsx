@@ -21,6 +21,7 @@ interface WorkPickerProps {
   label?: string;
   placeholder?: string;
   className?: string;
+  componentFilterId?: string | null;
 }
 
 export function WorkPicker({
@@ -32,6 +33,7 @@ export function WorkPicker({
   label,
   placeholder = "Tìm theo tiêu đề, mã tài liệu, hợp phần, giai đoạn...",
   className,
+  componentFilterId,
 }: WorkPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -40,9 +42,14 @@ export function WorkPicker({
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return works;
+    const sourceWorks =
+      componentFilterId && componentFilterId.trim() !== ""
+        ? works.filter((w) => w.componentId === componentFilterId)
+        : works;
+    if (!search.trim()) return sourceWorks;
     const q = normalizeSearch(search.trim());
-    return works.filter((w) => {
+    if (!q) return sourceWorks;
+    return sourceWorks.filter((w) => {
       const compName =
         w.componentId && components.length
           ? components.find((c) => c.id === w.componentId)?.name ?? ""
@@ -55,7 +62,7 @@ export function WorkPicker({
         normalizeSearch(stageStr).includes(q)
       );
     });
-  }, [works, components, search]);
+  }, [works, components, search, componentFilterId]);
 
   const visibleWorks = useMemo(() => filtered.slice(0, 100), [filtered]);
 
@@ -145,7 +152,7 @@ export function WorkPicker({
       <div className="relative">
         <div
           className={cn(
-            "flex items-center gap-2 rounded-md border bg-muted/30 min-h-9 px-3 py-2 text-sm",
+            "flex items-center gap-2 rounded-md border bg-muted/30 h-10 px-3 py-2 text-sm",
             disabled && "opacity-60 pointer-events-none",
             open && "ring-2 ring-ring ring-offset-2",
           )}

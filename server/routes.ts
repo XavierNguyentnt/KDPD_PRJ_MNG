@@ -36,6 +36,66 @@ function validateTaskContractLink(payload: { taskType?: string | null; relatedWo
   }
 }
 
+function parseDateOnly(input: string | Date | null | undefined): Date | null {
+  if (!input) return null;
+  if (input instanceof Date) {
+    if (Number.isNaN(input.getTime())) return null;
+    return new Date(input.getFullYear(), input.getMonth(), input.getDate());
+  }
+  const s = String(input);
+  const isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const y = Number.parseInt(isoMatch[1], 10);
+    const m = Number.parseInt(isoMatch[2], 10) - 1;
+    const d = Number.parseInt(isoMatch[3], 10);
+    if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(d)) {
+      return new Date(y, m, d);
+    }
+  }
+  const parsed = new Date(s);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+function validateContractDates(
+  startDate: string | Date | null | undefined,
+  endDate: string | Date | null | undefined,
+  actualCompletionDate: string | Date | null | undefined
+): string | null {
+  const start = parseDateOnly(startDate);
+  const end = parseDateOnly(endDate);
+  const actual = parseDateOnly(actualCompletionDate);
+  if (start && end && end.getTime() < start.getTime()) {
+    return "Ngày kết thúc hợp đồng không được nhỏ hơn ngày bắt đầu.";
+  }
+  if (start && actual && actual.getTime() < start.getTime()) {
+    return "Ngày hoàn thành thực tế không được nhỏ hơn ngày bắt đầu.";
+  }
+  return null;
+}
+
+function validateAssignmentDates(
+  assignments: Array<{ receivedAt?: string; dueDate?: string; completedAt?: string }>
+): string | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (const a of assignments) {
+    const receivedAt = parseDateOnly(a.receivedAt);
+    const dueDate = parseDateOnly(a.dueDate);
+    const completedAt = parseDateOnly(a.completedAt);
+    if (receivedAt && dueDate && dueDate.getTime() < receivedAt.getTime()) {
+      return "Ngày hoàn thành dự kiến không được nhỏ hơn ngày nhận công việc.";
+    }
+    if (receivedAt && completedAt && completedAt.getTime() < receivedAt.getTime()) {
+      return "Ngày hoàn thành thực tế không được nhỏ hơn ngày nhận công việc.";
+    }
+    if (completedAt && completedAt.getTime() > today.getTime()) {
+      return "Ngày hoàn thành thực tế không được lớn hơn ngày hiện tại.";
+    }
+  }
+  return null;
+}
+
 
 export async function registerRoutes(
   httpServer: Server,
@@ -222,6 +282,10 @@ export async function registerRoutes(
       const assignmentsInput = Array.isArray((req.body as { assignments?: unknown }).assignments)
         ? (req.body as { assignments: AssignmentInput[] }).assignments
         : undefined;
+      if (assignmentsInput) {
+        const dateError = validateAssignmentDates(assignmentsInput);
+        if (dateError) return res.status(400).json({ message: dateError });
+      }
 
       const task = await storage.updateTask(id, input);
 
@@ -286,6 +350,10 @@ export async function registerRoutes(
       const assignmentsInput = Array.isArray((req.body as { assignments?: unknown }).assignments)
         ? (req.body as { assignments: AssignmentInput[] }).assignments
         : undefined;
+      if (assignmentsInput) {
+        const dateError = validateAssignmentDates(assignmentsInput);
+        if (dateError) return res.status(400).json({ message: dateError });
+      }
 
       const now = new Date();
       const body = req.body as Record<string, unknown>;
@@ -779,7 +847,29 @@ export async function registerRoutes(
       if (!db) return res.status(503).json({ message: "Database not configured" });
       const body = normalizeTranslationContractBody((req.body as Record<string, unknown>) || {});
       const input = api.translationContracts.create.input.parse(body);
-      const row = await dbStorage.createTranslationContract(input);
+      const dateError = validateContractDates(
+        input.startDate,
+        input.endDate,
+        input.actualCompletionDate
+      );
+      if (dateError) return res.status(400).json({ message: dateError });
+      const createPayload = {
+        ...input,
+        status: input.actualCompletionDate ? "Completed" : input.status,
+      };
+      if (input.componentId && input.workId && input.contractNumber) {
+        const dup = await dbStorage.findDuplicateTranslationContract(
+          input.componentId,
+          input.workId,
+          String(input.contractNumber).trim()
+        );
+        if (dup) {
+          return res.status(409).json({
+            message: "Trùng hợp đồng dịch thuật (tác phẩm + số hợp đồng) trong cùng hợp phần.",
+          });
+        }
+      }
+      const row = await dbStorage.createTranslationContract(createPayload);
       res.json(row);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
@@ -792,7 +882,35 @@ export async function registerRoutes(
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const body = normalizeTranslationContractBody((req.body as Record<string, unknown>) || {});
       const input = api.translationContracts.update.input.parse(body);
-      const row = await dbStorage.updateTranslationContract(id, input);
+      const existing = await dbStorage.getTranslationContractById(id);
+      if (!existing) return res.status(404).json({ message: `Translation contract ${id} not found` });
+      const dateError = validateContractDates(
+        input.startDate ?? existing.startDate,
+        input.endDate ?? existing.endDate,
+        input.actualCompletionDate ?? existing.actualCompletionDate
+      );
+      if (dateError) return res.status(400).json({ message: dateError });
+      const updatePayload = {
+        ...input,
+        status: input.actualCompletionDate ? "Completed" : input.status,
+      };
+      const componentId = input.componentId ?? existing.componentId;
+      const workId = input.workId ?? existing.workId;
+      const contractNumber = (input.contractNumber ?? existing.contractNumber) as string | null;
+      if (componentId && workId && contractNumber) {
+        const dup = await dbStorage.findDuplicateTranslationContract(
+          componentId,
+          workId,
+          String(contractNumber).trim(),
+          id
+        );
+        if (dup) {
+          return res.status(409).json({
+            message: "Trùng hợp đồng dịch thuật (tác phẩm + số hợp đồng) trong cùng hợp phần.",
+          });
+        }
+      }
+      const row = await dbStorage.updateTranslationContract(id, updatePayload);
       res.json(row);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
@@ -859,6 +977,12 @@ export async function registerRoutes(
       if (!db) return res.status(503).json({ message: "Database not configured" });
       const body = normalizeProofreadingContractBody((req.body as Record<string, unknown>) || {});
       const input = api.proofreadingContracts.create.input.parse(body);
+      const dateError = validateContractDates(
+        input.startDate,
+        input.endDate,
+        input.actualCompletionDate
+      );
+      if (dateError) return res.status(400).json({ message: dateError });
       const row = await dbStorage.createProofreadingContract(input);
       res.json(row);
     } catch (err) {
@@ -872,6 +996,14 @@ export async function registerRoutes(
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const body = normalizeProofreadingContractBody((req.body as Record<string, unknown>) || {});
       const input = api.proofreadingContracts.update.input.parse(body);
+      const existing = await dbStorage.getProofreadingContractById(id);
+      if (!existing) return res.status(404).json({ message: `Proofreading contract ${id} not found` });
+      const dateError = validateContractDates(
+        input.startDate ?? existing.startDate,
+        input.endDate ?? existing.endDate,
+        input.actualCompletionDate ?? existing.actualCompletionDate
+      );
+      if (dateError) return res.status(400).json({ message: dateError });
       const row = await dbStorage.updateProofreadingContract(id, input);
       res.json(row);
     } catch (err) {

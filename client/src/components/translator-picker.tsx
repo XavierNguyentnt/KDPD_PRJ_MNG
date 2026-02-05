@@ -44,6 +44,7 @@ interface TranslatorPickerProps {
   label?: string;
   placeholder?: string;
   className?: string;
+  allowCreate?: boolean;
 }
 
 export function TranslatorPicker({
@@ -54,6 +55,7 @@ export function TranslatorPicker({
   label,
   placeholder = "Tìm theo tên hoặc email...",
   className,
+  allowCreate = true,
 }: TranslatorPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -172,7 +174,8 @@ export function TranslatorPicker({
       setHighlightedIndex(-1);
       return;
     }
-    const totalItems = filtered.length + (search.trim() && !hasExactMatch ? 1 : 0);
+    const totalItems =
+      filtered.length + (allowCreate && search.trim() && !hasExactMatch ? 1 : 0);
     if (totalItems === 0) {
       setHighlightedIndex(-1);
       return;
@@ -221,7 +224,8 @@ export function TranslatorPicker({
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (!open) setOpen(true);
-      const totalItems = filtered.length + (search.trim() && !hasExactMatch ? 1 : 0);
+    const totalItems =
+      filtered.length + (allowCreate && search.trim() && !hasExactMatch ? 1 : 0);
       if (totalItems === 0) return;
       const dir = e.key === "ArrowDown" ? 1 : -1;
       setHighlightedIndex((prev) => {
@@ -249,7 +253,8 @@ export function TranslatorPicker({
     }
   };
 
-  const totalItems = filtered.length + (search.trim() && !hasExactMatch ? 1 : 0);
+  const totalItems =
+    filtered.length + (allowCreate && search.trim() && !hasExactMatch ? 1 : 0);
 
   return (
     <>
@@ -258,7 +263,7 @@ export function TranslatorPicker({
         <div className="relative">
           <div
             className={cn(
-              "flex items-center gap-2 rounded-md border bg-muted/30 min-h-9 px-3 py-2 text-sm",
+              "flex items-center gap-2 rounded-md border bg-muted/30 h-10 px-3 py-2 text-sm",
               disabled && "opacity-60 pointer-events-none",
               open && "ring-2 ring-ring ring-offset-2"
             )}
@@ -332,7 +337,7 @@ export function TranslatorPicker({
                         </li>
                       );
                     })}
-                    {search.trim() && !hasExactMatch && (
+                    {allowCreate && search.trim() && !hasExactMatch && (
                       <li>
                         <button
                           type="button"

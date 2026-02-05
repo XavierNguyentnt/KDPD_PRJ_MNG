@@ -158,13 +158,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       : []),
   ];
 
-  const sidebarWidth = "16rem";
-
   return (
     <div
       className="min-h-screen bg-gray-50/50 md:grid overflow-x-hidden"
       style={{
-        gridTemplateColumns: `${sidebarWidth} 1fr`,
+        gridTemplateColumns: sidebarOpen ? "16rem 1fr" : "0px 1fr",
+        transition: "grid-template-columns 300ms ease-in-out",
       }}
     >
       {/* Sidebar */}
@@ -173,10 +172,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         className={`
           bg-card border-r border-border/50 hidden md:flex flex-col
           md:sticky md:top-0 md:h-screen overflow-hidden
-          transition-transform duration-300 ease-in-out
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"}
+          transition-[opacity,transform] duration-300 ease-in-out
+          ${sidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"}
         `}
-        style={{ width: sidebarWidth, willChange: "transform" }}
+        style={{ willChange: "transform,opacity" }}
       >
         <div className="p-6">
           <div className="flex items-center justify-between">
@@ -269,8 +268,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main 
         ref={mainContentRef}
-        className={`flex flex-col min-h-screen min-w-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? "md:translate-x-0" : "md:-translate-x-64"}`}
-        style={{ willChange: "transform" }}
+        className="flex flex-col min-h-screen min-w-0"
       >
         {/* Header */}
         <header className="h-16 border-b border-border/50 bg-card/50 backdrop-blur-xl px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
