@@ -106,6 +106,7 @@ import { WorksImport } from "@/components/works-import";
 import { DateInput } from "@/components/ui/date-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { WorkPicker } from "@/components/work-picker";
+import { TranslationContractPicker } from "@/components/translation-contract-picker";
 import {
   formatDateDDMMYYYY,
   formatNumberAccounting,
@@ -5358,14 +5359,6 @@ function ProofreadingContractForm({
   const [hasUserTouchedProofreader, setHasUserTouchedProofreader] =
     useState(false);
 
-  const getWorkTitleForContract = (contractId: string | null | undefined) => {
-    if (!contractId) return "";
-    const tc = translationContracts.find((c) => c.id === contractId);
-    if (!tc?.workId) return "";
-    const work = works.find((w) => w.id === tc.workId);
-    return work?.titleVi ?? work?.documentCode ?? "";
-  };
-
   const filteredTranslationContracts = useMemo(() => {
     let list = translationContracts;
     if (componentId) {
@@ -5560,19 +5553,17 @@ function ProofreadingContractForm({
           </select>
         </div>
         <div className="grid gap-2 min-w-0">
-          <Label>Tác phẩm</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={workId}
-            onChange={(e) => setWorkId(e.target.value)}
-            disabled={readOnly}>
-            <option value="">Chọn tác phẩm</option>
-            {works.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.titleVi ?? w.documentCode ?? w.id.slice(0, 8)}
-              </option>
-            ))}
-          </select>
+          <WorkPicker
+            label="Tác phẩm"
+            works={works}
+            components={componentsList}
+            value={workId || null}
+            onChange={(id) => setWorkId(id ?? "")}
+            disabled={readOnly}
+            placeholder="Tìm theo tiêu đề, mã tài liệu, hợp phần, giai đoạn..."
+            componentFilterId={componentId || null}
+            className="self-start"
+          />
           {selectedWork?.stage && (
             <p className="text-xs text-muted-foreground">
               Giai do?n: {formatStageDisplay(selectedWork.stage)}
@@ -5582,22 +5573,17 @@ function ProofreadingContractForm({
       </div>
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="grid gap-2 md:col-span-2 min-w-0">
-          <Label>Hợp đồng dịch thuật (liên kết)</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={translationContractId}
-            onChange={(e) => setTranslationContractId(e.target.value)}
-            disabled={readOnly}>
-            <option value="">Chọn Hợp đồng dịch thuật</option>
-            {filteredTranslationContracts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {(c.contractNumber ?? c.id.slice(0, 8)) +
-                  (getWorkTitleForContract(c.id)
-                    ? ` -- ${getWorkTitleForContract(c.id)}`
-                    : "")}
-              </option>
-            ))}
-          </select>
+          <TranslationContractPicker
+            label="Hợp đồng dịch thuật (liên kết)"
+            contracts={filteredTranslationContracts}
+            works={works}
+            components={componentsList}
+            value={translationContractId || null}
+            onChange={(id) => setTranslationContractId(id ?? "")}
+            disabled={readOnly}
+            placeholder="Tìm theo số HĐ, tác phẩm, mã tài liệu, hợp phần..."
+            className="self-start"
+          />
         </div>
         <div className="grid gap-2 md:col-span-3 min-w-0">
           <TranslatorPicker
