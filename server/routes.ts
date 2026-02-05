@@ -11,6 +11,7 @@ import * as dbStorage from "./db-storage";
 import { passport } from "./auth";
 import { requireAuth, requireRole } from "./middleware";
 import multer from "multer";
+import { buildNotificationContent } from "./notifications";
 
 /** Feature flag: Work/Contract taxonomy (theo Docs refactor – tắt được khi rollback). */
 const FEATURE_WORK_ENABLED = process.env.FEATURE_WORK_ENABLED === "true";
@@ -33,34 +34,6 @@ function validateTaskContractLink(payload: { taskType?: string | null; relatedWo
   if (!relatedWorkId) {
     throw new Error("Khi gắn hợp đồng (related_contract_id) bắt buộc phải có related_work_id.");
   }
-}
-
-const DUE_SOON_DAYS = 7;
-
-function formatDateOnly(input: string | Date | null | undefined): string | null {
-  if (!input) return null;
-  if (typeof input === "string") return input;
-  return input.toISOString().slice(0, 10);
-}
-
-function buildNotificationContent(type: "task_assigned" | "task_due_soon" | "task_overdue", taskTitle: string, dueDate?: string | null) {
-  const safeTitle = taskTitle || "Công việc";
-  if (type === "task_assigned") {
-    return {
-      title: "Công việc mới được giao",
-      message: `Bạn được giao: ${safeTitle}`,
-    };
-  }
-  if (type === "task_due_soon") {
-    return {
-      title: "Công việc sắp đến hạn",
-      message: dueDate ? `Sắp đến hạn (${dueDate}): ${safeTitle}` : `Sắp đến hạn: ${safeTitle}`,
-    };
-  }
-  return {
-    title: "Công việc đã quá hạn",
-    message: dueDate ? `Đã quá hạn (${dueDate}): ${safeTitle}` : `Đã quá hạn: ${safeTitle}`,
-  };
 }
 
 
@@ -141,11 +114,8 @@ export async function registerRoutes(
           if (!firstByTask.has(a.taskId)) firstByTask.set(a.taskId, a);
         }
         const userIds = Array.from(new Set(assignments.map((a) => a.userId)));
-        const userMap = new Map<string, User>();
-        for (const id of userIds) {
-          const u = await dbStorage.getUserById(id);
-          if (u) userMap.set(id, u);
-        }
+        const users = await dbStorage.getUsersByIds(userIds);
+        const userMap = new Map<string, User>(users.map((u) => [u.id, u]));
         const result: TaskWithAssignmentDetails[] = tasks.map((t) => {
           const taskAssignmentsList = assignmentsByTask.get(t.id) ?? [];
           const first = firstByTask.get(t.id);
@@ -442,38 +412,6 @@ export async function registerRoutes(
       if (!db) return res.json([]);
       const userId = (req.user as UserWithRolesAndGroups).id;
       const unreadOnly = String(req.query.unread || "").toLowerCase() === "true";
-
-      // Generate due-soon / overdue notifications on demand (idempotent by assignment+type)
-      const assignments = await dbStorage.getTaskAssignmentsWithTaskByUserId(userId);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      for (const { assignment, task } of assignments) {
-        const dueDateStr = formatDateOnly(assignment.dueDate);
-        if (!dueDateStr) continue;
-        const dueDate = new Date(dueDateStr);
-        const isCompleted = assignment.completedAt != null || task.status === "Completed";
-        if (isCompleted) continue;
-        const diffDays = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        let type: "task_due_soon" | "task_overdue" | null = null;
-        if (diffDays < 0) type = "task_overdue";
-        else if (diffDays <= DUE_SOON_DAYS) type = "task_due_soon";
-        if (!type) continue;
-        const existing = await dbStorage.getNotificationByAssignmentType(userId, assignment.id, type);
-        if (!existing) {
-          const content = buildNotificationContent(type, task.title ?? "", dueDateStr);
-          await dbStorage.createNotification({
-            userId,
-            type,
-            taskId: assignment.taskId,
-            taskAssignmentId: assignment.id,
-            title: content.title,
-            message: content.message,
-            isRead: false,
-            createdAt: new Date(),
-            readAt: null,
-          });
-        }
-      }
 
       const list = await dbStorage.getNotificationsByUserId(userId, { unreadOnly });
       res.json(list);

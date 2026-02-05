@@ -72,11 +72,39 @@ function requireDb() {
   return db;
 }
 
+type CacheEntry<T> = { value: T; expiresAt: number };
+const USERS_CACHE_TTL_MS = Number.parseInt(process.env.CACHE_USERS_TTL_MS || "30000", 10);
+const ROLES_CACHE_TTL_MS = Number.parseInt(process.env.CACHE_ROLES_TTL_MS || "30000", 10);
+let usersCache: CacheEntry<User[]> | null = null;
+let rolesCache: CacheEntry<Role[]> | null = null;
+
+function readCache<T>(entry: CacheEntry<T> | null): T | undefined {
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) return undefined;
+  return entry.value;
+}
+
+function writeCache<T>(value: T, ttlMs: number): CacheEntry<T> | null {
+  if (ttlMs <= 0) return null;
+  return { value, expiresAt: Date.now() + ttlMs };
+}
+
+function invalidateUsersCache(): void {
+  usersCache = null;
+}
+
+function invalidateRolesCache(): void {
+  rolesCache = null;
+}
+
 // -----------------------------------------------------------------------------
 // Users CRUD
 // -----------------------------------------------------------------------------
 export async function getUsers(): Promise<User[]> {
+  const cached = readCache(usersCache);
+  if (cached) return cached;
   const rows = await requireDb().select().from(users).orderBy(asc(users.displayName));
+  usersCache = writeCache(rows, USERS_CACHE_TTL_MS);
   return rows;
 }
 
@@ -87,6 +115,15 @@ export async function getUserById(id: string): Promise<User | undefined> {
     .where(eq(users.id, id))
     .limit(1);
   return rows[0];
+}
+
+export async function getUsersByIds(ids: string[]): Promise<User[]> {
+  if (ids.length === 0) return [];
+  const rows = await requireDb()
+    .select()
+    .from(users)
+    .where(inArray(users.id, ids));
+  return rows;
 }
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
@@ -101,6 +138,7 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
 export async function createUser(data: InsertUser): Promise<User> {
   const rows = await requireDb().insert(users).values(data).returning();
   if (!rows[0]) throw new Error("Failed to create user");
+  invalidateUsersCache();
   return rows[0];
 }
 
@@ -114,6 +152,7 @@ export async function updateUser(
     .where(eq(users.id, id))
     .returning();
   if (!rows[0]) throw new Error(`User ${id} not found`);
+  invalidateUsersCache();
   return rows[0];
 }
 
@@ -121,6 +160,7 @@ export async function deleteUser(id: string): Promise<void> {
   const existing = await getUserById(id);
   if (!existing) throw new Error(`User ${id} not found`);
   await requireDb().delete(users).where(eq(users.id, id));
+  invalidateUsersCache();
 }
 
 /** User kèm roles, groups và roleAssignments từ user_roles, user_groups (nguồn duy nhất). */
@@ -1038,7 +1078,11 @@ export async function deleteUserGroup(id: string): Promise<void> {
 // Roles CRUD
 // -----------------------------------------------------------------------------
 export async function getRoles(): Promise<Role[]> {
-  return requireDb().select().from(roles).orderBy(asc(roles.name));
+  const cached = readCache(rolesCache);
+  if (cached) return cached;
+  const rows = await requireDb().select().from(roles).orderBy(asc(roles.name));
+  rolesCache = writeCache(rows, ROLES_CACHE_TTL_MS);
+  return rows;
 }
 
 export async function getRoleById(id: string): Promise<Role | undefined> {
@@ -1053,6 +1097,7 @@ export async function getRoleById(id: string): Promise<Role | undefined> {
 export async function createRole(data: Omit<InsertRole, "id">): Promise<Role> {
   const rows = await requireDb().insert(roles).values(data).returning();
   if (!rows[0]) throw new Error("Failed to create role");
+  invalidateRolesCache();
   return rows[0];
 }
 
@@ -1066,6 +1111,7 @@ export async function updateRole(
     .where(eq(roles.id, id))
     .returning();
   if (!rows[0]) throw new Error(`Role ${id} not found`);
+  invalidateRolesCache();
   return rows[0];
 }
 
@@ -1073,6 +1119,7 @@ export async function deleteRole(id: string): Promise<void> {
   const existing = await getRoleById(id);
   if (!existing) throw new Error(`Role ${id} not found`);
   await requireDb().delete(roles).where(eq(roles.id, id));
+  invalidateRolesCache();
 }
 
 // -----------------------------------------------------------------------------

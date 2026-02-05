@@ -158,17 +158,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       : []),
   ];
 
+  const sidebarWidth = "16rem";
+
   return (
-    <div className="min-h-screen bg-gray-50/50 flex">
+    <div
+      className="min-h-screen bg-gray-50/50 md:grid overflow-x-hidden"
+      style={{
+        gridTemplateColumns: `${sidebarWidth} 1fr`,
+      }}
+    >
       {/* Sidebar */}
       <aside 
         ref={sidebarRef}
         className={`
-          fixed inset-y-0 left-0 z-50 bg-card border-r border-border/50 hidden md:flex flex-col
+          bg-card border-r border-border/50 hidden md:flex flex-col
+          md:sticky md:top-0 md:h-screen overflow-hidden
           transition-transform duration-300 ease-in-out
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"}
         `}
-        style={{ width: "16rem" }}
+        style={{ width: sidebarWidth, willChange: "transform" }}
       >
         <div className="p-6">
           <div className="flex items-center justify-between">
@@ -176,46 +184,46 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
                 <CheckSquare className="w-5 h-5" />
               </div>
-              {sidebarOpen && <span>KĐPĐ</span>}
-            </div>
-            {sidebarOpen && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setSidebarOpen(false)}
+              <span
+                className={`transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0"}`}
               >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+                KĐPĐ
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
-        {sidebarOpen && (
-          <>
-            <nav className="flex-1 px-4 space-y-1">
-              {navItems.map((item) => {
-                const isActive = location === item.href;
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <div
-                      className={`
-                        flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200
-                        ${isActive 
-                          ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 shadow-sm" 
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }
-                      `}
-                    >
-                      <item.icon className="w-4 h-4" />
-                      {item.label}
-                    </div>
-                  </Link>
-                );
-              })}
-            </nav>
-          </>
-        )}
+        <nav
+          className={`flex-1 px-4 space-y-1 transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        >
+          {navItems.map((item) => {
+            const isActive = location === item.href;
+            return (
+              <Link key={item.href} href={item.href}>
+                <div
+                  className={`
+                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-colors duration-200
+                    ${isActive 
+                      ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 shadow-sm" 
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }
+                  `}
+                >
+                  <item.icon className="w-4 h-4" />
+                  {item.label}
+                </div>
+              </Link>
+            );
+          })}
+        </nav>
       </aside>
 
       {/* Mobile Sidebar */}
@@ -261,7 +269,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main 
         ref={mainContentRef}
-        className={`flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300 ml-0 ${sidebarOpen ? "md:ml-64" : "md:ml-0"}`}
+        className={`flex flex-col min-h-screen min-w-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? "md:translate-x-0" : "md:-translate-x-64"}`}
+        style={{ willChange: "transform" }}
       >
         {/* Header */}
         <header className="h-16 border-b border-border/50 bg-card/50 backdrop-blur-xl px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">

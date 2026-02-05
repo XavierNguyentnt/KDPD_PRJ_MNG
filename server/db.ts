@@ -13,7 +13,23 @@ let db: ReturnType<typeof drizzle> | null = null;
 
 if (process.env.DATABASE_URL) {
   try {
-    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const readIntEnv = (name: string): number | undefined => {
+      const raw = process.env[name];
+      if (!raw) return undefined;
+      const value = Number.parseInt(raw, 10);
+      return Number.isNaN(value) ? undefined : value;
+    };
+    const poolConfig: pg.PoolConfig = { connectionString: process.env.DATABASE_URL };
+    const max = readIntEnv("PG_POOL_MAX");
+    const idleTimeoutMillis = readIntEnv("PG_POOL_IDLE_TIMEOUT_MS");
+    const connectionTimeoutMillis = readIntEnv("PG_POOL_CONN_TIMEOUT_MS");
+    const maxUses = readIntEnv("PG_POOL_MAX_USES");
+    if (max !== undefined) poolConfig.max = max;
+    if (idleTimeoutMillis !== undefined) poolConfig.idleTimeoutMillis = idleTimeoutMillis;
+    if (connectionTimeoutMillis !== undefined) poolConfig.connectionTimeoutMillis = connectionTimeoutMillis;
+    if (maxUses !== undefined && maxUses > 0) poolConfig.maxUses = maxUses;
+
+    pool = new Pool(poolConfig);
     db = drizzle(pool, { schema });
     console.log('Database connection initialized (Neon/Postgres)');
   } catch (error) {
