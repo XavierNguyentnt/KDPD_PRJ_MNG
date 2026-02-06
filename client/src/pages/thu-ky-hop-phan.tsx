@@ -5566,7 +5566,7 @@ function ProofreadingContractForm({
           />
           {selectedWork?.stage && (
             <p className="text-xs text-muted-foreground">
-              Giai do?n: {formatStageDisplay(selectedWork.stage)}
+              Giai đoạn: {formatStageDisplay(selectedWork.stage)}
             </p>
           )}
         </div>
