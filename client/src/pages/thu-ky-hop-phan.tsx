@@ -689,6 +689,7 @@ export default function ThuKyHopPhanPage() {
 
   const [tasksPage, setTasksPage] = useState(1);
   const [taskViewMode, setTaskViewMode] = useState<"table" | "board">("table");
+  const [isExportingTasks, setIsExportingTasks] = useState(false);
   const [tcViewMode, setTcViewMode] = useState<"table" | "card">("table");
   const [pcViewMode, setPcViewMode] = useState<"table" | "card">("table");
   const [worksPage, setWorksPage] = useState(1);
@@ -1019,8 +1020,21 @@ export default function ThuKyHopPhanPage() {
     });
   };
 
+  const componentNameById = useMemo(
+    () => new Map(componentsList.map((c) => [c.id, c.name])),
+    [componentsList]
+  );
   const getComponentName = (id: string | null) =>
-    id ? componentsList.find((c) => c.id === id)?.name ?? "—" : "—";
+    id ? componentNameById.get(id) ?? "—" : "—";
+  const workById = useMemo(() => new Map(works.map((w) => [w.id, w])), [works]);
+  const tcById = useMemo(
+    () => new Map(tcScoped.map((c) => [c.id, c])),
+    [tcScoped]
+  );
+  const pcById = useMemo(
+    () => new Map(pcScoped.map((c) => [c.id, c])),
+    [pcScoped]
+  );
   const workTitleById = useMemo(
     () =>
       new Map(
@@ -1303,6 +1317,396 @@ export default function ThuKyHopPhanPage() {
         return "bg-gray-50 text-gray-700";
       default:
         return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const getTaskStatusLabel = (status: string | null | undefined) => {
+    if (!status) return "";
+    if (status === "Not Started") return t.status.notStarted;
+    if (status === "In Progress") return t.status.inProgress;
+    if (status === "Completed") return t.status.completed;
+    if (status === "Pending") return t.status.pending;
+    if (status === "Cancelled") return t.status.cancelled;
+    return status;
+  };
+
+  const getPriorityLabel = (priority: string | null | undefined) => {
+    if (!priority) return "";
+    if (priority === "Low") return t.priority.low;
+    if (priority === "Medium") return t.priority.medium;
+    if (priority === "High") return t.priority.high;
+    if (priority === "Critical") return t.priority.critical;
+    return priority;
+  };
+
+  const getVoteLabel = (vote: string | null | undefined): string => {
+    if (!vote) return "—";
+    const v = vote.toLowerCase();
+    if (language === "vi") {
+      if (v === "tot") return "Hoàn thành tốt";
+      if (v === "kha") return "Hoàn thành khá";
+      if (v === "khong_tot") return "Không tốt";
+      if (v === "khong_hoan_thanh") return "Không hoàn thành";
+    } else {
+      if (v === "tot") return "Good";
+      if (v === "kha") return "Fair";
+      if (v === "khong_tot") return "Poor";
+      if (v === "khong_hoan_thanh") return "Not completed";
+    }
+    return vote;
+  };
+
+  const getAssignmentStatusLabel = (status: string | null | undefined) => {
+    const s = (status ?? "not_started").toLowerCase();
+    if (language === "vi") {
+      if (s === "completed") return "Hoàn thành";
+      if (s === "in_progress") return "Đang thực hiện";
+      return "Chưa bắt đầu";
+    }
+    if (s === "completed") return "Completed";
+    if (s === "in_progress") return "In progress";
+    return "Not started";
+  };
+
+  const getAssignmentLabel = (stageType: string) => {
+    if (stageType === "kiem_soat")
+      return language === "vi" ? "Người kiểm soát" : "Controller";
+    if (stageType.startsWith("nhan_su_"))
+      return (language === "vi" ? "Nhân sự " : "Staff ") +
+        stageType.replace("nhan_su_", "");
+    if (stageType === "primary")
+      return language === "vi" ? "Người thực hiện" : "Assignee";
+    if (stageType === "ktv_chinh")
+      return language === "vi" ? "KTV chính" : "Lead";
+    if (stageType.startsWith("tro_ly_"))
+      return (language === "vi" ? "Trợ lý " : "Assistant ") +
+        stageType.replace("tro_ly_", "");
+    return stageType;
+  };
+
+  const sortAssignments = (
+    assignments: NonNullable<TaskWithAssignmentDetails["assignments"]>
+  ) => {
+    const orderFor = (stageType: string) => {
+      if (stageType === "kiem_soat") return 1000;
+      if (stageType.startsWith("nhan_su_")) {
+        const n = parseInt(stageType.replace("nhan_su_", ""), 10);
+        return Number.isFinite(n) ? n : 200;
+      }
+      if (stageType.startsWith("tro_ly_")) {
+        const n = parseInt(stageType.replace("tro_ly_", ""), 10);
+        return Number.isFinite(n) ? 300 + n : 400;
+      }
+      return 900;
+    };
+    return assignments.slice().sort((a, b) => {
+      const aOrder = orderFor(a.stageType);
+      const bOrder = orderFor(b.stageType);
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return String(a.stageType).localeCompare(String(b.stageType));
+    });
+  };
+
+  const getSupervisorName = (task: TaskWithAssignmentDetails) => {
+    const supervisor = (task.assignments ?? []).find(
+      (a) => a.stageType === "kiem_soat"
+    );
+    return supervisor?.displayName ?? supervisor?.userId ?? "";
+  };
+
+  const buildStaffAssignmentDetails = (task: TaskWithAssignmentDetails) => {
+    const assignments = sortAssignments(task.assignments ?? []).filter(
+      (a) => a.stageType !== "kiem_soat"
+    );
+    if (assignments.length === 0) return "";
+    return assignments
+      .map((assignment) => {
+        let label = getAssignmentLabel(assignment.stageType);
+        if (assignment.stageType.startsWith("nhan_su_")) {
+          const n = assignment.stageType.replace("nhan_su_", "");
+          label = `Nhân sự ${n || ""}`.trim();
+        }
+        const name = assignment.displayName ?? assignment.userId ?? "";
+        const parts: string[] = [];
+        const prefix = label ? `${label}${name ? `: ${name}` : ""}` : name;
+        if (prefix) parts.push(prefix);
+
+        const received = formatDateDDMMYYYY(assignment.receivedAt);
+        if (received) parts.push(`Ngày nhận: ${received}`);
+        const due = formatDateDDMMYYYY(assignment.dueDate);
+        if (due) parts.push(`Ngày hoàn thành dự kiến: ${due}`);
+        const completed = formatDateDDMMYYYY(assignment.completedAt);
+        if (completed) parts.push(`Ngày hoàn thành thực tế: ${completed}`);
+        if (typeof assignment.progress === "number") {
+          parts.push(`Tiến độ: ${assignment.progress}%`);
+        }
+        return `- ${parts.join(" | ")}`;
+      })
+      .join("\r\n");
+  };
+
+  const getWorkForTask = (task: TaskWithAssignmentDetails) => {
+    let workId = task.relatedWorkId ?? null;
+    if (!workId && task.relatedContractId) {
+      const tc = tcById.get(task.relatedContractId);
+      if (tc?.workId) workId = tc.workId;
+      const pc = !workId ? pcById.get(task.relatedContractId) : null;
+      if (pc?.workId) workId = pc.workId;
+    }
+    return workId ? workById.get(workId) : undefined;
+  };
+
+  const handleExportTasks = async () => {
+    if (filteredTasks.length === 0) {
+      toast({
+        title: language === "vi" ? "Không có dữ liệu" : "No data",
+        description:
+          language === "vi"
+            ? "Không có công việc để xuất Excel."
+            : "No tasks to export.",
+      });
+      return;
+    }
+
+    setIsExportingTasks(true);
+    try {
+      const xlsxModule = await import("xlsx");
+      const XLSX = xlsxModule.default || xlsxModule;
+
+      const taskHeaders = [
+        "ID",
+        "Tiêu đề",
+        "Nhóm",
+        "Trạng thái",
+        "Mức độ ưu tiên",
+        "Tiến độ (%)",
+        "Phân công chi tiết",
+        "Người kiểm soát:",
+        "Ngày nhận công việc",
+        "Hạn hoàn thành",
+        "Ngày hoàn thành thực tế",
+        "Đánh giá",
+        "Tác phẩm",
+        "Mã tài liệu",
+        "Tiêu đề Hán Nôm",
+        "Hợp phần",
+        "Giai đoạn",
+        "Ghi chú",
+        "Ngày tạo",
+        "Ngày cập nhật",
+      ];
+
+      const assignmentHeaders = [
+        "Task ID",
+        "Tiêu đề",
+        "Nhóm",
+        "Tác phẩm",
+        "Mã tài liệu",
+        "Hợp phần",
+        "Giai đoạn",
+        "Vai trò",
+        "Nhân sự",
+        "Ngày nhận",
+        "Hạn",
+        "Hoàn thành thực tế",
+        "Trạng thái",
+        "Tiến độ (%)",
+        "Đánh giá",
+      ];
+
+      const tasksRows = filteredTasks.map((task) => {
+        const work = getWorkForTask(task);
+        const workTitle =
+          work?.titleVi ??
+          work?.documentCode ??
+          work?.titleHannom ??
+          "—";
+        const componentName = work?.componentId
+          ? getComponentName(work.componentId)
+          : "—";
+        const stageDisplay = work?.stage
+          ? formatStageDisplay(work.stage)
+          : "—";
+        const assignmentSummary = buildStaffAssignmentDetails(task);
+        const supervisorName = getSupervisorName(task);
+        const noteValue =
+          (task as TaskWithAssignmentDetails & { note?: string | null }).note ??
+          task.notes ??
+          "";
+        const detailText = assignmentSummary ? `'${assignmentSummary}` : "";
+        const noteText = noteValue ? `'${noteValue}` : "";
+        return {
+          ID: task.id,
+          "Tiêu đề": task.title ?? "",
+          Nhóm: task.group ?? "",
+          "Trạng thái": getTaskStatusLabel(task.status),
+          "Mức độ ưu tiên": getPriorityLabel(task.priority),
+          "Tiến độ (%)":
+            typeof task.progress === "number" ? task.progress : "",
+          "Phân công chi tiết": detailText,
+          "Người kiểm soát:": supervisorName,
+          "Ngày nhận công việc": formatDateDDMMYYYY(
+            (task as TaskWithAssignmentDetails & { receivedAt?: string | Date | null })
+              .receivedAt
+          ),
+          "Hạn hoàn thành": formatDateDDMMYYYY(task.dueDate),
+          "Ngày hoàn thành thực tế": formatDateDDMMYYYY(task.actualCompletedAt),
+          "Đánh giá": getVoteLabel(task.vote),
+          "Tác phẩm": workTitle,
+          "Mã tài liệu": work?.documentCode ?? "",
+          "Tiêu đề Hán Nôm": work?.titleHannom ?? "",
+          "Hợp phần": componentName,
+          "Giai đoạn": stageDisplay,
+          "Ghi chú": noteText,
+          "Ngày tạo": formatDateDDMMYYYY(task.createdAt),
+          "Ngày cập nhật": formatDateDDMMYYYY(task.updatedAt),
+        };
+      });
+
+      const assignmentRows = filteredTasks.flatMap((task) => {
+        const work = getWorkForTask(task);
+        const workTitle =
+          work?.titleVi ??
+          work?.documentCode ??
+          work?.titleHannom ??
+          "—";
+        const componentName = work?.componentId
+          ? getComponentName(work.componentId)
+          : "—";
+        const stageDisplay = work?.stage
+          ? formatStageDisplay(work.stage)
+          : "—";
+        const assignments = sortAssignments(task.assignments ?? []);
+        return assignments.map((assignment) => ({
+          "Task ID": task.id,
+          "Tiêu đề": task.title ?? "",
+          Nhóm: task.group ?? "",
+          "Tác phẩm": workTitle,
+          "Mã tài liệu": work?.documentCode ?? "",
+          "Hợp phần": componentName,
+          "Giai đoạn": stageDisplay,
+          "Vai trò": getAssignmentLabel(assignment.stageType),
+          "Nhân sự": assignment.displayName ?? assignment.userId ?? "",
+          "Ngày nhận": formatDateDDMMYYYY(assignment.receivedAt),
+          "Hạn": formatDateDDMMYYYY(assignment.dueDate),
+          "Hoàn thành thực tế": formatDateDDMMYYYY(assignment.completedAt),
+          "Trạng thái": getAssignmentStatusLabel(assignment.status),
+          "Tiến độ (%)":
+            typeof assignment.progress === "number" ? assignment.progress : "",
+          "Đánh giá":
+            assignment.stageType === "kiem_soat"
+              ? getVoteLabel(task.vote)
+              : "",
+        }));
+      });
+
+      const workbook = XLSX.utils.book_new();
+      const tasksSheet = XLSX.utils.json_to_sheet(tasksRows, {
+        header: taskHeaders,
+      });
+      const detailColIndex = taskHeaders.indexOf("Phân công chi tiết");
+      const noteColIndex = taskHeaders.indexOf("Ghi chú");
+      if (detailColIndex >= 0) {
+        for (let i = 0; i < tasksRows.length; i += 1) {
+          const cellRef = XLSX.utils.encode_cell({
+            r: i + 1,
+            c: detailColIndex,
+          });
+          if (tasksSheet[cellRef]) {
+            tasksSheet[cellRef].t = "s";
+            tasksSheet[cellRef].s = {
+              alignment: { wrapText: true, vertical: "top" },
+            };
+          } else {
+            tasksSheet[cellRef] = {
+              t: "s",
+              v: "",
+              s: { alignment: { wrapText: true, vertical: "top" } },
+            };
+          }
+        }
+      }
+
+      const countLines = (value: unknown) => {
+        if (value == null) return 1;
+        const text = String(value);
+        if (!text) return 1;
+        return text.split(/\r\n|\n/).length;
+      };
+      const detailKey = "Phân công chi tiết";
+      const noteKey = "Ghi chú";
+      const rowsMeta: Array<{ hpt?: number }> = [];
+      for (let i = 0; i < tasksRows.length; i += 1) {
+        const row = tasksRows[i] as Record<string, unknown>;
+        const lines = Math.max(
+          countLines(row[detailKey]),
+          countLines(row[noteKey])
+        );
+        if (lines > 1) {
+          rowsMeta[i + 1] = { hpt: Math.max(18, lines * 16) };
+        }
+      }
+      if (rowsMeta.length > 0) {
+        tasksSheet["!rows"] = rowsMeta;
+      }
+      if (noteColIndex >= 0) {
+        for (let i = 0; i < tasksRows.length; i += 1) {
+          const cellRef = XLSX.utils.encode_cell({
+            r: i + 1,
+            c: noteColIndex,
+          });
+          if (tasksSheet[cellRef]) {
+            tasksSheet[cellRef].t = "s";
+            tasksSheet[cellRef].s = {
+              alignment: { wrapText: true, vertical: "top" },
+            };
+          } else {
+            tasksSheet[cellRef] = {
+              t: "s",
+              v: "",
+              s: { alignment: { wrapText: true, vertical: "top" } },
+            };
+          }
+        }
+      }
+      const assignmentsSheet =
+        assignmentRows.length > 0
+          ? XLSX.utils.json_to_sheet(assignmentRows, {
+              header: assignmentHeaders,
+            })
+          : XLSX.utils.aoa_to_sheet([assignmentHeaders]);
+      XLSX.utils.book_append_sheet(workbook, tasksSheet, "Cong_viec");
+      XLSX.utils.book_append_sheet(workbook, assignmentsSheet, "Phan_cong");
+
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const now = new Date();
+      const dateStamp = `${now.getFullYear()}${pad(
+        now.getMonth() + 1
+      )}${pad(now.getDate())}`;
+      const fileName = `thu-ky-hop-phan-cong-viec-${dateStamp}.xlsx`;
+      XLSX.writeFile(workbook, fileName, { bookType: "xlsx" });
+
+      toast({
+        title: language === "vi" ? "Xuất Excel thành công" : "Exported",
+        description:
+          language === "vi"
+            ? `Đã xuất ${filteredTasks.length} công việc.`
+            : `Exported ${filteredTasks.length} tasks.`,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : language === "vi"
+            ? "Xuất Excel thất bại."
+            : "Failed to export.";
+      toast({
+        title: language === "vi" ? "Lỗi" : "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingTasks(false);
     }
   };
 
@@ -1979,6 +2383,19 @@ export default function ThuKyHopPhanPage() {
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportTasks}
+                  disabled={isExportingTasks || tasksLoading || filteredTasks.length === 0}
+                >
+                  {isExportingTasks ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4 mr-2" />
+                  )}
+                  {language === "vi" ? "Xuất Excel" : "Export Excel"}
+                </Button>
                 <ToggleGroup
                   type="single"
                   value={taskViewMode}
