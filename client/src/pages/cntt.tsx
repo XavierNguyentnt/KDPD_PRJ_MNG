@@ -1,17 +1,42 @@
 import { useMemo, useState } from "react";
-import { useTasks, useRefreshTasks, useCreateTask, useDeleteTask, UserRole } from "@/hooks/use-tasks";
+import {
+  useTasks,
+  useRefreshTasks,
+  useCreateTask,
+  useDeleteTask,
+  UserRole,
+} from "@/hooks/use-tasks";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
-import { useWorks, useComponents, useUsers } from "@/hooks/use-works-and-components";
+import {
+  useWorks,
+  useComponents,
+  useUsers,
+} from "@/hooks/use-works-and-components";
 import { TaskStatsBadgesOnly } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
-import { TaskTable, sortTasks, type TaskSortColumn } from "@/components/task-table";
+import {
+  TaskTable,
+  sortTasks,
+  type TaskSortColumn,
+} from "@/components/task-table";
 import { TaskKanbanBoard } from "@/components/task-kanban-board";
-import { TaskFilters, getDefaultTaskFilters, applyTaskFilters, type TaskFilterState } from "@/components/task-filters";
+import {
+  TaskFilters,
+  getDefaultTaskFilters,
+  applyTaskFilters,
+  type TaskFilterState,
+} from "@/components/task-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -24,13 +49,64 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, RefreshCw, Search, Filter, AlertTriangle, Plus, LayoutGrid, List } from "lucide-react";
+import {
+  Loader2,
+  RefreshCw,
+  Search,
+  Filter,
+  AlertTriangle,
+  Plus,
+  LayoutGrid,
+  List,
+} from "lucide-react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
 import { normalizeSearch } from "@/lib/utils";
+import * as XLSX from "xlsx";
+import { useTaskListControls } from "@/hooks/use-task-list-controls";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 const INCLUDED_GROUPS = ["CNTT", "Quét trùng lặp"];
 const DEFAULT_GROUP = "CNTT";
+
+import type { TaskWithAssignmentDetails as TTask } from "@shared/schema";
+function handleExportTasks(
+  filteredTasks: TTask[],
+  language: string,
+  toast: (opts: any) => any,
+) {
+  if (filteredTasks.length === 0) {
+    toast({
+      title: language === "vi" ? "Không có dữ liệu" : "No data",
+      description:
+        language === "vi"
+          ? "Không có công việc để xuất Excel."
+          : "No tasks to export.",
+    });
+    return;
+  }
+
+  const taskHeaders = [
+    "ID",
+    "Tiêu đề",
+    "Nhóm",
+    "Trạng thái",
+    "Người thực hiện",
+  ];
+  const taskData = filteredTasks.map((task) => [
+    task.id,
+    task.title,
+    task.group,
+    task.status,
+    task.assignee,
+  ]);
+
+  const worksheet = XLSX.utils.aoa_to_sheet([taskHeaders, ...taskData]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
+
+  XLSX.writeFile(workbook, "CNTT_Tasks.xlsx");
+}
 
 export default function CNTTPage() {
   const { data: tasks, isLoading, isError } = useTasks();
@@ -40,81 +116,74 @@ export default function CNTTPage() {
   const { role, user } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
-
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<TaskFilterState>(getDefaultTaskFilters);
-  const [groupFilter, setGroupFilter] = useState("all");
-  const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
-  const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
-  const [deleteTaskConfirmOpen, setDeleteTaskConfirmOpen] = useState(false);
-  const [deleteTaskTarget, setDeleteTaskTarget] = useState<TaskWithAssignmentDetails | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"table" | "board">("table");
-
   const { data: works = [] } = useWorks();
+
+  const {
+    search,
+    setSearch,
+    filters,
+    setFilters,
+    groupFilter,
+    setGroupFilter,
+    sortBy,
+    sortDir,
+    handleSort,
+    viewMode,
+    setViewMode,
+    filteredTasks,
+    availableGroups,
+  } = useTaskListControls({
+    tasks,
+    role,
+    userDisplayName: user?.displayName,
+    works,
+    includedGroups: INCLUDED_GROUPS,
+  });
+  const [selectedTask, setSelectedTask] =
+    useState<TaskWithAssignmentDetails | null>(null);
+  const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const deleteConfirm = useConfirmDialog<TaskWithAssignmentDetails>();
+
   const { data: components = [] } = useComponents();
   const usersQuery = useUsers();
   const users = usersQuery.data ?? [];
-  const stages = useMemo(() => Array.from(new Set(works.map((w) => w.stage).filter(Boolean))) as string[], [works]);
-  const componentOptions = useMemo(() => components.map((c) => ({ id: c.id, name: c.name })), [components]);
-
-  const availableGroups = useMemo(() => {
-    if (!tasks) return [];
-    const groups = new Set(
-      tasks
-        .filter((t) => INCLUDED_GROUPS.includes(t.group || ""))
-        .map((t) => t.group)
-        .filter(Boolean)
-    );
-    return Array.from(groups).sort();
-  }, [tasks]);
-
-  const filteredTasks = useMemo(() => {
-    if (!tasks) return [];
-    let list = tasks.filter((t) => INCLUDED_GROUPS.includes(t.group || ""));
-    if (groupFilter !== "all") list = list.filter((t) => t.group === groupFilter);
-    if (role === UserRole.EMPLOYEE) {
-      list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
-    }
-    if (search.trim()) {
-      const q = normalizeSearch(search.trim());
-      list = list.filter(
-        (t) =>
-          normalizeSearch(t.title ?? "").includes(q) ||
-          normalizeSearch(t.description ?? "").includes(q) ||
-          normalizeSearch(t.assignee ?? "").includes(q) ||
-          normalizeSearch(t.id ?? "").includes(q)
-      );
-    }
-    list = applyTaskFilters(list, filters, works);
-    return sortTasks(list, sortBy, sortDir);
-  }, [tasks, role, user?.displayName, search, groupFilter, filters, works, sortBy, sortDir]);
-
-  const handleSort = (column: TaskSortColumn) => {
-    setSortBy((prev) => {
-      if (prev === column) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-      else setSortDir("asc");
-      return column;
-    });
-  };
+  const stages = useMemo(
+    () =>
+      Array.from(
+        new Set(works.map((w) => w.stage).filter(Boolean)),
+      ) as string[],
+    [works],
+  );
+  const componentOptions = useMemo(
+    () => components.map((c) => ({ id: c.id, name: c.name })),
+    [components],
+  );
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "High": return "bg-orange-100 text-orange-700 hover:bg-orange-100/80";
-      case "Critical": return "bg-red-100 text-red-700 hover:bg-red-100/80";
-      case "Medium": return "bg-blue-100 text-blue-700 hover:bg-blue-100/80";
-      default: return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
+      case "High":
+        return "bg-orange-100 text-orange-700 hover:bg-orange-100/80";
+      case "Critical":
+        return "bg-red-100 text-red-700 hover:bg-red-100/80";
+      case "Medium":
+        return "bg-blue-100 text-blue-700 hover:bg-blue-100/80";
+      default:
+        return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
     }
   };
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Completed": return "bg-green-100 text-green-700 hover:bg-green-100/80";
-      case "In Progress": return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
-      case "Pending": return "bg-amber-100 text-amber-700 hover:bg-amber-100/80";
-      case "Cancelled": return "bg-red-100 text-red-700 hover:bg-red-100/80";
-      default: return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
+      case "Completed":
+        return "bg-green-100 text-green-700 hover:bg-green-100/80";
+      case "In Progress":
+        return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
+      case "Pending":
+        return "bg-amber-100 text-amber-700 hover:bg-amber-100/80";
+      case "Cancelled":
+        return "bg-red-100 text-red-700 hover:bg-red-100/80";
+      default:
+        return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
     }
   };
 
@@ -134,9 +203,13 @@ export default function CNTTPage() {
           <AlertTriangle className="w-8 h-8" />
         </div>
         <h2 className="text-xl font-bold">{t.errors.failedToLoad}</h2>
-        <p className="text-muted-foreground max-w-md">{t.errors.failedToLoad}</p>
+        <p className="text-muted-foreground max-w-md">
+          {t.errors.failedToLoad}
+        </p>
         <Button onClick={() => refresh()} disabled={isRefreshing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+          />
           {t.errors.retryConnection}
         </Button>
       </div>
@@ -149,7 +222,8 @@ export default function CNTTPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-sm text-muted-foreground">
-              Quản lý công việc CNTT và quét trùng lặp với nhiều nhân sự thực hiện
+              Quản lý công việc CNTT và quét trùng lặp với nhiều nhân sự thực
+              hiện
             </p>
           </div>
           <div className="text-sm text-muted-foreground flex items-center gap-2">
@@ -157,26 +231,31 @@ export default function CNTTPage() {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 w-8 p-0"
+              className="btn-icon"
               onClick={() => refresh()}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+              disabled={isRefreshing}>
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+              />
             </Button>
           </div>
         </div>
         <TaskStatsBadgesOnly tasks={filteredTasks} />
       </section>
 
-      <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
+      <section className="section-card">
+        <div className="section-header">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
             <Badge variant="secondary" className="font-normal">
               {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
             </Badge>
             {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
-              <Button size="sm" onClick={() => setIsCreateDialogOpen(true)} disabled={isCreating} className="ml-2">
+              <Button
+                size="sm"
+                onClick={() => setIsCreateDialogOpen(true)}
+                disabled={isCreating}
+                className="ml-2">
                 <Plus className="w-4 h-4 mr-2" />
                 {t.dashboard.createNew}
               </Button>
@@ -186,8 +265,13 @@ export default function CNTTPage() {
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t.common.search + " " + t.dashboard.tasks.toLowerCase() + "..."}
-                className="pl-9 bg-background"
+                placeholder={
+                  t.common.search +
+                  " " +
+                  t.dashboard.tasks.toLowerCase() +
+                  "..."
+                }
+                className="search-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -199,19 +283,22 @@ export default function CNTTPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.dashboard.allGroups}</SelectItem>
-                {availableGroups.filter((g): g is string => !!g).map((group) => (
-                  <SelectItem key={group} value={group}>
-                    {group}
-                  </SelectItem>
-                ))}
+                {availableGroups
+                  .filter((g): g is string => !!g)
+                  .map((group) => (
+                    <SelectItem key={group} value={group}>
+                      {group}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <ToggleGroup
               type="single"
               value={viewMode}
-              onValueChange={(v) => v && (v === "table" || v === "board") && setViewMode(v)}
-              className="border rounded-md bg-background"
-            >
+              onValueChange={(v) =>
+                v && (v === "table" || v === "board") && setViewMode(v)
+              }
+              className="toggle-group-box">
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
                 <List className="h-4 w-4 mr-1.5" />
                 {t.dashboard.viewTable}
@@ -224,7 +311,7 @@ export default function CNTTPage() {
           </div>
         </div>
 
-        <div className="px-4 py-3 border-b border-border bg-muted/20">
+        <div className="filter-bar">
           <TaskFilters
             users={users}
             components={componentOptions}
@@ -257,8 +344,7 @@ export default function CNTTPage() {
                 setTaskDialogMode("edit");
               },
               onDelete: (task) => {
-                setDeleteTaskTarget(task);
-                setDeleteTaskConfirmOpen(true);
+                deleteConfirm.ask(task);
               },
             }}
             columns={{
@@ -289,7 +375,20 @@ export default function CNTTPage() {
         )}
       </section>
 
-      <TaskDialog open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)} task={selectedTask} mode={taskDialogMode} />
+      <div className="flex justify-end p-4">
+        <Button
+          onClick={() => handleExportTasks(filteredTasks, language, toast)}
+          disabled={filteredTasks.length === 0}>
+          Xuất Excel
+        </Button>
+      </div>
+
+      <TaskDialog
+        open={!!selectedTask}
+        onOpenChange={(open) => !open && setSelectedTask(null)}
+        task={selectedTask}
+        mode={taskDialogMode}
+      />
 
       <TaskDialog
         open={isCreateDialogOpen}
@@ -303,7 +402,10 @@ export default function CNTTPage() {
               onSuccess: () => {
                 toast({
                   title: t.common.success,
-                  description: t.task.createNew + " " + (language === "vi" ? "thành công" : "successfully"),
+                  description:
+                    t.task.createNew +
+                    " " +
+                    (language === "vi" ? "thành công" : "successfully"),
                 });
                 setIsCreateDialogOpen(false);
               },
@@ -314,36 +416,37 @@ export default function CNTTPage() {
                   variant: "destructive",
                 });
               },
-            }
+            },
           );
         }}
         isCreating={isCreating}
       />
 
-      <AlertDialog open={deleteTaskConfirmOpen} onOpenChange={setDeleteTaskConfirmOpen}>
+      <AlertDialog
+        open={deleteConfirm.open}
+        onOpenChange={deleteConfirm.setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Xác nhận xóa công việc</AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa công việc "{deleteTaskTarget?.title ?? deleteTaskTarget?.id}"?
-              Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa công việc "
+              {deleteConfirm.target?.title ?? deleteConfirm.target?.id}"? Hành
+              động này không thể hoàn tác.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (!deleteTaskTarget?.id) return;
-                deleteTask(deleteTaskTarget.id, {
+                if (!deleteConfirm.target?.id) return;
+                deleteTask(deleteConfirm.target.id, {
                   onSuccess: () => {
-                    setDeleteTaskConfirmOpen(false);
-                    setDeleteTaskTarget(null);
+                    deleteConfirm.cancel();
                   },
                 });
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isDeleting}
-            >
+              disabled={isDeleting}>
               Xóa
             </AlertDialogAction>
           </AlertDialogFooter>

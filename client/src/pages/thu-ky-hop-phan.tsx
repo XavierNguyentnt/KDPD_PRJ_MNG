@@ -1,6 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useQueries,
+} from "@tanstack/react-query";
+import * as XLSX from "xlsx";
 import {
   useTasks,
   useCreateTask,
@@ -159,7 +165,7 @@ export type ProofreadingContractSortColumn =
 function sortWorks(
   works: Work[],
   sortColumns: Array<{ column: WorkSortColumn; dir: "asc" | "desc" }>,
-  getComponentName: (id: string | null) => string
+  getComponentName: (id: string | null) => string,
 ): Work[] {
   if (sortColumns.length === 0) return works.slice();
 
@@ -228,7 +234,7 @@ function sortTranslationContracts(
     column: TranslationContractSortColumn;
     dir: "asc" | "desc";
   }>,
-  getComponentName: (id: string | null) => string
+  getComponentName: (id: string | null) => string,
 ): TranslationContract[] {
   if (sortColumns.length === 0) return contracts.slice();
 
@@ -264,7 +270,7 @@ function sortTranslationContracts(
           : "";
         if (av === bv) continue;
         const cmp = av < bv ? -1 : 1;
-        if (cmp !== 0) return cmp * dir;
+        return cmp * dir;
         continue; // Equal values, try next sort column
       } else if (
         sortBy === "unitPrice" ||
@@ -307,7 +313,7 @@ function sortProofreadingContracts(
     column: ProofreadingContractSortColumn;
     dir: "asc" | "desc";
   }>,
-  getComponentName: (id: string | null) => string
+  getComponentName: (id: string | null) => string,
 ): ProofreadingContract[] {
   if (sortColumns.length === 0) return contracts.slice();
 
@@ -341,7 +347,7 @@ function sortProofreadingContracts(
           : "";
         if (av === bv) continue;
         const cmp = av < bv ? -1 : 1;
-        if (cmp !== 0) return cmp * dir;
+        return cmp * dir;
         continue; // Equal values, try next sort column
       } else if (
         sortBy === "contractValue" ||
@@ -471,7 +477,7 @@ function parseDateOnly(value: string | Date | null | undefined): Date | null {
 
 function formatDurationMonths(
   startDate: string | Date | null | undefined,
-  endDate: string | Date | null | undefined
+  endDate: string | Date | null | undefined,
 ): string {
   const start = parseDateOnly(startDate);
   const end = parseDateOnly(endDate);
@@ -501,7 +507,7 @@ const contractPillClass: Record<ContractPill["tone"], string> = {
 
 function buildTranslationContractPills(
   contract: TranslationContract,
-  opts: { proofreadingCompletedDate?: string; editingCompletedDate?: string }
+  opts: { proofreadingCompletedDate?: string; editingCompletedDate?: string },
 ): ContractPill[] {
   const pills: ContractPill[] = [];
   const proofreadingCompleted =
@@ -513,7 +519,7 @@ function buildTranslationContractPills(
   } else {
     pills.push({
       label: `Đã kiểm tra tiến độ (${formatDateDDMMYYYY(
-        contract.progressCheckDate
+        contract.progressCheckDate,
       )})`,
       tone: "info",
     });
@@ -521,7 +527,7 @@ function buildTranslationContractPills(
   if (contract.expertReviewDate) {
     pills.push({
       label: `Đã thẩm định cấp chuyên gia (${formatDateDDMMYYYY(
-        contract.expertReviewDate
+        contract.expertReviewDate,
       )})`,
       tone: "info",
     });
@@ -529,7 +535,7 @@ function buildTranslationContractPills(
   if (contract.projectAcceptanceDate) {
     pills.push({
       label: `Đã nghiệm thu cấp Dự án (${formatDateDDMMYYYY(
-        contract.projectAcceptanceDate
+        contract.projectAcceptanceDate,
       )})`,
       tone: "success",
     });
@@ -591,7 +597,7 @@ function parseStageNumber(stage: string | null | undefined): string {
 // Helper function to generate pagination items with ellipsis
 function generatePaginationItems(
   currentPage: number,
-  totalPages: number
+  totalPages: number,
 ): (number | "ellipsis")[] {
   if (totalPages <= 7) {
     // Show all pages if 7 or fewer
@@ -657,6 +663,19 @@ async function fetchComponents(): Promise<Component[]> {
   return res.json();
 }
 
+async function fetchFinanceSummary(
+  contractId: string,
+): Promise<{ totalPaid: number; totalAdvance: number; outstanding: number }> {
+  const res = await fetch(
+    buildUrl(api.finance.translationContractSummary.path, { id: contractId }),
+    {
+      credentials: "include",
+    },
+  );
+  if (!res.ok) throw new Error("Không tải được tóm tắt tài chính");
+  return res.json();
+}
+
 const ROLE_THU_KY_NAME = "Thư ký hợp phần";
 const ROLE_THU_KY_CODE = "prj_secretary";
 
@@ -670,9 +689,9 @@ export default function ThuKyHopPhanPage() {
   const thuKyRole = useMemo(
     () =>
       user?.roles?.find(
-        (r) => r.name === ROLE_THU_KY_NAME || r.code === ROLE_THU_KY_CODE
+        (r) => r.name === ROLE_THU_KY_NAME || r.code === ROLE_THU_KY_CODE,
       ),
-    [user?.roles]
+    [user?.roles],
   );
   const allowedComponentIds = useMemo(
     () =>
@@ -681,7 +700,7 @@ export default function ThuKyHopPhanPage() {
             .filter((a) => a.roleId === thuKyRole.id && a.componentId)
             .map((a) => a.componentId as string)
         : [],
-    [thuKyRole, user?.roleAssignments]
+    [thuKyRole, user?.roleAssignments],
   );
   // Admin, Quản lý có thể xem tất cả trang quản lý công việc (kể cả Thư ký hợp phần).
   const canAccessPage =
@@ -697,7 +716,7 @@ export default function ThuKyHopPhanPage() {
   const [pcPage, setPcPage] = useState(1);
   const [tasksSearch, setTasksSearch] = useState("");
   const [taskFilters, setTaskFilters] = useState<TaskFilterState>(
-    getDefaultTaskFilters
+    getDefaultTaskFilters,
   );
   const [taskSortBy, setTaskSortBy] = useState<TaskSortColumn | null>(null);
   const [taskSortDir, setTaskSortDir] = useState<"asc" | "desc">("asc");
@@ -802,8 +821,8 @@ export default function ThuKyHopPhanPage() {
         (m: { proofreadingContractId: string; userId: string }) => [
           m.proofreadingContractId,
           m.userId,
-        ]
-      )
+        ],
+      ),
     );
     return (contractId: string | null | undefined): string => {
       if (!contractId) return "—";
@@ -820,7 +839,7 @@ export default function ThuKyHopPhanPage() {
         const list = membersByContractId.get(m.translationContractId) ?? [];
         if (!list.includes(m.userId)) list.push(m.userId);
         membersByContractId.set(m.translationContractId, list);
-      }
+      },
     );
     return (contractId: string | null | undefined): string => {
       if (!contractId) return "—";
@@ -842,49 +861,49 @@ export default function ThuKyHopPhanPage() {
     () =>
       allowedComponentIds.length > 0
         ? works.filter(
-            (w) => w.componentId && allowedComponentIds.includes(w.componentId)
+            (w) => w.componentId && allowedComponentIds.includes(w.componentId),
           )
         : works,
-    [works, allowedComponentIds]
+    [works, allowedComponentIds],
   );
   const tcScoped = useMemo(
     () =>
       allowedComponentIds.length > 0
         ? translationContracts.filter(
-            (c) => c.componentId && allowedComponentIds.includes(c.componentId)
+            (c) => c.componentId && allowedComponentIds.includes(c.componentId),
           )
         : translationContracts,
-    [translationContracts, allowedComponentIds]
+    [translationContracts, allowedComponentIds],
   );
   const pcScoped = useMemo(
     () =>
       allowedComponentIds.length > 0
         ? proofreadingContracts.filter(
-            (c) => c.componentId && allowedComponentIds.includes(c.componentId)
+            (c) => c.componentId && allowedComponentIds.includes(c.componentId),
           )
         : proofreadingContracts,
-    [proofreadingContracts, allowedComponentIds]
+    [proofreadingContracts, allowedComponentIds],
   );
 
   const taskStages = useMemo(
     () =>
       Array.from(
-        new Set(worksScoped.map((w) => w.stage).filter(Boolean))
+        new Set(worksScoped.map((w) => w.stage).filter(Boolean)),
       ) as string[],
-    [worksScoped]
+    [worksScoped],
   );
   const taskComponentOptions = useMemo(
     () => componentsList.map((c) => ({ id: c.id, name: c.name })),
-    [componentsList]
+    [componentsList],
   );
 
   // Get unique stages from works for filtering
   const worksStages = useMemo(
     () =>
       Array.from(
-        new Set(worksScoped.map((w) => w.stage).filter(Boolean))
+        new Set(worksScoped.map((w) => w.stage).filter(Boolean)),
       ).sort() as string[],
-    [worksScoped]
+    [worksScoped],
   );
 
   // Reset page to 1 when filters change
@@ -914,12 +933,12 @@ export default function ThuKyHopPhanPage() {
           (t.relatedWorkId && allowedWorkIds.has(t.relatedWorkId)) ||
           (t.relatedContractId &&
             (allowedTcIds.has(t.relatedContractId) ||
-              allowedPcIds.has(t.relatedContractId)))
+              allowedPcIds.has(t.relatedContractId))),
       );
     }
     if (role === UserRole.EMPLOYEE) {
       list = list.filter((t) =>
-        t.assignee?.includes((user?.displayName ?? "").split(" ")[0])
+        t.assignee?.includes((user?.displayName ?? "").split(" ")[0]),
       );
     }
     if (tasksSearch.trim()) {
@@ -929,7 +948,7 @@ export default function ThuKyHopPhanPage() {
           normalizeSearch(t.title ?? "").includes(q) ||
           normalizeSearch(t.description ?? "").includes(q) ||
           normalizeSearch(t.assignee ?? "").includes(q) ||
-          normalizeSearch(t.group ?? "").includes(q)
+          normalizeSearch(t.group ?? "").includes(q),
       );
     }
     list = applyTaskFilters(list, taskFilters, worksScoped);
@@ -980,7 +999,7 @@ export default function ThuKyHopPhanPage() {
 
   const handleTcSort = (
     column: TranslationContractSortColumn,
-    e?: React.MouseEvent
+    e?: React.MouseEvent,
   ) => {
     setTcSortColumns((prev) => {
       const existingIndex = prev.findIndex((s) => s.column === column);
@@ -1001,7 +1020,7 @@ export default function ThuKyHopPhanPage() {
 
   const handlePcSort = (
     column: ProofreadingContractSortColumn,
-    e?: React.MouseEvent
+    e?: React.MouseEvent,
   ) => {
     setPcSortColumns((prev) => {
       const existingIndex = prev.findIndex((s) => s.column === column);
@@ -1022,18 +1041,18 @@ export default function ThuKyHopPhanPage() {
 
   const componentNameById = useMemo(
     () => new Map(componentsList.map((c) => [c.id, c.name])),
-    [componentsList]
+    [componentsList],
   );
   const getComponentName = (id: string | null) =>
-    id ? componentNameById.get(id) ?? "—" : "—";
+    id ? (componentNameById.get(id) ?? "—") : "—";
   const workById = useMemo(() => new Map(works.map((w) => [w.id, w])), [works]);
   const tcById = useMemo(
     () => new Map(tcScoped.map((c) => [c.id, c])),
-    [tcScoped]
+    [tcScoped],
   );
   const pcById = useMemo(
     () => new Map(pcScoped.map((c) => [c.id, c])),
-    [pcScoped]
+    [pcScoped],
   );
   const workTitleById = useMemo(
     () =>
@@ -1041,12 +1060,12 @@ export default function ThuKyHopPhanPage() {
         worksScoped.map((w) => [
           w.id,
           w.titleVi ?? w.documentCode ?? w.titleHannom ?? w.id.slice(0, 8),
-        ])
+        ]),
       ),
-    [worksScoped]
+    [worksScoped],
   );
   const getWorkTitle = (id: string | null) =>
-    id ? workTitleById.get(id) ?? "—" : "—";
+    id ? (workTitleById.get(id) ?? "—") : "—";
 
   // Filter and sort ALL data from DB (before pagination)
   // Order: Filter -> Sort -> Paginate (in paginatedWorks)
@@ -1073,7 +1092,7 @@ export default function ThuKyHopPhanPage() {
             (normalizeSearch(formatStageDisplay(w.stage)).includes(q) ||
               normalizeSearch(w.stage).includes(q))) ||
           (w.documentCode && normalizeSearch(w.documentCode).includes(q)) ||
-          normalizeSearch(getComponentName(w.componentId)).includes(q)
+          normalizeSearch(getComponentName(w.componentId)).includes(q),
       );
     }
 
@@ -1101,7 +1120,7 @@ export default function ThuKyHopPhanPage() {
     // Step 2: Filter by stage (via work)
     if (tcStageFilter && tcStageFilter !== "all") {
       const workIdsWithStage = new Set(
-        worksScoped.filter((w) => w.stage === tcStageFilter).map((w) => w.id)
+        worksScoped.filter((w) => w.stage === tcStageFilter).map((w) => w.id),
       );
       list = list.filter((c) => c.workId && workIdsWithStage.has(c.workId));
     }
@@ -1113,7 +1132,7 @@ export default function ThuKyHopPhanPage() {
         (c) =>
           (c.contractNumber && normalizeSearch(c.contractNumber).includes(q)) ||
           normalizeSearch(getComponentName(c.componentId)).includes(q) ||
-          normalizeSearch(getWorkTitle(c.workId)).includes(q)
+          normalizeSearch(getWorkTitle(c.workId)).includes(q),
       );
     }
     if (tcTranslatorSearch.trim()) {
@@ -1152,7 +1171,7 @@ export default function ThuKyHopPhanPage() {
     // Step 2: Filter by stage (via work)
     if (pcStageFilter && pcStageFilter !== "all") {
       const workIdsWithStage = new Set(
-        worksScoped.filter((w) => w.stage === pcStageFilter).map((w) => w.id)
+        worksScoped.filter((w) => w.stage === pcStageFilter).map((w) => w.id),
       );
       list = list.filter((c) => c.workId && workIdsWithStage.has(c.workId));
     }
@@ -1165,7 +1184,7 @@ export default function ThuKyHopPhanPage() {
           (c.contractNumber && normalizeSearch(c.contractNumber).includes(q)) ||
           normalizeSearch(getProofreaderName(c.id)).includes(q) ||
           normalizeSearch(getComponentName(c.componentId)).includes(q) ||
-          normalizeSearch(getWorkTitle(c.workId)).includes(q)
+          normalizeSearch(getWorkTitle(c.workId)).includes(q),
       );
     }
 
@@ -1188,7 +1207,7 @@ export default function ThuKyHopPhanPage() {
       const date =
         typeof c.actualCompletionDate === "string"
           ? c.actualCompletionDate.slice(0, 10)
-          : c.actualCompletionDate.toISOString().slice(0, 10);
+          : new Date(c.actualCompletionDate as any).toISOString().slice(0, 10);
       if (c.translationContractId) {
         const prev = map.get(c.translationContractId);
         if (!prev || date > prev) map.set(c.translationContractId, date);
@@ -1204,7 +1223,7 @@ export default function ThuKyHopPhanPage() {
       const date =
         typeof c.actualCompletionDate === "string"
           ? c.actualCompletionDate.slice(0, 10)
-          : c.actualCompletionDate.toISOString().slice(0, 10);
+          : new Date(c.actualCompletionDate as any).toISOString().slice(0, 10);
       const prev = map.get(c.workId);
       if (!prev || date > prev) map.set(c.workId, date);
     });
@@ -1252,7 +1271,7 @@ export default function ThuKyHopPhanPage() {
   }, [filteredTasks, tasksPage]);
   const totalTasksPages = Math.max(
     1,
-    Math.ceil(filteredTasks.length / PAGE_SIZE)
+    Math.ceil(filteredTasks.length / PAGE_SIZE),
   );
 
   // Paginate AFTER filtering and sorting (sort is applied to ALL data, not just current page)
@@ -1263,15 +1282,15 @@ export default function ThuKyHopPhanPage() {
   }, [filteredWorks, worksPage]);
   const totalWorksPages = Math.max(
     1,
-    Math.ceil(filteredWorks.length / PAGE_SIZE)
+    Math.ceil(filteredWorks.length / PAGE_SIZE),
   );
   const paginatedWorkIds = useMemo(
     () => new Set(paginatedWorks.map((w) => w.id)),
-    [paginatedWorks]
+    [paginatedWorks],
   );
   const selectedWorkSet = useMemo(
     () => new Set(selectedWorkIds),
-    [selectedWorkIds]
+    [selectedWorkIds],
   );
   const allSelectedOnPage =
     paginatedWorks.length > 0 &&
@@ -1285,6 +1304,23 @@ export default function ThuKyHopPhanPage() {
     return filteredTc.slice(start, start + PAGE_SIZE);
   }, [filteredTc, tcPage]);
   const totalTcPages = Math.max(1, Math.ceil(filteredTc.length / PAGE_SIZE));
+
+  const financeQueries = useQueries({
+    queries: paginatedTc.map((c) => ({
+      queryKey: ["finance-summary", c.id],
+      queryFn: () => fetchFinanceSummary(c.id),
+      enabled: !!c.id,
+      staleTime: 60_000,
+    })),
+  });
+  const outstandingById = useMemo(() => {
+    const map = new Map<string, number>();
+    financeQueries.forEach((q, idx) => {
+      const id = paginatedTc[idx]?.id;
+      if (id && q.data) map.set(id, q.data.outstanding);
+    });
+    return map;
+  }, [financeQueries, paginatedTc]);
 
   const paginatedPc = useMemo(() => {
     const start = (pcPage - 1) * PAGE_SIZE;
@@ -1372,20 +1408,24 @@ export default function ThuKyHopPhanPage() {
     if (stageType === "kiem_soat")
       return language === "vi" ? "Người kiểm soát" : "Controller";
     if (stageType.startsWith("nhan_su_"))
-      return (language === "vi" ? "Nhân sự " : "Staff ") +
-        stageType.replace("nhan_su_", "");
+      return (
+        (language === "vi" ? "Nhân sự " : "Staff ") +
+        stageType.replace("nhan_su_", "")
+      );
     if (stageType === "primary")
       return language === "vi" ? "Người thực hiện" : "Assignee";
     if (stageType === "ktv_chinh")
       return language === "vi" ? "KTV chính" : "Lead";
     if (stageType.startsWith("tro_ly_"))
-      return (language === "vi" ? "Trợ lý " : "Assistant ") +
-        stageType.replace("tro_ly_", "");
+      return (
+        (language === "vi" ? "Trợ lý " : "Assistant ") +
+        stageType.replace("tro_ly_", "")
+      );
     return stageType;
   };
 
   const sortAssignments = (
-    assignments: NonNullable<TaskWithAssignmentDetails["assignments"]>
+    assignments: NonNullable<TaskWithAssignmentDetails["assignments"]>,
   ) => {
     const orderFor = (stageType: string) => {
       if (stageType === "kiem_soat") return 1000;
@@ -1409,14 +1449,14 @@ export default function ThuKyHopPhanPage() {
 
   const getSupervisorName = (task: TaskWithAssignmentDetails) => {
     const supervisor = (task.assignments ?? []).find(
-      (a) => a.stageType === "kiem_soat"
+      (a) => a.stageType === "kiem_soat",
     );
     return supervisor?.displayName ?? supervisor?.userId ?? "";
   };
 
   const buildStaffAssignmentDetails = (task: TaskWithAssignmentDetails) => {
     const assignments = sortAssignments(task.assignments ?? []).filter(
-      (a) => a.stageType !== "kiem_soat"
+      (a) => a.stageType !== "kiem_soat",
     );
     if (assignments.length === 0) return "";
     return assignments
@@ -1517,16 +1557,11 @@ export default function ThuKyHopPhanPage() {
       const tasksRows = filteredTasks.map((task) => {
         const work = getWorkForTask(task);
         const workTitle =
-          work?.titleVi ??
-          work?.documentCode ??
-          work?.titleHannom ??
-          "—";
+          work?.titleVi ?? work?.documentCode ?? work?.titleHannom ?? "—";
         const componentName = work?.componentId
           ? getComponentName(work.componentId)
           : "—";
-        const stageDisplay = work?.stage
-          ? formatStageDisplay(work.stage)
-          : "—";
+        const stageDisplay = work?.stage ? formatStageDisplay(work.stage) : "—";
         const assignmentSummary = buildStaffAssignmentDetails(task);
         const supervisorName = getSupervisorName(task);
         const noteValue =
@@ -1541,13 +1576,15 @@ export default function ThuKyHopPhanPage() {
           Nhóm: task.group ?? "",
           "Trạng thái": getTaskStatusLabel(task.status),
           "Mức độ ưu tiên": getPriorityLabel(task.priority),
-          "Tiến độ (%)":
-            typeof task.progress === "number" ? task.progress : "",
+          "Tiến độ (%)": typeof task.progress === "number" ? task.progress : "",
           "Phân công chi tiết": detailText,
           "Người kiểm soát:": supervisorName,
           "Ngày nhận công việc": formatDateDDMMYYYY(
-            (task as TaskWithAssignmentDetails & { receivedAt?: string | Date | null })
-              .receivedAt
+            (
+              task as TaskWithAssignmentDetails & {
+                receivedAt?: string | Date | null;
+              }
+            ).receivedAt,
           ),
           "Hạn hoàn thành": formatDateDDMMYYYY(task.dueDate),
           "Ngày hoàn thành thực tế": formatDateDDMMYYYY(task.actualCompletedAt),
@@ -1566,16 +1603,11 @@ export default function ThuKyHopPhanPage() {
       const assignmentRows = filteredTasks.flatMap((task) => {
         const work = getWorkForTask(task);
         const workTitle =
-          work?.titleVi ??
-          work?.documentCode ??
-          work?.titleHannom ??
-          "—";
+          work?.titleVi ?? work?.documentCode ?? work?.titleHannom ?? "—";
         const componentName = work?.componentId
           ? getComponentName(work.componentId)
           : "—";
-        const stageDisplay = work?.stage
-          ? formatStageDisplay(work.stage)
-          : "—";
+        const stageDisplay = work?.stage ? formatStageDisplay(work.stage) : "—";
         const assignments = sortAssignments(task.assignments ?? []);
         return assignments.map((assignment) => ({
           "Task ID": task.id,
@@ -1588,15 +1620,13 @@ export default function ThuKyHopPhanPage() {
           "Vai trò": getAssignmentLabel(assignment.stageType),
           "Nhân sự": assignment.displayName ?? assignment.userId ?? "",
           "Ngày nhận": formatDateDDMMYYYY(assignment.receivedAt),
-          "Hạn": formatDateDDMMYYYY(assignment.dueDate),
+          Hạn: formatDateDDMMYYYY(assignment.dueDate),
           "Hoàn thành thực tế": formatDateDDMMYYYY(assignment.completedAt),
           "Trạng thái": getAssignmentStatusLabel(assignment.status),
           "Tiến độ (%)":
             typeof assignment.progress === "number" ? assignment.progress : "",
           "Đánh giá":
-            assignment.stageType === "kiem_soat"
-              ? getVoteLabel(task.vote)
-              : "",
+            assignment.stageType === "kiem_soat" ? getVoteLabel(task.vote) : "",
         }));
       });
 
@@ -1640,7 +1670,7 @@ export default function ThuKyHopPhanPage() {
         const row = tasksRows[i] as Record<string, unknown>;
         const lines = Math.max(
           countLines(row[detailKey]),
-          countLines(row[noteKey])
+          countLines(row[noteKey]),
         );
         if (lines > 1) {
           rowsMeta[i + 1] = { hpt: Math.max(18, lines * 16) };
@@ -1680,9 +1710,9 @@ export default function ThuKyHopPhanPage() {
 
       const pad = (n: number) => String(n).padStart(2, "0");
       const now = new Date();
-      const dateStamp = `${now.getFullYear()}${pad(
-        now.getMonth() + 1
-      )}${pad(now.getDate())}`;
+      const dateStamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
+        now.getDate(),
+      )}`;
       const fileName = `thu-ky-hop-phan-cong-viec-${dateStamp}.xlsx`;
       XLSX.writeFile(workbook, fileName, { bookType: "xlsx" });
 
@@ -1708,6 +1738,177 @@ export default function ThuKyHopPhanPage() {
     } finally {
       setIsExportingTasks(false);
     }
+  };
+
+  const handleExportWorks = (
+    filteredWorks: Work[],
+    toast: (opts: any) => any,
+  ) => {
+    if (filteredWorks.length === 0) {
+      toast({
+        title: "Không có dữ liệu",
+        description: "Không có tác phẩm để xuất Excel.",
+      });
+      return;
+    }
+
+    const workHeaders = [
+      "ID",
+      "Tiêu đề (VI)",
+      "Tiêu đề Hán Nôm",
+      "Hợp phần",
+      "Giai đoạn",
+      "Mã tài liệu",
+      "Số chữ gốc",
+      "Số trang gốc",
+      "Hệ số ước tính",
+      "Số chữ ước tính",
+      "Số trang ước tính",
+      "Ghi chú",
+    ];
+    const workData = filteredWorks.map((work: Work) => [
+      work.id,
+      work.titleVi ?? "—",
+      work.titleHannom ?? "—",
+      getComponentName(work.componentId),
+      formatStageDisplay(work.stage),
+      work.documentCode ?? "—",
+      formatNumberAccounting(work.baseWordCount),
+      formatNumberAccounting(work.basePageCount),
+      work.estimateFactor != null
+        ? formatNumberAccounting(work.estimateFactor, 1)
+        : "—",
+      formatNumberAccounting(work.estimateWordCount),
+      formatNumberAccounting(work.estimatePageCount),
+      work.note ?? "—",
+    ]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet([workHeaders, ...workData]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Danh_Muc_Tac_Pham");
+
+    XLSX.writeFile(workbook, "Danh_Muc_Tac_Pham.xlsx");
+  };
+
+  const handleExportTranslationContracts = (
+    filteredTc: TranslationContract[],
+    toast: (opts: any) => any,
+  ) => {
+    if (filteredTc.length === 0) {
+      toast({
+        title: "Không có dữ liệu",
+        description: "Không có hợp đồng dịch thuật để xuất Excel.",
+      });
+      return;
+    }
+
+    const headers = [
+      "ID",
+      "Số HĐ",
+      "Hợp phần",
+      "Tác phẩm",
+      "Dịch giả",
+      "Đơn giá",
+      "Kinh phí tổng quan",
+      "Kinh phí dịch thuật",
+      "Giá trị HĐ",
+      "Ngày bắt đầu",
+      "Ngày kết thúc",
+      "Gia hạn từ",
+      "Gia hạn đến",
+      "Hoàn thành thực tế",
+      "Số chữ TT",
+      "Số trang TT",
+      "Tỷ lệ HT",
+      "Giá trị quyết toán",
+      "Trạng thái",
+      "Ghi chú",
+    ];
+
+    const data = filteredTc.map((c) => [
+      c.id,
+      c.contractNumber ?? "—",
+      getComponentName(c.componentId),
+      getWorkTitle(c.workId),
+      getTranslatorName(c.id),
+      formatNumberAccounting(c.unitPrice),
+      formatNumberAccounting(c.overviewValue),
+      formatNumberAccounting(c.translationValue),
+      formatNumberAccounting(c.contractValue),
+      formatDateDDMMYYYY(c.startDate),
+      formatDateDDMMYYYY(c.endDate),
+      formatDateDDMMYYYY(c.extensionStartDate),
+      formatDateDDMMYYYY(c.extensionEndDate),
+      formatDateDDMMYYYY(c.actualCompletionDate),
+      formatNumberAccounting(c.actualWordCount),
+      formatNumberAccounting(c.actualPageCount),
+      c.completionRate != null ? formatPercent(c.completionRate) : "—",
+      formatNumberAccounting(c.settlementValue),
+      c.status ?? "—",
+      c.note ?? "—",
+    ]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Hop_Dong_Dich_Thuat");
+
+    XLSX.writeFile(workbook, "Hop_Dong_Dich_Thuat.xlsx");
+  };
+
+  const handleExportProofreadingContracts = (
+    filteredPc: ProofreadingContract[],
+    toast: (opts: any) => any,
+  ) => {
+    if (filteredPc.length === 0) {
+      toast({
+        title: "Không có dữ liệu",
+        description: "Không có hợp đồng hiệu đính để xuất Excel.",
+      });
+      return;
+    }
+
+    const headers = [
+      "ID",
+      "Số HĐ",
+      "Hợp phần",
+      "Tác phẩm",
+      "HĐ Dịch thuật (liên kết)",
+      "Người hiệu đính",
+      "Số trang",
+      "Tỷ lệ (%)",
+      "Giá trị HĐ",
+      "Ngày bắt đầu",
+      "Ngày kết thúc",
+      "Hoàn thành thực tế",
+      "Ghi chú",
+    ];
+
+    const data = filteredPc.map((c: ProofreadingContract) => {
+      const tc = c.translationContractId
+        ? tcById.get(c.translationContractId)
+        : null;
+      return [
+        c.id,
+        c.contractNumber ?? "—",
+        getComponentName(c.componentId),
+        getWorkTitle(c.workId),
+        tc?.contractNumber ?? "—",
+        getProofreaderName(c.id),
+        formatNumberAccounting(c.pageCount),
+        c.rateRatio != null ? formatPercent(c.rateRatio) : "—",
+        formatNumberAccounting(c.contractValue),
+        formatDateDDMMYYYY(c.startDate),
+        formatDateDDMMYYYY(c.endDate),
+        formatDateDDMMYYYY(c.actualCompletionDate),
+        c.note ?? "—",
+      ];
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Proofreading Contracts");
+
+    XLSX.writeFile(workbook, "Hop_Dong_Hieu_Dinh.xlsx");
   };
 
   const createWorkMutation = useMutation({
@@ -1797,7 +1998,7 @@ export default function ThuKyHopPhanPage() {
             throw new Error((err.message as string) || "Xóa thất bại");
           }
           return res.json();
-        })
+        }),
       );
     },
     onSuccess: () => {
@@ -1838,7 +2039,7 @@ export default function ThuKyHopPhanPage() {
       const translatorUserIds = (variables as { _translatorUserIds?: string[] })
         ?._translatorUserIds;
       const uniqueTranslatorUserIds = Array.from(
-        new Set((translatorUserIds ?? []).filter(Boolean))
+        new Set((translatorUserIds ?? []).filter(Boolean)),
       );
       if (uniqueTranslatorUserIds.length > 0 && contract?.id) {
         try {
@@ -1849,7 +2050,7 @@ export default function ThuKyHopPhanPage() {
           if (rolesRes.ok) {
             const rolesList = await rolesRes.json();
             const partnerRole = rolesList.find(
-              (r: { code: string }) => r.code === "partner"
+              (r: { code: string }) => r.code === "partner",
             );
             partnerRoleId = partnerRole?.id ?? null;
           }
@@ -1858,12 +2059,12 @@ export default function ThuKyHopPhanPage() {
             if (partnerRoleId) {
               const userRes = await fetch(
                 buildUrl(api.users.get.path, { id: userId }),
-                { credentials: "include" }
+                { credentials: "include" },
               );
               if (userRes.ok) {
                 const user = await userRes.json();
                 const hasPartnerRole = user.roles?.some(
-                  (r: { id: string }) => r.id === partnerRoleId
+                  (r: { id: string }) => r.id === partnerRoleId,
                 );
                 if (!hasPartnerRole) {
                   await fetch(buildUrl(api.users.update.path, { id: userId }), {
@@ -1927,7 +2128,7 @@ export default function ThuKyHopPhanPage() {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify(payload),
-        }
+        },
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1944,7 +2145,7 @@ export default function ThuKyHopPhanPage() {
         variables.data as { _translatorUserIds?: string[] }
       )?._translatorUserIds;
       const uniqueTranslatorUserIds = Array.from(
-        new Set((translatorUserIds ?? []).filter(Boolean))
+        new Set((translatorUserIds ?? []).filter(Boolean)),
       );
       if (contract?.id) {
         try {
@@ -1953,7 +2154,7 @@ export default function ThuKyHopPhanPage() {
             buildUrl(api.translationContractMembers.listByContract.path, {
               contractId: contract.id,
             }),
-            { credentials: "include" }
+            { credentials: "include" },
           );
           if (membersRes.ok) {
             const members = await membersRes.json();
@@ -1962,7 +2163,7 @@ export default function ThuKyHopPhanPage() {
                 buildUrl(api.translationContractMembers.delete.path, {
                   id: member.id,
                 }),
-                { method: "DELETE", credentials: "include" }
+                { method: "DELETE", credentials: "include" },
               );
             }
           }
@@ -1975,7 +2176,7 @@ export default function ThuKyHopPhanPage() {
             if (rolesRes.ok) {
               const rolesList = await rolesRes.json();
               const partnerRole = rolesList.find(
-                (r: { code: string }) => r.code === "partner"
+                (r: { code: string }) => r.code === "partner",
               );
               partnerRoleId = partnerRole?.id ?? null;
             }
@@ -1984,12 +2185,12 @@ export default function ThuKyHopPhanPage() {
               if (partnerRoleId) {
                 const userRes = await fetch(
                   buildUrl(api.users.get.path, { id: userId }),
-                  { credentials: "include" }
+                  { credentials: "include" },
                 );
                 if (userRes.ok) {
                   const user = await userRes.json();
                   const hasPartnerRole = user.roles?.some(
-                    (r: { id: string }) => r.id === partnerRoleId
+                    (r: { id: string }) => r.id === partnerRoleId,
                   );
                   if (!hasPartnerRole) {
                     await fetch(
@@ -2005,7 +2206,7 @@ export default function ThuKyHopPhanPage() {
                             partnerRoleId,
                           ],
                         }),
-                      }
+                      },
                     );
                   }
                 }
@@ -2071,18 +2272,18 @@ export default function ThuKyHopPhanPage() {
           if (rolesRes.ok) {
             const rolesList = await rolesRes.json();
             const partnerRole = rolesList.find(
-              (r: { code: string }) => r.code === "partner"
+              (r: { code: string }) => r.code === "partner",
             );
             if (partnerRole) {
               // Kiểm tra xem user đã có role "partner" chưa
               const userRes = await fetch(
                 buildUrl(api.users.get.path, { id: proofreaderUserId }),
-                { credentials: "include" }
+                { credentials: "include" },
               );
               if (userRes.ok) {
                 const user = await userRes.json();
                 const hasPartnerRole = user.roles?.some(
-                  (r: { id: string }) => r.id === partnerRole.id
+                  (r: { id: string }) => r.id === partnerRole.id,
                 );
                 if (!hasPartnerRole) {
                   // Gán role "partner" cho user
@@ -2099,7 +2300,7 @@ export default function ThuKyHopPhanPage() {
                           partnerRole.id,
                         ],
                       }),
-                    }
+                    },
                   );
                 }
               }
@@ -2145,7 +2346,7 @@ export default function ThuKyHopPhanPage() {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify(data),
-        }
+        },
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -2169,7 +2370,7 @@ export default function ThuKyHopPhanPage() {
             buildUrl(api.proofreadingContractMembers.listByContract.path, {
               contractId: contract.id,
             }),
-            { credentials: "include" }
+            { credentials: "include" },
           );
           if (membersRes.ok) {
             const members = await membersRes.json();
@@ -2178,7 +2379,7 @@ export default function ThuKyHopPhanPage() {
                 buildUrl(api.proofreadingContractMembers.delete.path, {
                   id: member.id,
                 }),
-                { method: "DELETE", credentials: "include" }
+                { method: "DELETE", credentials: "include" },
               );
             }
           }
@@ -2192,18 +2393,18 @@ export default function ThuKyHopPhanPage() {
             if (rolesRes.ok) {
               const rolesList = await rolesRes.json();
               const partnerRole = rolesList.find(
-                (r: { code: string }) => r.code === "partner"
+                (r: { code: string }) => r.code === "partner",
               );
               if (partnerRole) {
                 // Kiểm tra xem user đã có role "partner" chưa
                 const userRes = await fetch(
                   buildUrl(api.users.get.path, { id: proofreaderUserId }),
-                  { credentials: "include" }
+                  { credentials: "include" },
                 );
                 if (userRes.ok) {
                   const user = await userRes.json();
                   const hasPartnerRole = user.roles?.some(
-                    (r: { id: string }) => r.id === partnerRole.id
+                    (r: { id: string }) => r.id === partnerRole.id,
                   );
                   if (!hasPartnerRole) {
                     // Gán role "partner" cho user
@@ -2222,7 +2423,7 @@ export default function ThuKyHopPhanPage() {
                             partnerRole.id,
                           ],
                         }),
-                      }
+                      },
                     );
                   }
                 }
@@ -2265,7 +2466,7 @@ export default function ThuKyHopPhanPage() {
         {
           method: "DELETE",
           credentials: "include",
-        }
+        },
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -2293,7 +2494,7 @@ export default function ThuKyHopPhanPage() {
         {
           method: "DELETE",
           credentials: "include",
-        }
+        },
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -2387,8 +2588,11 @@ export default function ThuKyHopPhanPage() {
                   size="sm"
                   variant="outline"
                   onClick={handleExportTasks}
-                  disabled={isExportingTasks || tasksLoading || filteredTasks.length === 0}
-                >
+                  disabled={
+                    isExportingTasks ||
+                    tasksLoading ||
+                    filteredTasks.length === 0
+                  }>
                   {isExportingTasks ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
@@ -2503,7 +2707,7 @@ export default function ThuKyHopPhanPage() {
                         </PaginationItem>
                         {Array.from(
                           { length: totalTasksPages },
-                          (_, i) => i + 1
+                          (_, i) => i + 1,
                         ).map((p) => (
                           <PaginationItem key={p}>
                             <PaginationLink
@@ -2523,7 +2727,7 @@ export default function ThuKyHopPhanPage() {
                             onClick={(e) => {
                               e.preventDefault();
                               setTasksPage((p) =>
-                                Math.min(totalTasksPages, p + 1)
+                                Math.min(totalTasksPages, p + 1),
                               );
                             }}
                             className={
@@ -2576,6 +2780,13 @@ export default function ThuKyHopPhanPage() {
                     onClick={() => setWorksImportOpen(true)}>
                     <Upload className="w-4 h-4 mr-2" />
                     Import Excel
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleExportWorks(filteredWorks, toast)}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Xuất Excel
                   </Button>
                   <Button
                     size="sm"
@@ -2650,23 +2861,23 @@ export default function ThuKyHopPhanPage() {
                                 allSelectedOnPage
                                   ? true
                                   : someSelectedOnPage
-                                  ? "indeterminate"
-                                  : false
+                                    ? "indeterminate"
+                                    : false
                               }
                               onCheckedChange={(checked) => {
                                 if (checked) {
                                   setSelectedWorkIds((prev) => {
                                     const next = new Set(prev);
                                     paginatedWorks.forEach((w) =>
-                                      next.add(w.id)
+                                      next.add(w.id),
                                     );
                                     return Array.from(next);
                                   });
                                 } else {
                                   setSelectedWorkIds((prev) =>
                                     prev.filter(
-                                      (id) => !paginatedWorkIds.has(id)
-                                    )
+                                      (id) => !paginatedWorkIds.has(id),
+                                    ),
                                   );
                                 }
                               }}
@@ -2981,7 +3192,7 @@ export default function ThuKyHopPhanPage() {
                         </PaginationItem>
                         {generatePaginationItems(
                           worksPage,
-                          totalWorksPages
+                          totalWorksPages,
                         ).map((item, idx) => {
                           if (item === "ellipsis") {
                             return (
@@ -3010,7 +3221,7 @@ export default function ThuKyHopPhanPage() {
                             onClick={(e) => {
                               e.preventDefault();
                               setWorksPage((p) =>
-                                Math.min(totalWorksPages, p + 1)
+                                Math.min(totalWorksPages, p + 1),
                               );
                             }}
                             className={
@@ -3065,6 +3276,16 @@ export default function ThuKyHopPhanPage() {
                       Thẻ
                     </ToggleGroupItem>
                   </ToggleGroup>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      handleExportTranslationContracts(filteredTc, toast)
+                    }
+                    disabled={filteredTc.length === 0}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Xuất Excel
+                  </Button>
                   <Button
                     size="sm"
                     onClick={() =>
@@ -3247,6 +3468,7 @@ export default function ThuKyHopPhanPage() {
                             onSort={handleTcSort}
                             className="text-right"
                           />
+                          <TableHead>Công nợ</TableHead>
                           <TableHead>Tiến độ</TableHead>
                           <TableHead className="max-w-[100px] truncate">
                             Ghi chú
@@ -3308,7 +3530,7 @@ export default function ThuKyHopPhanPage() {
                                   c.translationValue !== "" && (
                                     <span className="text-xs text-muted-foreground block mt-0.5">
                                       {numberToVietnameseWords(
-                                        c.translationValue
+                                        c.translationValue,
                                       )}
                                     </span>
                                   )}
@@ -3363,10 +3585,17 @@ export default function ThuKyHopPhanPage() {
                                   c.settlementValue !== "" && (
                                     <span className="text-xs text-muted-foreground block mt-0.5">
                                       {numberToVietnameseWords(
-                                        c.settlementValue
+                                        c.settlementValue,
                                       )}
                                     </span>
                                   )}
+                              </TableCell>
+                              <TableCell className="text-right align-top">
+                                <span>
+                                  {formatNumberAccounting(
+                                    outstandingById.get(c.id),
+                                  )}
+                                </span>
                               </TableCell>
                               <TableCell className="min-w-[220px]">
                                 <div className="flex flex-wrap gap-2">
@@ -3375,7 +3604,7 @@ export default function ThuKyHopPhanPage() {
                                       proofreadingCompletionByTcId.get(c.id) ??
                                       (c.workId
                                         ? proofreadingCompletionByWorkId.get(
-                                            c.workId
+                                            c.workId,
                                           )
                                         : undefined),
                                     editingCompletedDate: c.workId
@@ -3597,7 +3826,7 @@ export default function ThuKyHopPhanPage() {
                                 </PaginationLink>
                               </PaginationItem>
                             );
-                          }
+                          },
                         )}
                         <PaginationItem>
                           <PaginationNext
@@ -3665,6 +3894,16 @@ export default function ThuKyHopPhanPage() {
                     }>
                     <Plus className="w-4 h-4 mr-2" />
                     Thêm hợp đồng hiệu đính
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      handleExportProofreadingContracts(filteredPc, toast)
+                    }
+                    disabled={filteredPc.length === 0}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Xuất Excel
                   </Button>
                 </div>
               </div>
@@ -3929,7 +4168,7 @@ export default function ThuKyHopPhanPage() {
                                 </PaginationLink>
                               </PaginationItem>
                             );
-                          }
+                          },
                         )}
                         <PaginationItem>
                           <PaginationNext
@@ -3984,7 +4223,7 @@ export default function ThuKyHopPhanPage() {
                   description: e.message,
                   variant: "destructive",
                 }),
-            }
+            },
           );
         }}
       />
@@ -4120,8 +4359,8 @@ export default function ThuKyHopPhanPage() {
               {tcDialog.mode === "view"
                 ? "Xem hợp đồng dịch thuật"
                 : tcDialog.contract
-                ? "Chỉnh sửa hợp đồng dịch thuật"
-                : "Thêm hợp đồng dịch thuật"}
+                  ? "Chỉnh sửa hợp đồng dịch thuật"
+                  : "Thêm hợp đồng dịch thuật"}
             </DialogTitle>
             <DialogDescription>
               Hợp đồng dịch thuật gắn với tác phẩm.
@@ -4163,8 +4402,8 @@ export default function ThuKyHopPhanPage() {
               {pcDialog.mode === "view"
                 ? "Xem hợp đồng hiệu đính"
                 : pcDialog.contract
-                ? "Chỉnh sửa hợp đồng hiệu đính"
-                : "Thêm hợp đồng hiệu đính"}
+                  ? "Chỉnh sửa hợp đồng hiệu đính"
+                  : "Thêm hợp đồng hiệu đính"}
             </DialogTitle>
             <DialogDescription>
               Hợp đồng hiệu đính gắn với hợp đồng dịch thuật.
@@ -4252,14 +4491,14 @@ export default function ThuKyHopPhanPage() {
 // --- Contract stages (giai đoạn hợp đồng) subsection ---
 async function fetchStages(
   translationContractId: string | null,
-  proofreadingContractId: string | null
+  proofreadingContractId: string | null,
 ): Promise<ContractStage[]> {
   if (translationContractId) {
     const res = await fetch(
       buildUrl(api.contractStages.listByTranslationContract.path, {
         contractId: translationContractId,
       }),
-      { credentials: "include" }
+      { credentials: "include" },
     );
     if (!res.ok) return [];
     return res.json();
@@ -4269,7 +4508,7 @@ async function fetchStages(
       buildUrl(api.contractStages.listByProofreadingContract.path, {
         contractId: proofreadingContractId,
       }),
-      { credentials: "include" }
+      { credentials: "include" },
     );
     if (!res.ok) return [];
     return res.json();
@@ -4295,7 +4534,7 @@ function ContractStagesSection({
     queryFn: () =>
       fetchStages(
         translationContractId ?? null,
-        proofreadingContractId ?? null
+        proofreadingContractId ?? null,
       ),
     enabled: !!contractId,
   });
@@ -4366,7 +4605,7 @@ function ContractStagesSection({
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify(data),
-        }
+        },
       );
       if (!res.ok) throw new Error("Cập nhật thất bại");
       return res.json();
@@ -4386,7 +4625,7 @@ function ContractStagesSection({
     mutationFn: async (id: string) => {
       const res = await fetch(
         buildUrl(api.contractStages.delete.path, { id }),
-        { method: "DELETE", credentials: "include" }
+        { method: "DELETE", credentials: "include" },
       );
       if (!res.ok) throw new Error("Xóa thất bại");
     },
@@ -4605,6 +4844,291 @@ function ContractStagesSection({
   );
 }
 
+// --- Payments (chi tiền: tạm ứng/quyết toán) subsection ---
+async function fetchPaymentsByTcId(contractId: string): Promise<
+  Array<{
+    id: string;
+    translationContractId: string | null;
+    contractId: string | null;
+    paymentType: string | null;
+    voucherNo: string | null;
+    paymentDate: string | null;
+    amount: number;
+    note: string | null;
+  }>
+> {
+  const res = await fetch(
+    buildUrl(api.payments.listByTranslationContract.path, { id: contractId }),
+    { credentials: "include" },
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
+function PaymentsSection({
+  translationContractId,
+  queryClient,
+  readOnly = false,
+}: {
+  translationContractId: string;
+  queryClient: ReturnType<typeof useQueryClient>;
+  readOnly?: boolean;
+}) {
+  const { toast } = useToast();
+  const { data: payments = [], isLoading } = useQuery({
+    queryKey: ["payments", translationContractId],
+    queryFn: () => fetchPaymentsByTcId(translationContractId),
+    enabled: !!translationContractId,
+  });
+  const { data: summary } = useQuery({
+    queryKey: ["finance-summary", translationContractId],
+    queryFn: () => fetchFinanceSummary(translationContractId),
+    enabled: !!translationContractId,
+    staleTime: 60_000,
+  });
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({
+    paymentType: "advance",
+    voucherNo: "",
+    paymentDate: "",
+    amount: "",
+    note: "",
+  });
+  const reset = () => {
+    setForm({
+      paymentType: "advance",
+      voucherNo: "",
+      paymentDate: "",
+      amount: "",
+      note: "",
+    });
+    setAdding(false);
+  };
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const body = {
+        translationContractId,
+        paymentType: form.paymentType || null,
+        voucherNo: form.voucherNo || null,
+        paymentDate: form.paymentDate || null,
+        amount: form.amount ? String(Number(form.amount)) : null,
+        note: form.note || null,
+      };
+      const res = await fetch(api.payments.create.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Thêm chi tiền thất bại");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["payments", translationContractId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["finance-summary", translationContractId],
+      });
+      reset();
+      toast({ title: "Đã thêm chi tiền" });
+    },
+    onError: (e) =>
+      toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(buildUrl(api.payments.delete.path, { id }), {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Xóa thất bại");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["payments", translationContractId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["finance-summary", translationContractId],
+      });
+      toast({ title: "Đã xóa chi tiền" });
+    },
+    onError: (e) =>
+      toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
+  });
+  return (
+    <div className="space-y-2 rounded-md border p-3 bg-muted/30">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">
+          Thanh toán (tạm ứng/quyết toán)
+        </Label>
+        {!readOnly && !adding && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setAdding(true)}>
+            <Plus className="w-4 h-4 mr-1" />
+            Thêm chi tiền
+          </Button>
+        )}
+      </div>
+      {summary && (
+        <div className="text-sm text-muted-foreground">
+          Tổng đã chi:{" "}
+          <span className="font-medium">
+            {formatNumberAccounting(summary.totalPaid)}
+          </span>{" "}
+          • Tạm ứng:{" "}
+          <span className="font-medium">
+            {formatNumberAccounting(summary.totalAdvance)}
+          </span>{" "}
+          • Công nợ:{" "}
+          <span className="font-medium">
+            {formatNumberAccounting(summary.outstanding)}
+          </span>
+        </div>
+      )}
+      {isLoading ? (
+        <div className="flex items-center gap-2 py-2 text-muted-foreground text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" /> Đang tải...
+        </div>
+      ) : (
+        <>
+          {payments.length > 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Loại</TableHead>
+                    <TableHead>Số chứng từ</TableHead>
+                    <TableHead>Ngày</TableHead>
+                    <TableHead className="text-right">Số tiền</TableHead>
+                    <TableHead className="max-w-[100px]">Ghi chú</TableHead>
+                    {!readOnly && <TableHead className="w-[80px]"></TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>{p.paymentType ?? "—"}</TableCell>
+                      <TableCell>{p.voucherNo ?? "—"}</TableCell>
+                      <TableCell>
+                        {formatDateDDMMYYYY(p.paymentDate) || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatNumberAccounting(p.amount)}
+                      </TableCell>
+                      <TableCell
+                        className="max-w-[240px] truncate"
+                        title={p.note ?? undefined}>
+                        {p.note ?? "—"}
+                      </TableCell>
+                      {!readOnly && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => deleteMutation.mutate(p.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          {adding && !readOnly && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                createMutation.mutate();
+              }}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end mt-2">
+              <div className="grid gap-1">
+                <Label>Loại</Label>
+                <Select
+                  value={form.paymentType}
+                  onValueChange={(v) =>
+                    setForm((f) => ({ ...f, paymentType: v }))
+                  }>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Chọn" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="advance">advance</SelectItem>
+                    <SelectItem value="settlement">settlement</SelectItem>
+                    <SelectItem value="other">other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1">
+                <Label>Số chứng từ</Label>
+                <Input
+                  value={form.voucherNo}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, voucherNo: e.target.value }))
+                  }
+                  placeholder="VD: PT-001"
+                />
+              </div>
+              <div className="grid gap-1">
+                <Label>Ngày</Label>
+                <DateInput
+                  value={form.paymentDate || null}
+                  onChange={(v) =>
+                    setForm((f) => ({ ...f, paymentDate: v || "" }))
+                  }
+                />
+              </div>
+              <div className="grid gap-1">
+                <Label>Số tiền</Label>
+                <NumberInput
+                  value={form.amount}
+                  onChange={(v) => setForm((f) => ({ ...f, amount: v }))}
+                  decimals={2}
+                  showFormatted={true}
+                  placeholder="0"
+                />
+              </div>
+              <div className="grid gap-1">
+                <Label>Ghi chú</Label>
+                <Input
+                  value={form.note}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, note: e.target.value }))
+                  }
+                  placeholder="Ghi chú"
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={createMutation.isPending}>
+                  {createMutation.isPending && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
+                  Thêm
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={reset}>
+                  Hủy
+                </Button>
+              </div>
+            </form>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 function WorkForm({
   work,
   componentsList,
@@ -4626,19 +5150,19 @@ function WorkForm({
   const [stage, setStage] = useState(() => parseStageNumber(work?.stage));
   const [documentCode, setDocumentCode] = useState(work?.documentCode ?? "");
   const [baseWordCount, setBaseWordCount] = useState(
-    work?.baseWordCount != null ? String(work.baseWordCount) : ""
+    work?.baseWordCount != null ? String(work.baseWordCount) : "",
   );
   const [basePageCount, setBasePageCount] = useState(
-    work?.basePageCount != null ? String(work.basePageCount) : ""
+    work?.basePageCount != null ? String(work.basePageCount) : "",
   );
   const [estimateFactor, setEstimateFactor] = useState(
-    work?.estimateFactor != null ? String(work.estimateFactor) : ""
+    work?.estimateFactor != null ? String(work.estimateFactor) : "",
   );
   const [estimateWordCount, setEstimateWordCount] = useState(
-    work?.estimateWordCount != null ? String(work.estimateWordCount) : ""
+    work?.estimateWordCount != null ? String(work.estimateWordCount) : "",
   );
   const [estimatePageCount, setEstimatePageCount] = useState(
-    work?.estimatePageCount != null ? String(work.estimatePageCount) : ""
+    work?.estimatePageCount != null ? String(work.estimatePageCount) : "",
   );
   const [note, setNote] = useState(work?.note ?? "");
 
@@ -4864,56 +5388,56 @@ function TranslationContractForm({
   readOnly?: boolean;
 }) {
   const [contractNumber, setContractNumber] = useState(
-    contract?.contractNumber ?? ""
+    contract?.contractNumber ?? "",
   );
   const [componentId, setComponentId] = useState(contract?.componentId ?? "");
   const [workId, setWorkId] = useState(contract?.workId ?? "");
   const [unitPrice, setUnitPrice] = useState(
-    contract?.unitPrice != null ? String(contract.unitPrice) : ""
+    contract?.unitPrice != null ? String(contract.unitPrice) : "",
   );
   const [overviewValue, setOverviewValue] = useState(
-    contract?.overviewValue != null ? String(contract.overviewValue) : ""
+    contract?.overviewValue != null ? String(contract.overviewValue) : "",
   );
   const [translationValue, setTranslationValue] = useState(
-    contract?.translationValue != null ? String(contract.translationValue) : ""
+    contract?.translationValue != null ? String(contract.translationValue) : "",
   );
   const [contractValue, setContractValue] = useState(
-    contract?.contractValue != null ? String(contract.contractValue) : ""
+    contract?.contractValue != null ? String(contract.contractValue) : "",
   );
   const [startDate, setStartDate] = useState(
-    contract?.startDate ? (contract.startDate as string).slice(0, 10) : ""
+    contract?.startDate ? (contract.startDate as string).slice(0, 10) : "",
   );
   const [endDate, setEndDate] = useState(
-    contract?.endDate ? (contract.endDate as string).slice(0, 10) : ""
+    contract?.endDate ? (contract.endDate as string).slice(0, 10) : "",
   );
   const [extensionStartDate, setExtensionStartDate] = useState(
     contract?.extensionStartDate
       ? (contract.extensionStartDate as string).slice(0, 10)
-      : ""
+      : "",
   );
   const [extensionEndDate, setExtensionEndDate] = useState(
     contract?.extensionEndDate
       ? (contract.extensionEndDate as string).slice(0, 10)
-      : ""
+      : "",
   );
   const [actualCompletionDate, setActualCompletionDate] = useState(
     contract?.actualCompletionDate
       ? (contract.actualCompletionDate as string).slice(0, 10)
-      : ""
+      : "",
   );
   const [actualWordCount, setActualWordCount] = useState(
-    contract?.actualWordCount != null ? String(contract.actualWordCount) : ""
+    contract?.actualWordCount != null ? String(contract.actualWordCount) : "",
   );
   const [actualPageCount, setActualPageCount] = useState(
-    contract?.actualPageCount != null ? String(contract.actualPageCount) : ""
+    contract?.actualPageCount != null ? String(contract.actualPageCount) : "",
   );
   const [completionRate, setCompletionRate] = useState(
     contract?.completionRate != null
       ? String(Number(contract.completionRate) * 100)
-      : ""
+      : "",
   );
   const [settlementValue, setSettlementValue] = useState(
-    contract?.settlementValue != null ? String(contract.settlementValue) : ""
+    contract?.settlementValue != null ? String(contract.settlementValue) : "",
   );
   const [note, setNote] = useState(contract?.note ?? "");
   const [status, setStatus] = useState(contract?.status ?? "Active");
@@ -4949,7 +5473,7 @@ function TranslationContractForm({
         buildUrl(api.translationContractMembers.listByContract.path, {
           contractId: contract.id,
         }),
-        { credentials: "include" }
+        { credentials: "include" },
       );
       if (!res.ok) return [];
       return res.json();
@@ -4985,7 +5509,9 @@ function TranslationContractForm({
       return;
     }
     setTranslatorUsers((prev) =>
-      prev.some((u) => u.id === id) ? prev : [...prev, { id, name: name || id }]
+      prev.some((u) => u.id === id)
+        ? prev
+        : [...prev, { id, name: name || id }],
     );
     setTranslatorPickerName("");
     setTranslatorPickerUserId(null);
@@ -4995,38 +5521,38 @@ function TranslationContractForm({
     setTranslatorUsers((prev) => prev.filter((u) => u.id !== id));
   };
   const [cancelledAt, setCancelledAt] = useState(
-    contract?.cancelledAt ? (contract.cancelledAt as string).slice(0, 10) : ""
+    contract?.cancelledAt ? (contract.cancelledAt as string).slice(0, 10) : "",
   );
   const [progressCheckDate, setProgressCheckDate] = useState(
     contract?.progressCheckDate
       ? (contract.progressCheckDate as string).slice(0, 10)
-      : ""
+      : "",
   );
   const [expertReviewDate, setExpertReviewDate] = useState(
     contract?.expertReviewDate
       ? (contract.expertReviewDate as string).slice(0, 10)
-      : ""
+      : "",
   );
   const [projectAcceptanceDate, setProjectAcceptanceDate] = useState(
     contract?.projectAcceptanceDate
       ? (contract.projectAcceptanceDate as string).slice(0, 10)
-      : ""
+      : "",
   );
   const [proofreadingInProgress, setProofreadingInProgress] = useState(
-    !!contract?.proofreadingInProgress
+    !!contract?.proofreadingInProgress,
   );
   const [editingInProgress, setEditingInProgress] = useState(
-    !!contract?.editingInProgress
+    !!contract?.editingInProgress,
   );
   const [printTransferDate, setPrintTransferDate] = useState(
     contract?.printTransferDate
       ? (contract.printTransferDate as string).slice(0, 10)
-      : ""
+      : "",
   );
   const [publishedDate, setPublishedDate] = useState(
     contract?.publishedDate
       ? (contract.publishedDate as string).slice(0, 10)
-      : ""
+      : "",
   );
   useEffect(() => {
     if (actualCompletionDate.trim() !== "") {
@@ -5049,7 +5575,7 @@ function TranslationContractForm({
   const autoEditingCompletedDate = useMemo(() => {
     if (!workId) return "";
     const bienTapTasks = tasks.filter(
-      (t) => t.group === "Biên tập" && t.relatedWorkId === workId
+      (t) => t.group === "Biên tập" && t.relatedWorkId === workId,
     );
     const completedDates = bienTapTasks
       .filter((t) => {
@@ -5089,7 +5615,7 @@ function TranslationContractForm({
     const matches = proofreadingContracts.filter((c) =>
       contract?.id
         ? c.translationContractId === contract.id
-        : c.workId === workId
+        : c.workId === workId,
     );
     const dates = matches
       .map((c) => c.actualCompletionDate)
@@ -5720,6 +6246,13 @@ function TranslationContractForm({
           readOnly={readOnly}
         />
       )}
+      {contract && (
+        <PaymentsSection
+          translationContractId={contract.id}
+          queryClient={queryClient}
+          readOnly={readOnly}
+        />
+      )}
       {!readOnly && (
         <DialogFooter>
           <Button
@@ -5761,16 +6294,16 @@ function ProofreadingContractForm({
   readOnly?: boolean;
 }) {
   const [contractNumber, setContractNumber] = useState(
-    contract?.contractNumber ?? ""
+    contract?.contractNumber ?? "",
   );
   const [componentId, setComponentId] = useState(contract?.componentId ?? "");
   const [workId, setWorkId] = useState(contract?.workId ?? "");
   const [translationContractId, setTranslationContractId] = useState(
-    contract?.translationContractId ?? ""
+    contract?.translationContractId ?? "",
   );
   const [proofreaderName, setProofreaderName] = useState("");
   const [proofreaderUserId, setProofreaderUserId] = useState<string | null>(
-    null
+    null,
   );
   const [selfProofreading, setSelfProofreading] = useState(false);
   const [hasUserTouchedProofreader, setHasUserTouchedProofreader] =
@@ -5790,7 +6323,7 @@ function ProofreadingContractForm({
   useEffect(() => {
     if (!translationContractId) return;
     const exists = filteredTranslationContracts.some(
-      (c) => c.id === translationContractId
+      (c) => c.id === translationContractId,
     );
     if (!exists) setTranslationContractId("");
   }, [filteredTranslationContracts, translationContractId]);
@@ -5799,7 +6332,7 @@ function ProofreadingContractForm({
   const translatorForSelectedContract = useMemo(() => {
     if (!translationContractId) return null;
     const member = translationContractMembers.find(
-      (m) => m.translationContractId === translationContractId && m.userId
+      (m) => m.translationContractId === translationContractId && m.userId,
     );
     if (!member?.userId) return null;
     const user = users.find((u) => u.id === member.userId);
@@ -5815,7 +6348,7 @@ function ProofreadingContractForm({
         buildUrl(api.proofreadingContractMembers.listByContract.path, {
           contractId: contract.id,
         }),
-        { credentials: "include" }
+        { credentials: "include" },
       );
       if (!res.ok) return [];
       return res.json();
@@ -5858,35 +6391,35 @@ function ProofreadingContractForm({
   };
 
   const [pageCount, setPageCount] = useState(
-    contract?.pageCount != null ? String(contract.pageCount) : ""
+    contract?.pageCount != null ? String(contract.pageCount) : "",
   );
   const [rateRatio, setRateRatio] = useState(
-    contract?.rateRatio != null ? String(Number(contract.rateRatio) * 100) : ""
+    contract?.rateRatio != null ? String(Number(contract.rateRatio) * 100) : "",
   );
   const [contractValue, setContractValue] = useState(
-    contract?.contractValue != null ? String(contract.contractValue) : ""
+    contract?.contractValue != null ? String(contract.contractValue) : "",
   );
   const [startDate, setStartDate] = useState(
-    contract?.startDate ? (contract.startDate as string).slice(0, 10) : ""
+    contract?.startDate ? (contract.startDate as string).slice(0, 10) : "",
   );
   const [endDate, setEndDate] = useState(
-    contract?.endDate ? (contract.endDate as string).slice(0, 10) : ""
+    contract?.endDate ? (contract.endDate as string).slice(0, 10) : "",
   );
   const [actualCompletionDate, setActualCompletionDate] = useState(
     contract?.actualCompletionDate
       ? (contract.actualCompletionDate as string).slice(0, 10)
-      : ""
+      : "",
   );
   const [note, setNote] = useState(contract?.note ?? "");
 
   const selectedTranslationContract = useMemo(
     () =>
       translationContracts.find((c) => c.id === translationContractId) ?? null,
-    [translationContracts, translationContractId]
+    [translationContracts, translationContractId],
   );
   const selectedWork = useMemo(
     () => works.find((w) => w.id === workId) ?? null,
-    [works, workId]
+    [works, workId],
   );
 
   useEffect(() => {
@@ -5911,8 +6444,8 @@ function ProofreadingContractForm({
       base == null
         ? NaN
         : typeof base === "string"
-        ? parseFloat(base)
-        : Number(base);
+          ? parseFloat(base)
+          : Number(base);
     const ratio = rateRatio.trim() === "" ? NaN : parseFloat(rateRatio) / 100;
     if (Number.isNaN(settlement) || Number.isNaN(ratio)) {
       setContractValue("");

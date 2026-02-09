@@ -157,7 +157,7 @@ export default function ThietKeCNTTPage() {
             <Button 
               variant="outline" 
               size="sm" 
-              className="h-8 w-8 p-0" 
+              className="btn-icon" 
               onClick={() => refresh()}
               disabled={isRefreshing}
             >
@@ -169,8 +169,8 @@ export default function ThietKeCNTTPage() {
       </section>
 
       {/* Task List */}
-      <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
+      <section className="section-card">
+        <div className="section-header">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
             <Badge variant="secondary" className="font-normal">
@@ -194,7 +194,7 @@ export default function ThietKeCNTTPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={t.common.search + " " + t.dashboard.tasks.toLowerCase() + "..."}
-                className="pl-9 bg-background"
+                className="search-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -218,7 +218,7 @@ export default function ThietKeCNTTPage() {
               type="single"
               value={viewMode}
               onValueChange={(v) => v && (v === "table" || v === "board") && setViewMode(v)}
-              className="border rounded-md bg-background"
+              className="toggle-group-box"
             >
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
                 <List className="h-4 w-4 mr-1.5" />
@@ -232,7 +232,7 @@ export default function ThietKeCNTTPage() {
           </div>
         </div>
 
-        <div className="px-4 py-3 border-b border-border bg-muted/20">
+        <div className="filter-bar">
           <TaskFilters
             users={users}
             components={componentOptions}

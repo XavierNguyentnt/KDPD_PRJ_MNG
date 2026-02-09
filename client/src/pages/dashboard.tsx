@@ -286,7 +286,7 @@ export default function Dashboard() {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 w-8 p-0 shrink-0"
+            className="btn-icon shrink-0"
             onClick={() => refresh()}
             disabled={isRefreshing}>
             <RefreshCw
@@ -424,8 +424,8 @@ export default function Dashboard() {
       {/* Task List — Protend-style table card */}
       <section
         ref={taskListRef}
-        className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
+        className="section-card">
+        <div className="section-header">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
             <Badge variant="secondary" className="font-normal">
@@ -453,7 +453,7 @@ export default function Dashboard() {
                   t.dashboard.tasks.toLowerCase() +
                   "..."
                 }
-                className="pl-9 bg-background"
+                className="search-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />

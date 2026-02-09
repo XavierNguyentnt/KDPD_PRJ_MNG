@@ -124,6 +124,7 @@ export const translationContracts = pgTable("translation_contracts", {
   actualPageCount: integer("actual_page_count"),
   completionRate: numeric("completion_rate", { precision: 10, scale: 4 }),
   settlementValue: numeric("settlement_value", { precision: 15, scale: 2 }),
+  settlementDate: date("settlement_date"),
   progressCheckDate: date("progress_check_date"),
   expertReviewDate: date("expert_review_date"),
   projectAcceptanceDate: date("project_acceptance_date"),
@@ -135,6 +136,10 @@ export const translationContracts = pgTable("translation_contracts", {
   editingCompleted: boolean("editing_completed").default(false),
   printTransferDate: date("print_transfer_date"),
   publishedDate: date("published_date"),
+  advanceIncludeOverview: boolean("advance_include_overview"),
+  advance1Percent: numeric("advance_1_percent", { precision: 10, scale: 4 }),
+  advance2Percent: numeric("advance_2_percent", { precision: 10, scale: 4 }),
+  isSettled: boolean("is_settled"),
   note: text("note"),
 });
 
@@ -353,6 +358,27 @@ export const insertProofreadingContractMemberSchema = createInsertSchema(proofre
 export const selectProofreadingContractMemberSchema = createSelectSchema(proofreadingContractMembers);
 export type ProofreadingContractMember = typeof proofreadingContractMembers.$inferSelect;
 export type InsertProofreadingContractMember = z.infer<typeof insertProofreadingContractMemberSchema>;
+
+// -----------------------------------------------------------------------------
+// Payments (chuẩn kế toán – mỗi lần chi tiền = 1 record)
+// -----------------------------------------------------------------------------
+export const payments = pgTable("payments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  translationContractId: uuid("translation_contract_id")
+    .references(() => translationContracts.id, { onDelete: "cascade" }),
+  paymentType: text("payment_type"), // advance | settlement | other
+  voucherNo: text("voucher_no"),
+  paymentDate: date("payment_date"),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertPaymentSchema = createInsertSchema(payments);
+export const selectPaymentSchema = createSelectSchema(payments);
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 // -----------------------------------------------------------------------------
 // Document tasks (documents ↔ tasks)

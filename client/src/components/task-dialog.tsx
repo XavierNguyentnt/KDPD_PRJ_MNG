@@ -1024,7 +1024,7 @@ export function TaskDialog({
             : "not_started";
         const maxRoundHint = getMaxBienTapRoundForWork(
           data.relatedWorkId ?? null,
-          task?.id ?? null,
+          null,
         );
         const roundNum = roundNumberFromRoundType(data.roundType, maxRoundHint);
         payload.assignments = [

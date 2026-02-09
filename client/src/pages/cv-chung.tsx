@@ -1,14 +1,34 @@
 import { useMemo, useState } from "react";
-import { useTasks, useRefreshTasks, useCreateTask, useDeleteTask, UserRole } from "@/hooks/use-tasks";
+import * as XLSX from "xlsx";
+import {
+  useTasks,
+  useRefreshTasks,
+  useCreateTask,
+  useDeleteTask,
+  UserRole,
+} from "@/hooks/use-tasks";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
-import { useWorks, useComponents, useUsers } from "@/hooks/use-works-and-components";
+import {
+  useWorks,
+  useComponents,
+  useUsers,
+} from "@/hooks/use-works-and-components";
 import { TaskStatsBadgesOnly } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
-import { TaskTable, sortTasks, type TaskSortColumn } from "@/components/task-table";
+import {
+  TaskTable,
+  sortTasks,
+  type TaskSortColumn,
+} from "@/components/task-table";
 import { TaskKanbanBoard } from "@/components/task-kanban-board";
-import { TaskFilters, getDefaultTaskFilters, applyTaskFilters, type TaskFilterState } from "@/components/task-filters";
+import {
+  TaskFilters,
+  getDefaultTaskFilters,
+  applyTaskFilters,
+  type TaskFilterState,
+} from "@/components/task-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -23,11 +43,57 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, RefreshCw, Search, AlertTriangle, Plus, LayoutGrid, List } from "lucide-react";
+import {
+  Loader2,
+  RefreshCw,
+  Search,
+  AlertTriangle,
+  Plus,
+  LayoutGrid,
+  List,
+} from "lucide-react";
 import { Task } from "@shared/schema";
-import type { TaskWithAssignmentDetails } from "@shared/schema";
+import type { TaskWithAssignmentDetails as TTask } from "@shared/schema";
 import { format } from "date-fns";
 import { normalizeSearch } from "@/lib/utils";
+
+function handleExportTasks(
+  filteredTasks: TTask[],
+  language: string,
+  toast: (opts: any) => any,
+) {
+  if (filteredTasks.length === 0) {
+    toast({
+      title: language === "vi" ? "Không có dữ liệu" : "No data",
+      description:
+        language === "vi"
+          ? "Không có công việc để xuất Excel."
+          : "No tasks to export.",
+    });
+    return;
+  }
+
+  const taskHeaders = [
+    "ID",
+    "Tiêu đề",
+    "Nhóm",
+    "Trạng thái",
+    "Người thực hiện",
+  ];
+  const taskData = filteredTasks.map((task) => [
+    task.id,
+    task.title,
+    task.group,
+    task.status,
+    task.assignee,
+  ]);
+
+  const worksheet = XLSX.utils.aoa_to_sheet([taskHeaders, ...taskData]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
+
+  XLSX.writeFile(workbook, "CV_Chung_Tasks.xlsx");
+}
 
 export default function CVChungPage() {
   const { data: tasks, isLoading, isError } = useTasks();
@@ -37,15 +103,17 @@ export default function CVChungPage() {
   const { role, user } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
-  
+
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<TaskFilterState>(getDefaultTaskFilters);
+  const [filters, setFilters] = useState<TaskFilterState>(
+    getDefaultTaskFilters,
+  );
   const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [selectedTask, setSelectedTask] = useState<TaskWithAssignmentDetails | null>(null);
+  const [selectedTask, setSelectedTask] = useState<TTask | null>(null);
   const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
   const [deleteTaskConfirmOpen, setDeleteTaskConfirmOpen] = useState(false);
-  const [deleteTaskTarget, setDeleteTaskTarget] = useState<TaskWithAssignmentDetails | null>(null);
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState<TTask | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
@@ -54,17 +122,30 @@ export default function CVChungPage() {
   const { data: users = [] } = useUsers();
 
   const worksForFilter = useMemo(() => works, [works]);
-  const stages = useMemo(() => Array.from(new Set(works.map((w) => w.stage).filter(Boolean))) as string[], [works]);
-  const componentOptions = useMemo(() => components.map((c) => ({ id: c.id, name: c.name })), [components]);
+  const stages = useMemo(
+    () =>
+      Array.from(
+        new Set(works.map((w) => w.stage).filter(Boolean)),
+      ) as string[],
+    [works],
+  );
+  const componentOptions = useMemo(
+    () => components.map((c) => ({ id: c.id, name: c.name })),
+    [components],
+  );
 
   // Filter tasks for "Công việc chung" group only (DB có thể lưu "CV chung" hoặc "Công việc chung")
   const CV_CHUNG_GROUP_NAMES = ["Công việc chung", "CV chung"];
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    let list = tasks.filter((t) => t.group && CV_CHUNG_GROUP_NAMES.includes(t.group));
+    let list = tasks.filter(
+      (t) => t.group && CV_CHUNG_GROUP_NAMES.includes(t.group),
+    );
 
     if (role === UserRole.EMPLOYEE) {
-      list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
+      list = list.filter((t) =>
+        t.assignee?.includes((user?.displayName ?? "").split(" ")[0]),
+      );
     }
 
     if (search.trim()) {
@@ -74,13 +155,22 @@ export default function CVChungPage() {
           normalizeSearch(t.title ?? "").includes(q) ||
           normalizeSearch(t.description ?? "").includes(q) ||
           normalizeSearch(t.assignee ?? "").includes(q) ||
-          normalizeSearch(t.id ?? "").includes(q)
+          normalizeSearch(t.id ?? "").includes(q),
       );
     }
 
     list = applyTaskFilters(list, filters, worksForFilter);
     return sortTasks(list, sortBy, sortDir);
-  }, [tasks, role, user?.displayName, search, filters, worksForFilter, sortBy, sortDir]);
+  }, [
+    tasks,
+    role,
+    user?.displayName,
+    search,
+    filters,
+    worksForFilter,
+    sortBy,
+    sortDir,
+  ]);
 
   const handleSort = (column: TaskSortColumn) => {
     setSortBy((prev) => {
@@ -92,19 +182,28 @@ export default function CVChungPage() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "High": return "bg-orange-100 text-orange-700 hover:bg-orange-100/80";
-      case "Critical": return "bg-red-100 text-red-700 hover:bg-red-100/80";
-      case "Medium": return "bg-blue-100 text-blue-700 hover:bg-blue-100/80";
-      default: return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
+      case "High":
+        return "bg-orange-100 text-orange-700 hover:bg-orange-100/80";
+      case "Critical":
+        return "bg-red-100 text-red-700 hover:bg-red-100/80";
+      case "Medium":
+        return "bg-blue-100 text-blue-700 hover:bg-blue-100/80";
+      default:
+        return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
     }
   };
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Completed": return "bg-green-100 text-green-700 hover:bg-green-100/80";
-      case "In Progress": return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
-      case "Pending": return "bg-amber-100 text-amber-700 hover:bg-amber-100/80";
-      case "Cancelled": return "bg-red-100 text-red-700 hover:bg-red-100/80";
-      default: return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
+      case "Completed":
+        return "bg-green-100 text-green-700 hover:bg-green-100/80";
+      case "In Progress":
+        return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
+      case "Pending":
+        return "bg-amber-100 text-amber-700 hover:bg-amber-100/80";
+      case "Cancelled":
+        return "bg-red-100 text-red-700 hover:bg-red-100/80";
+      default:
+        return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
     }
   };
 
@@ -128,7 +227,9 @@ export default function CVChungPage() {
           {t.errors.failedToLoad}
         </p>
         <Button onClick={() => refresh()} disabled={isRefreshing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw
+            className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+          />
           {t.errors.retryConnection}
         </Button>
       </div>
@@ -141,18 +242,21 @@ export default function CVChungPage() {
       <section>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-sm text-muted-foreground">Quản lý các công việc chung của dự án</p>
+            <p className="text-sm text-muted-foreground">
+              Quản lý các công việc chung của dự án
+            </p>
           </div>
           <div className="text-sm text-muted-foreground flex items-center gap-2">
-            {t.dashboard.lastSynced}: {format(new Date(), 'h:mm a')}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 w-8 p-0" 
+            {t.dashboard.lastSynced}: {format(new Date(), "h:mm a")}
+            <Button
+              variant="outline"
+              size="sm"
+              className="btn-icon"
               onClick={() => refresh()}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              disabled={isRefreshing}>
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+              />
             </Button>
           </div>
         </div>
@@ -160,8 +264,8 @@ export default function CVChungPage() {
       </section>
 
       {/* Task List */}
-      <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
+      <section className="section-card">
+        <div className="section-header">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
             <Badge variant="secondary" className="font-normal">
@@ -172,8 +276,7 @@ export default function CVChungPage() {
                 size="sm"
                 onClick={() => setIsCreateDialogOpen(true)}
                 disabled={isCreating}
-                className="ml-2"
-              >
+                className="ml-2">
                 <Plus className="w-4 h-4 mr-2" />
                 {t.dashboard.createNew}
               </Button>
@@ -184,8 +287,13 @@ export default function CVChungPage() {
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t.common.search + " " + t.dashboard.tasks.toLowerCase() + "..."}
-                className="pl-9 bg-background"
+                placeholder={
+                  t.common.search +
+                  " " +
+                  t.dashboard.tasks.toLowerCase() +
+                  "..."
+                }
+                className="search-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -193,9 +301,10 @@ export default function CVChungPage() {
             <ToggleGroup
               type="single"
               value={viewMode}
-              onValueChange={(v) => v && (v === "table" || v === "board") && setViewMode(v)}
-              className="border rounded-md bg-background"
-            >
+              onValueChange={(v) =>
+                v && (v === "table" || v === "board") && setViewMode(v)
+              }
+              className="toggle-group-box">
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
                 <List className="h-4 w-4 mr-1.5" />
                 {t.dashboard.viewTable}
@@ -205,10 +314,15 @@ export default function CVChungPage() {
                 {t.dashboard.viewBoard}
               </ToggleGroupItem>
             </ToggleGroup>
+            <Button
+              onClick={() => handleExportTasks(filteredTasks, language, toast)}
+              disabled={filteredTasks.length === 0}>
+              Xuất Excel
+            </Button>
           </div>
         </div>
 
-        <div className="px-4 py-3 border-b border-border bg-muted/20">
+        <div className="filter-bar">
           <TaskFilters
             users={users}
             components={componentOptions}
@@ -279,29 +393,35 @@ export default function CVChungPage() {
         task={selectedTask}
         mode={taskDialogMode}
       />
-      
-      <TaskDialog 
-        open={isCreateDialogOpen} 
-        onOpenChange={(open) => setIsCreateDialogOpen(open)} 
+
+      <TaskDialog
+        open={isCreateDialogOpen}
+        onOpenChange={(open) => setIsCreateDialogOpen(open)}
         task={null}
         defaultGroup="Công việc chung"
         onCreate={(taskData) => {
-          createTask({ ...taskData, group: taskData.group || 'Công việc chung' }, {
-            onSuccess: () => {
-              setIsCreateDialogOpen(false);
+          createTask(
+            { ...taskData, group: taskData.group || "Công việc chung" },
+            {
+              onSuccess: () => {
+                setIsCreateDialogOpen(false);
+              },
             },
-          });
+          );
         }}
         isCreating={isCreating}
       />
 
-      <AlertDialog open={deleteTaskConfirmOpen} onOpenChange={setDeleteTaskConfirmOpen}>
+      <AlertDialog
+        open={deleteTaskConfirmOpen}
+        onOpenChange={setDeleteTaskConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Xác nhận xóa công việc</AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa công việc "{deleteTaskTarget?.title ?? deleteTaskTarget?.id}"?
-              Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa công việc "
+              {deleteTaskTarget?.title ?? deleteTaskTarget?.id}"? Hành động này
+              không thể hoàn tác.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -317,8 +437,7 @@ export default function CVChungPage() {
                 });
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isDeleting}
-            >
+              disabled={isDeleting}>
               Xóa
             </AlertDialogAction>
           </AlertDialogFooter>
