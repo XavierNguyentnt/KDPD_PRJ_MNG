@@ -24,8 +24,12 @@ export const users = pgTable("users", {
   lastName: text("last_name"),
   department: text("department"),
   isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertUserSchema = createInsertSchema(users);
@@ -51,8 +55,12 @@ export const contracts = pgTable("contracts", {
   description: text("description"),
   startDate: date("start_date"),
   endDate: date("end_date"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertContractSchema = createInsertSchema(contracts);
@@ -71,7 +79,9 @@ export const components = pgTable("components", {
   name: text("name").notNull(),
   description: text("description"),
   displayOrder: integer("display_order").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertComponentSchema = createInsertSchema(components);
@@ -95,7 +105,9 @@ export const works = pgTable("works", {
   estimateWordCount: integer("estimate_word_count"),
   estimatePageCount: integer("estimate_page_count"),
   note: text("note"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertWorkSchema = createInsertSchema(works);
@@ -124,7 +136,6 @@ export const translationContracts = pgTable("translation_contracts", {
   actualPageCount: integer("actual_page_count"),
   completionRate: numeric("completion_rate", { precision: 10, scale: 4 }),
   settlementValue: numeric("settlement_value", { precision: 15, scale: 2 }),
-  settlementDate: date("settlement_date"),
   progressCheckDate: date("progress_check_date"),
   expertReviewDate: date("expert_review_date"),
   projectAcceptanceDate: date("project_acceptance_date"),
@@ -136,17 +147,17 @@ export const translationContracts = pgTable("translation_contracts", {
   editingCompleted: boolean("editing_completed").default(false),
   printTransferDate: date("print_transfer_date"),
   publishedDate: date("published_date"),
-  advanceIncludeOverview: boolean("advance_include_overview"),
-  advance1Percent: numeric("advance_1_percent", { precision: 10, scale: 4 }),
-  advance2Percent: numeric("advance_2_percent", { precision: 10, scale: 4 }),
-  isSettled: boolean("is_settled"),
   note: text("note"),
 });
 
-export const insertTranslationContractSchema = createInsertSchema(translationContracts);
-export const selectTranslationContractSchema = createSelectSchema(translationContracts);
+export const insertTranslationContractSchema =
+  createInsertSchema(translationContracts);
+export const selectTranslationContractSchema =
+  createSelectSchema(translationContracts);
 export type TranslationContract = typeof translationContracts.$inferSelect;
-export type InsertTranslationContract = z.infer<typeof insertTranslationContractSchema>;
+export type InsertTranslationContract = z.infer<
+  typeof insertTranslationContractSchema
+>;
 
 // -----------------------------------------------------------------------------
 // Proofreading contracts (hợp đồng hiệu đính)
@@ -156,7 +167,9 @@ export const proofreadingContracts = pgTable("proofreading_contracts", {
   contractNumber: text("contract_number"),
   componentId: uuid("component_id").references(() => components.id),
   workId: uuid("work_id").references(() => works.id),
-  translationContractId: uuid("translation_contract_id").references(() => translationContracts.id),
+  translationContractId: uuid("translation_contract_id").references(
+    () => translationContracts.id,
+  ),
   pageCount: integer("page_count"),
   rateRatio: numeric("rate_ratio", { precision: 10, scale: 4 }),
   contractValue: numeric("contract_value", { precision: 15, scale: 2 }),
@@ -171,8 +184,14 @@ export const proofreadingContracts = pgTable("proofreading_contracts", {
 // -----------------------------------------------------------------------------
 export const contractStages = pgTable("contract_stages", {
   id: uuid("id").primaryKey().defaultRandom(),
-  translationContractId: uuid("translation_contract_id").references(() => translationContracts.id, { onDelete: "cascade" }),
-  proofreadingContractId: uuid("proofreading_contract_id").references(() => proofreadingContracts.id, { onDelete: "cascade" }),
+  translationContractId: uuid("translation_contract_id").references(
+    () => translationContracts.id,
+    { onDelete: "cascade" },
+  ),
+  proofreadingContractId: uuid("proofreading_contract_id").references(
+    () => proofreadingContracts.id,
+    { onDelete: "cascade" },
+  ),
   stageCode: text("stage_code").notNull(),
   stageOrder: integer("stage_order").notNull().default(1),
   startDate: date("start_date"),
@@ -186,10 +205,16 @@ export const selectContractStageSchema = createSelectSchema(contractStages);
 export type ContractStage = typeof contractStages.$inferSelect;
 export type InsertContractStage = z.infer<typeof insertContractStageSchema>;
 
-export const insertProofreadingContractSchema = createInsertSchema(proofreadingContracts);
-export const selectProofreadingContractSchema = createSelectSchema(proofreadingContracts);
+export const insertProofreadingContractSchema = createInsertSchema(
+  proofreadingContracts,
+);
+export const selectProofreadingContractSchema = createSelectSchema(
+  proofreadingContracts,
+);
 export type ProofreadingContract = typeof proofreadingContracts.$inferSelect;
-export type InsertProofreadingContract = z.infer<typeof insertProofreadingContractSchema>;
+export type InsertProofreadingContract = z.infer<
+  typeof insertProofreadingContractSchema
+>;
 
 // -----------------------------------------------------------------------------
 // Tasks (chỉ thông tin task-level; người giao / ngày nhận-hoàn thành ở task_assignments)
@@ -212,8 +237,12 @@ export const tasks = pgTable("tasks", {
   relatedWorkId: uuid("related_work_id").references(() => works.id),
   relatedContractId: uuid("related_contract_id"),
   vote: text("vote"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertTaskSchema = createInsertSchema(tasks);
@@ -247,8 +276,12 @@ export const documents = pgTable("documents", {
   contractId: uuid("contract_id"),
   taskId: text("task_id"),
   uploadedBy: uuid("uploaded_by"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertDocumentSchema = createInsertSchema(documents);
@@ -262,8 +295,12 @@ export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 // -----------------------------------------------------------------------------
 export const taskAssignments = pgTable("task_assignments", {
   id: uuid("id").primaryKey().defaultRandom(),
-  taskId: text("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   stageType: text("stage_type").notNull(),
   roundNumber: integer("round_number").notNull().default(1),
   receivedAt: date("received_at"),
@@ -272,8 +309,12 @@ export const taskAssignments = pgTable("task_assignments", {
   status: text("status").notNull().default("not_started"),
   progress: integer("progress").notNull().default(0),
   notes: text("notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertTaskAssignmentSchema = createInsertSchema(taskAssignments);
@@ -286,14 +327,21 @@ export type InsertTaskAssignment = z.infer<typeof insertTaskAssignmentSchema>;
 // -----------------------------------------------------------------------------
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(), // task_assigned | task_due_soon | task_overdue
   taskId: text("task_id").references(() => tasks.id, { onDelete: "cascade" }),
-  taskAssignmentId: uuid("task_assignment_id").references(() => taskAssignments.id, { onDelete: "cascade" }),
+  taskAssignmentId: uuid("task_assignment_id").references(
+    () => taskAssignments.id,
+    { onDelete: "cascade" },
+  ),
   title: text("title").notNull(),
   message: text("message").notNull(),
   isRead: boolean("is_read").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   readAt: timestamp("read_at", { withTimezone: true }),
 });
 
@@ -307,11 +355,19 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 // -----------------------------------------------------------------------------
 export const contractMembers = pgTable("contract_members", {
   id: uuid("id").primaryKey().defaultRandom(),
-  contractId: uuid("contract_id").notNull().references(() => contracts.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  contractId: uuid("contract_id")
+    .notNull()
+    .references(() => contracts.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   role: text("role"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertContractMemberSchema = createInsertSchema(contractMembers);
@@ -322,57 +378,88 @@ export type InsertContractMember = z.infer<typeof insertContractMemberSchema>;
 // -----------------------------------------------------------------------------
 // Translation contract members (translation_contracts ↔ users)
 // -----------------------------------------------------------------------------
-export const translationContractMembers = pgTable("translation_contract_members", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  translationContractId: uuid("translation_contract_id")
-    .notNull()
-    .references(() => translationContracts.id, { onDelete: "cascade" }),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const translationContractMembers = pgTable(
+  "translation_contract_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    translationContractId: uuid("translation_contract_id")
+      .notNull()
+      .references(() => translationContracts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
 
-export const insertTranslationContractMemberSchema = createInsertSchema(translationContractMembers);
-export const selectTranslationContractMemberSchema = createSelectSchema(translationContractMembers);
-export type TranslationContractMember = typeof translationContractMembers.$inferSelect;
-export type InsertTranslationContractMember = z.infer<typeof insertTranslationContractMemberSchema>;
+export const insertTranslationContractMemberSchema = createInsertSchema(
+  translationContractMembers,
+);
+export const selectTranslationContractMemberSchema = createSelectSchema(
+  translationContractMembers,
+);
+export type TranslationContractMember =
+  typeof translationContractMembers.$inferSelect;
+export type InsertTranslationContractMember = z.infer<
+  typeof insertTranslationContractMemberSchema
+>;
 
 // -----------------------------------------------------------------------------
 // Proofreading contract members (proofreading_contracts ↔ users)
 // -----------------------------------------------------------------------------
-export const proofreadingContractMembers = pgTable("proofreading_contract_members", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  proofreadingContractId: uuid("proofreading_contract_id")
-    .notNull()
-    .references(() => proofreadingContracts.id, { onDelete: "cascade" }),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const proofreadingContractMembers = pgTable(
+  "proofreading_contract_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    proofreadingContractId: uuid("proofreading_contract_id")
+      .notNull()
+      .references(() => proofreadingContracts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
 
-export const insertProofreadingContractMemberSchema = createInsertSchema(proofreadingContractMembers);
-export const selectProofreadingContractMemberSchema = createSelectSchema(proofreadingContractMembers);
-export type ProofreadingContractMember = typeof proofreadingContractMembers.$inferSelect;
-export type InsertProofreadingContractMember = z.infer<typeof insertProofreadingContractMemberSchema>;
+export const insertProofreadingContractMemberSchema = createInsertSchema(
+  proofreadingContractMembers,
+);
+export const selectProofreadingContractMemberSchema = createSelectSchema(
+  proofreadingContractMembers,
+);
+export type ProofreadingContractMember =
+  typeof proofreadingContractMembers.$inferSelect;
+export type InsertProofreadingContractMember = z.infer<
+  typeof insertProofreadingContractMemberSchema
+>;
 
 // -----------------------------------------------------------------------------
 // Payments (chuẩn kế toán – mỗi lần chi tiền = 1 record)
 // -----------------------------------------------------------------------------
 export const payments = pgTable("payments", {
   id: uuid("id").primaryKey().defaultRandom(),
-  translationContractId: uuid("translation_contract_id")
-    .references(() => translationContracts.id, { onDelete: "cascade" }),
+  contractId: uuid("contract_id"),
   paymentType: text("payment_type"), // advance | settlement | other
   voucherNo: text("voucher_no"),
   paymentDate: date("payment_date"),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   note: text("note"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertPaymentSchema = createInsertSchema(payments);
@@ -385,12 +472,20 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 // -----------------------------------------------------------------------------
 export const documentTasks = pgTable("document_tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
-  documentId: uuid("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
-  taskId: text("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
   role: text("role"),
   note: text("note"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertDocumentTaskSchema = createInsertSchema(documentTasks);
@@ -403,18 +498,30 @@ export type InsertDocumentTask = z.infer<typeof insertDocumentTaskSchema>;
 // -----------------------------------------------------------------------------
 export const documentContracts = pgTable("document_contracts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  documentId: uuid("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
-  contractId: uuid("contract_id").notNull().references(() => contracts.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  contractId: uuid("contract_id")
+    .notNull()
+    .references(() => contracts.id, { onDelete: "cascade" }),
   role: text("role"),
   note: text("note"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
-export const insertDocumentContractSchema = createInsertSchema(documentContracts);
-export const selectDocumentContractSchema = createSelectSchema(documentContracts);
+export const insertDocumentContractSchema =
+  createInsertSchema(documentContracts);
+export const selectDocumentContractSchema =
+  createSelectSchema(documentContracts);
 export type DocumentContract = typeof documentContracts.$inferSelect;
-export type InsertDocumentContract = z.infer<typeof insertDocumentContractSchema>;
+export type InsertDocumentContract = z.infer<
+  typeof insertDocumentContractSchema
+>;
 
 // -----------------------------------------------------------------------------
 // Groups (nhóm công việc / nhóm nhân sự)
@@ -424,8 +531,12 @@ export const groups = pgTable("groups", {
   code: text("code").notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertGroupSchema = createInsertSchema(groups);
@@ -438,10 +549,18 @@ export type InsertGroup = z.infer<typeof insertGroupSchema>;
 // -----------------------------------------------------------------------------
 export const userGroups = pgTable("user_groups", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  groupId: uuid("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  groupId: uuid("group_id")
+    .notNull()
+    .references(() => groups.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertUserGroupSchema = createInsertSchema(userGroups);
@@ -457,8 +576,12 @@ export const roles = pgTable("roles", {
   code: text("code").notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertRoleSchema = createInsertSchema(roles);
@@ -471,11 +594,21 @@ export type InsertRole = z.infer<typeof insertRoleSchema>;
 // -----------------------------------------------------------------------------
 export const userRoles = pgTable("user_roles", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  roleId: uuid("role_id").notNull().references(() => roles.id, { onDelete: "cascade" }),
-  componentId: uuid("component_id").references(() => components.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  roleId: uuid("role_id")
+    .notNull()
+    .references(() => roles.id, { onDelete: "cascade" }),
+  componentId: uuid("component_id").references(() => components.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const insertUserRoleSchema = createInsertSchema(userRoles);
@@ -500,7 +633,8 @@ export const EmployeeGroup = {
   BIEN_TAP: "bien_tap",
 } as const;
 
-export type EmployeeGroupType = (typeof EmployeeGroup)[keyof typeof EmployeeGroup];
+export type EmployeeGroupType =
+  (typeof EmployeeGroup)[keyof typeof EmployeeGroup];
 
 /** (roleId, componentId) từ user_roles — dùng để phân quyền thư ký theo hợp phần. */
 export type UserRoleAssignment = { roleId: string; componentId: string | null };

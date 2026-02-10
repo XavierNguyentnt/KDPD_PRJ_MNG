@@ -1390,6 +1390,28 @@ export async function registerRoutes(
       }
     },
   );
+  app.get(
+    api.payments.listByProofreadingContract.path,
+    requireAuth,
+    async (req, res) => {
+      try {
+        if (!db)
+          return res.status(503).json({ message: "Database not configured" });
+        const id = Array.isArray(req.params.id)
+          ? req.params.id[0]
+          : req.params.id;
+        const list = await dbStorage.getPaymentsByProofreadingContractId(id);
+        res.json(list);
+      } catch (err) {
+        res
+          .status(500)
+          .json({
+            message:
+              err instanceof Error ? err.message : "Failed to fetch payments",
+          });
+      }
+    },
+  );
 
   app.post(api.payments.create.path, requireAuth, async (req, res) => {
     try {
@@ -1419,6 +1441,44 @@ export async function registerRoutes(
         .json({
           message:
             err instanceof Error ? err.message : "Failed to create payment",
+        });
+    }
+  });
+
+  app.patch(api.payments.update.path, requireAuth, async (req, res) => {
+    try {
+      if (!db)
+        return res.status(503).json({ message: "Database not configured" });
+      const id = Array.isArray(req.params.id)
+        ? req.params.id[0]
+        : req.params.id;
+      const input = api.payments.update.input.parse(req.body);
+      const updated = await dbStorage.updatePayment(id, {
+        ...input,
+        paymentDate: input.paymentDate
+          ? typeof input.paymentDate === "string"
+            ? input.paymentDate
+            : new Date(input.paymentDate).toISOString().slice(0, 10)
+          : null,
+      });
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res
+          .status(400)
+          .json({
+            message: err.errors[0].message,
+            field: err.errors[0].path.join("."),
+          });
+      }
+      if (err instanceof Error && err.message.includes("not found")) {
+        return res.status(404).json({ message: err.message });
+      }
+      res
+        .status(500)
+        .json({
+          message:
+            err instanceof Error ? err.message : "Failed to update payment",
         });
     }
   });
@@ -1512,6 +1572,31 @@ export async function registerRoutes(
         });
     }
   });
+  app.get(
+    api.finance.proofreadingContractSummary.path,
+    requireAuth,
+    async (req, res) => {
+      try {
+        if (!db)
+          return res.status(503).json({ message: "Database not configured" });
+        const id = Array.isArray(req.params.id)
+          ? req.params.id[0]
+          : req.params.id;
+        const summary =
+          await dbStorage.getProofreadingContractFinanceSummary(id);
+        res.json(summary);
+      } catch (err) {
+        res
+          .status(500)
+          .json({
+            message:
+              err instanceof Error
+                ? err.message
+                : "Failed to fetch finance summary",
+          });
+      }
+    },
+  );
   const numericKeysPc = ["rateRatio", "contractValue"] as const;
   const uuidKeysPc = [
     "componentId",
@@ -1727,12 +1812,20 @@ export async function registerRoutes(
           await dbStorage.getContractStagesByTranslationContractId(contractId);
         res.json(list);
       } catch (err) {
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error ? err.message : "Failed to fetch stages",
-          });
+        const msg = err instanceof Error ? err.message : String(err);
+        if (
+          typeof msg === "string" &&
+          (msg.includes("contract_stages") ||
+            msg.includes("relation") ||
+            msg.includes("does not exist") ||
+            msg.includes("column"))
+        ) {
+          return res.json([]);
+        }
+        res.status(500).json({
+          message: err instanceof Error ? err.message : "Failed to fetch stages",
+          stack: err instanceof Error ? err.stack : undefined,
+        });
       }
     },
   );

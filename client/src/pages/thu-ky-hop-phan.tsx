@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, Fragment } from "react";
 import { useLocation } from "wouter";
 import {
   useQuery,
@@ -40,6 +40,7 @@ import type {
   ProofreadingContract,
   Component,
   ContractStage,
+  Payment,
 } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -72,6 +73,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import {
   Pagination,
   PaginationContent,
@@ -676,6 +685,28 @@ async function fetchFinanceSummary(
   return res.json();
 }
 
+async function fetchFinanceSummaryPc(
+  contractId: string,
+): Promise<{ totalPaid: number; totalAdvance: number; outstanding: number }> {
+  const res = await fetch(
+    buildUrl(api.finance.proofreadingContractSummary.path, { id: contractId }),
+    {
+      credentials: "include",
+    },
+  );
+  if (!res.ok) throw new Error("Không tải được tóm tắt tài chính");
+  return res.json();
+}
+
+async function fetchContractPayments(contractId: string): Promise<Payment[]> {
+  const res = await fetch(
+    buildUrl(api.payments.listByTranslationContract.path, { id: contractId }),
+    { credentials: "include" },
+  );
+  if (!res.ok) throw new Error("Không tải được danh sách chi trả");
+  return res.json();
+}
+
 const ROLE_THU_KY_NAME = "Thư ký hợp phần";
 const ROLE_THU_KY_CODE = "prj_secretary";
 
@@ -742,6 +773,27 @@ export default function ThuKyHopPhanPage() {
   const [pcSortColumns, setPcSortColumns] = useState<
     Array<{ column: ProofreadingContractSortColumn; dir: "asc" | "desc" }>
   >([]);
+  const [tcColumnVis, setTcColumnVis] = useState({
+    overviewValue: true,
+    translationValue: true,
+    contractValue: true,
+    settlementValue: true,
+    outstanding: true,
+  });
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("tcColumnVis");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setTcColumnVis((s) => ({ ...s, ...parsed }));
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("tcColumnVis", JSON.stringify(tcColumnVis));
+    } catch {}
+  }, [tcColumnVis]);
 
   const [selectedTask, setSelectedTask] =
     useState<TaskWithAssignmentDetails | null>(null);
@@ -1317,11 +1369,57 @@ export default function ThuKyHopPhanPage() {
     const map = new Map<string, number>();
     financeQueries.forEach((q, idx) => {
       const id = paginatedTc[idx]?.id;
-      if (id && q.data) map.set(id, q.data.outstanding);
+      if (id && q.data) map.set(id, Math.max(q.data.outstanding, 0));
     });
     return map;
   }, [financeQueries, paginatedTc]);
 
+  const paymentsQueries = useQueries({
+    queries: paginatedTc.map((c) => ({
+      queryKey: ["payments", c.id],
+      queryFn: () => fetchContractPayments(c.id),
+      enabled: !!c.id,
+      staleTime: 60_000,
+    })),
+  });
+  const paymentInfoById = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        advance1?: Payment;
+        advance2?: Payment;
+        settlement?: Payment;
+      }
+    >();
+    paymentsQueries.forEach((q, idx) => {
+      const id = paginatedTc[idx]?.id;
+      const list = (q.data ?? []).slice();
+      const advances = list
+        .filter((p) => String(p.paymentType || "").toLowerCase() === "advance")
+        .sort((a, b) => {
+          const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
+          const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
+          return ad - bd;
+        });
+      const settlements = list
+        .filter(
+          (p) => String(p.paymentType || "").toLowerCase() === "settlement",
+        )
+        .sort((a, b) => {
+          const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
+          const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
+          return bd - ad;
+        });
+      if (id) {
+        map.set(id, {
+          advance1: advances[0],
+          advance2: advances[1],
+          settlement: settlements[0],
+        });
+      }
+    });
+    return map;
+  }, [paymentsQueries, paginatedTc]);
   const paginatedPc = useMemo(() => {
     const start = (pcPage - 1) * PAGE_SIZE;
     // filteredPc is already sorted, we just slice the correct page
@@ -1329,6 +1427,68 @@ export default function ThuKyHopPhanPage() {
   }, [filteredPc, pcPage]);
   const totalPcPages = Math.max(1, Math.ceil(filteredPc.length / PAGE_SIZE));
 
+  const pcFinanceQueries = useQueries({
+    queries: paginatedPc.map((c) => ({
+      queryKey: ["finance-summary", c.id],
+      queryFn: () => fetchFinanceSummaryPc(c.id),
+      enabled: !!c.id,
+      staleTime: 60_000,
+    })),
+  });
+  const pcOutstandingById = useMemo(() => {
+    const map = new Map<string, number>();
+    pcFinanceQueries.forEach((q, idx) => {
+      const id = paginatedPc[idx]?.id;
+      if (id && q.data) map.set(id, Math.max(q.data.outstanding, 0));
+    });
+    return map;
+  }, [pcFinanceQueries, paginatedPc]);
+  const pcPaymentsQueries = useQueries({
+    queries: paginatedPc.map((c) => ({
+      queryKey: ["payments", c.id],
+      queryFn: () => fetchPaymentsByPcId(c.id),
+      enabled: !!c.id,
+      staleTime: 60_000,
+    })),
+  });
+  const pcPaymentInfoById = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        advance1?: Payment;
+        advance2?: Payment;
+        settlement?: Payment;
+      }
+    >();
+    pcPaymentsQueries.forEach((q, idx) => {
+      const id = paginatedPc[idx]?.id;
+      const list = (q.data ?? []).slice();
+      const advances = list
+        .filter((p) => String(p.paymentType || "").toLowerCase() === "advance")
+        .sort((a, b) => {
+          const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
+          const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
+          return ad - bd;
+        });
+      const settlements = list
+        .filter(
+          (p) => String(p.paymentType || "").toLowerCase() === "settlement",
+        )
+        .sort((a, b) => {
+          const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
+          const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
+          return bd - ad;
+        });
+      if (id) {
+        map.set(id, {
+          advance1: advances[0],
+          advance2: advances[1],
+          settlement: settlements[0],
+        });
+      }
+    });
+    return map;
+  }, [pcPaymentsQueries, paginatedPc]);
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "High":
@@ -1817,9 +1977,9 @@ export default function ThuKyHopPhanPage() {
       "Gia hạn từ",
       "Gia hạn đến",
       "Hoàn thành thực tế",
-      "Số chữ TT",
-      "Số trang TT",
-      "Tỷ lệ HT",
+      "Số chữ Thực tế",
+      "Số trang Thực tế",
+      "Tỷ lệ hoàn thành",
       "Giá trị quyết toán",
       "Trạng thái",
       "Ghi chú",
@@ -2842,6 +3002,53 @@ export default function ThuKyHopPhanPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex-1" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="shrink-0">
+                      Hiển thị cột
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Cột tài chính</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={tcColumnVis.overviewValue}
+                      onCheckedChange={(v) =>
+                        setTcColumnVis((s) => ({ ...s, overviewValue: !!v }))
+                      }>
+                      Kinh phí tổng quan
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={tcColumnVis.translationValue}
+                      onCheckedChange={(v) =>
+                        setTcColumnVis((s) => ({ ...s, translationValue: !!v }))
+                      }>
+                      Kinh phí dịch thuật
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={tcColumnVis.contractValue}
+                      onCheckedChange={(v) =>
+                        setTcColumnVis((s) => ({ ...s, contractValue: !!v }))
+                      }>
+                      Giá trị HĐ
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={tcColumnVis.settlementValue}
+                      onCheckedChange={(v) =>
+                        setTcColumnVis((s) => ({ ...s, settlementValue: !!v }))
+                      }>
+                      Giá trị quyết toán
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={tcColumnVis.outstanding}
+                      onCheckedChange={(v) =>
+                        setTcColumnVis((s) => ({ ...s, outstanding: !!v }))
+                      }>
+                      Công nợ
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
             {worksLoading ? (
@@ -2854,7 +3061,7 @@ export default function ThuKyHopPhanPage() {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                        <TableRow className="sticky top-0 bg-white z-30">
                           <TableHead className="w-[44px]">
                             <Checkbox
                               checked={
@@ -2889,18 +3096,21 @@ export default function ThuKyHopPhanPage() {
                             column="component"
                             sortColumns={worksSortColumns}
                             onSort={handleWorksSort}
+                            className="sticky left-[44px] z-20 bg-white w-[140px] min-w-[140px]"
                           />
                           <SortableHead
                             label="Tiêu đề (VI)"
                             column="titleVi"
                             sortColumns={worksSortColumns}
                             onSort={handleWorksSort}
+                            className="sticky left-[184px] z-20 bg-white w-[180px] min-w-[180px]"
                           />
                           <SortableHead
                             label="Tiêu đề Hán Nôm"
                             column="titleHannom"
                             sortColumns={worksSortColumns}
                             onSort={handleWorksSort}
+                            className="sticky left-[364px] z-20 bg-white w-[140px] min-w-[140px]"
                           />
                           <SortableHead
                             label="Giai đoạn"
@@ -2967,7 +3177,7 @@ export default function ThuKyHopPhanPage() {
                         ) : (
                           paginatedWorks.map((w) => (
                             <TableRow key={w.id}>
-                              <TableCell>
+                              <TableCell className="sticky left-0 z-20 bg-white w-[44px] min-w-[44px]">
                                 <Checkbox
                                   checked={selectedWorkSet.has(w.id)}
                                   onCheckedChange={(checked) => {
@@ -2983,13 +3193,13 @@ export default function ThuKyHopPhanPage() {
                                   }`}
                                 />
                               </TableCell>
-                              <TableCell className="max-w-[140px]">
+                              <TableCell className="sticky left-[44px] z-10 bg-white max-w-[140px] w-[140px] min-w-[140px]">
                                 {getComponentName(w.componentId)}
                               </TableCell>
-                              <TableCell className="font-medium max-w-[180px]">
+                              <TableCell className="sticky left-[184px] z-10 bg-white font-medium max-w-[180px] w-[180px] min-w-[180px]">
                                 {w.titleVi ?? "—"}
                               </TableCell>
-                              <TableCell className="max-w-[140px]">
+                              <TableCell className="sticky left-[364px] z-10 bg-white max-w-[140px] w-[140px] min-w-[140px]">
                                 {w.titleHannom ?? "—"}
                               </TableCell>
                               <TableCell>
@@ -3125,7 +3335,7 @@ export default function ThuKyHopPhanPage() {
                             </div>
                             <div>
                               <div className="text-muted-foreground">
-                                Hoàn thành TT
+                                Hoàn thành Thực tế
                               </div>
                               <div>
                                 {formatDateDDMMYYYY(c.actualCompletionDate) ||
@@ -3367,20 +3577,24 @@ export default function ThuKyHopPhanPage() {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                        <TableRow className="sticky top-0 bg-white z-30">
                           <SortableHead
                             label="Số HĐ"
                             column="contractNumber"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
+                            className="sticky left-0 z-20 bg-white w-[120px] min-w-[120px]"
                           />
                           <SortableHead
                             label="Hợp phần"
                             column="component"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
+                            className="sticky left-[120px] z-20 bg-white w-[140px] min-w-[140px]"
                           />
-                          <TableHead>Tác phẩm</TableHead>
+                          <TableHead className="sticky left-[260px] z-10 bg-white w-[220px] min-w-[220px]">
+                            Tác phẩm
+                          </TableHead>
                           <SortableHead
                             label="Đơn giá"
                             column="unitPrice"
@@ -3393,21 +3607,33 @@ export default function ThuKyHopPhanPage() {
                             column="overviewValue"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
-                            className="text-right"
+                            className={
+                              tcColumnVis.overviewValue
+                                ? "text-right"
+                                : "hidden"
+                            }
                           />
                           <SortableHead
                             label="Kinh phí dịch thuật"
                             column="translationValue"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
-                            className="text-right"
+                            className={
+                              tcColumnVis.translationValue
+                                ? "text-right"
+                                : "hidden"
+                            }
                           />
                           <SortableHead
                             label="Giá trị HĐ"
                             column="contractValue"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
-                            className="text-right"
+                            className={
+                              tcColumnVis.contractValue
+                                ? "text-right"
+                                : "hidden"
+                            }
                           />
                           <TableHead>Thời gian (tháng)</TableHead>
                           <SortableHead
@@ -3435,27 +3661,27 @@ export default function ThuKyHopPhanPage() {
                             onSort={handleTcSort}
                           />
                           <SortableHead
-                            label="Hoàn thành TT"
+                            label="Hoàn thành Thực tế"
                             column="actualCompletionDate"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
                           />
                           <SortableHead
-                            label="Số chữ TT"
+                            label="Số chữ Thực tế"
                             column="actualWordCount"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
                             className="text-right"
                           />
                           <SortableHead
-                            label="Số trang TT"
+                            label="Số trang Thực tế"
                             column="actualPageCount"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
                             className="text-right"
                           />
                           <SortableHead
-                            label="Tỷ lệ HT"
+                            label="Tỷ lệ hoàn thành"
                             column="completionRate"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
@@ -3466,9 +3692,24 @@ export default function ThuKyHopPhanPage() {
                             column="settlementValue"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
-                            className="text-right"
+                            className={
+                              tcColumnVis.settlementValue
+                                ? "text-right"
+                                : "hidden"
+                            }
                           />
-                          <TableHead>Công nợ</TableHead>
+                          <TableHead className="text-right">
+                            Chênh lệch so với GTHĐ
+                          </TableHead>
+                          <TableHead>Đã Tạm ứng đợt 1</TableHead>
+                          <TableHead>Đã Tạm ứng đợt 2</TableHead>
+                          <TableHead>Đã Quyết toán</TableHead>
+                          <TableHead
+                            className={
+                              tcColumnVis.outstanding ? undefined : "hidden"
+                            }>
+                            Công nợ
+                          </TableHead>
                           <TableHead>Tiến độ</TableHead>
                           <TableHead className="max-w-[100px] truncate">
                             Ghi chú
@@ -3488,13 +3729,13 @@ export default function ThuKyHopPhanPage() {
                         ) : (
                           paginatedTc.map((c) => (
                             <TableRow key={c.id}>
-                              <TableCell className="font-medium">
+                              <TableCell className="sticky left-0 z-20 bg-white font-medium w-[120px] min-w-[120px]">
                                 {c.contractNumber ?? "—"}
                               </TableCell>
-                              <TableCell className="max-w-[140px]">
+                              <TableCell className="sticky left-[120px] z-10 bg-white max-w-[140px] w-[140px] min-w-[140px]">
                                 {getComponentName(c.componentId)}
                               </TableCell>
-                              <TableCell className="max-w-[220px]">
+                              <TableCell className="sticky left-[260px] z-10 bg-white max-w-[220px] w-[220px] min-w-[220px]">
                                 <div
                                   className="font-medium truncate"
                                   title={getWorkTitle(c.workId)}>
@@ -3511,7 +3752,12 @@ export default function ThuKyHopPhanPage() {
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right align-top">
+                              <TableCell
+                                className={
+                                  tcColumnVis.overviewValue
+                                    ? "text-right align-top"
+                                    : "hidden"
+                                }>
                                 <span>
                                   {formatNumberAccounting(c.overviewValue)}
                                 </span>
@@ -3522,7 +3768,12 @@ export default function ThuKyHopPhanPage() {
                                     </span>
                                   )}
                               </TableCell>
-                              <TableCell className="text-right align-top">
+                              <TableCell
+                                className={
+                                  tcColumnVis.translationValue
+                                    ? "text-right align-top"
+                                    : "hidden"
+                                }>
                                 <span>
                                   {formatNumberAccounting(c.translationValue)}
                                 </span>
@@ -3535,7 +3786,12 @@ export default function ThuKyHopPhanPage() {
                                     </span>
                                   )}
                               </TableCell>
-                              <TableCell className="text-right align-top">
+                              <TableCell
+                                className={
+                                  tcColumnVis.contractValue
+                                    ? "text-right align-top"
+                                    : "hidden"
+                                }>
                                 <span>
                                   {formatNumberAccounting(c.contractValue)}
                                 </span>
@@ -3577,7 +3833,12 @@ export default function ThuKyHopPhanPage() {
                                   ? formatPercent(c.completionRate)
                                   : "—"}
                               </TableCell>
-                              <TableCell className="text-right align-top">
+                              <TableCell
+                                className={
+                                  tcColumnVis.settlementValue
+                                    ? "text-right align-top"
+                                    : "hidden"
+                                }>
                                 <span>
                                   {formatNumberAccounting(c.settlementValue)}
                                 </span>
@@ -3592,10 +3853,119 @@ export default function ThuKyHopPhanPage() {
                               </TableCell>
                               <TableCell className="text-right align-top">
                                 <span>
+                                  {c.settlementValue != null &&
+                                  c.contractValue != null
+                                    ? formatNumberAccounting(
+                                        Number(c.settlementValue) -
+                                          Number(c.contractValue),
+                                      )
+                                    : "—"}
+                                </span>
+                                {c.settlementValue != null &&
+                                  c.contractValue != null && (
+                                    <span className="text-xs text-muted-foreground block mt-0.5">
+                                      {numberToVietnameseWords(
+                                        Number(c.settlementValue) -
+                                          Number(c.contractValue),
+                                      )}
+                                    </span>
+                                  )}
+                              </TableCell>
+                              <TableCell className="text-right align-top">
+                                <span>
+                                  {formatNumberAccounting(
+                                    paymentInfoById.get(c.id)?.advance1?.amount,
+                                  )}
+                                </span>
+                                {paymentInfoById.get(c.id)?.advance1?.amount !=
+                                  null &&
+                                  paymentInfoById.get(c.id)?.advance1
+                                    ?.amount !== "" && (
+                                    <span className="text-xs text-muted-foreground block mt-0.5">
+                                      {numberToVietnameseWords(
+                                        paymentInfoById.get(c.id)?.advance1
+                                          ?.amount,
+                                      )}
+                                    </span>
+                                  )}
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {formatDateDDMMYYYY(
+                                    paymentInfoById.get(c.id)?.advance1
+                                      ?.paymentDate,
+                                  ) || "—"}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right align-top">
+                                <span>
+                                  {formatNumberAccounting(
+                                    paymentInfoById.get(c.id)?.advance2?.amount,
+                                  )}
+                                </span>
+                                {paymentInfoById.get(c.id)?.advance2?.amount !=
+                                  null &&
+                                  paymentInfoById.get(c.id)?.advance2
+                                    ?.amount !== "" && (
+                                    <span className="text-xs text-muted-foreground block mt-0.5">
+                                      {numberToVietnameseWords(
+                                        paymentInfoById.get(c.id)?.advance2
+                                          ?.amount,
+                                      )}
+                                    </span>
+                                  )}
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {formatDateDDMMYYYY(
+                                    paymentInfoById.get(c.id)?.advance2
+                                      ?.paymentDate,
+                                  ) || "—"}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right align-top">
+                                <span>
+                                  {formatNumberAccounting(
+                                    paymentInfoById.get(c.id)?.settlement
+                                      ?.amount,
+                                  )}
+                                </span>
+                                {paymentInfoById.get(c.id)?.settlement
+                                  ?.amount != null &&
+                                  paymentInfoById.get(c.id)?.settlement
+                                    ?.amount !== "" && (
+                                    <span className="text-xs text-muted-foreground block mt-0.5">
+                                      {numberToVietnameseWords(
+                                        paymentInfoById.get(c.id)?.settlement
+                                          ?.amount,
+                                      )}
+                                    </span>
+                                  )}
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {formatDateDDMMYYYY(
+                                    paymentInfoById.get(c.id)?.settlement
+                                      ?.paymentDate,
+                                  ) || "—"}
+                                </div>
+                              </TableCell>
+                              <TableCell
+                                className={
+                                  tcColumnVis.outstanding
+                                    ? "text-right align-top"
+                                    : "hidden"
+                                }>
+                                <span>
                                   {formatNumberAccounting(
                                     outstandingById.get(c.id),
                                   )}
                                 </span>
+                                {typeof outstandingById.get(c.id) ===
+                                  "number" &&
+                                  !Number.isNaN(
+                                    outstandingById.get(c.id) as number,
+                                  ) && (
+                                    <span className="text-xs text-muted-foreground block mt-0.5">
+                                      {numberToVietnameseWords(
+                                        outstandingById.get(c.id) as number,
+                                      )}
+                                    </span>
+                                  )}
                               </TableCell>
                               <TableCell className="min-w-[220px]">
                                 <div className="flex flex-wrap gap-2">
@@ -3760,7 +4130,7 @@ export default function ThuKyHopPhanPage() {
                             </div>
                             <div>
                               <div className="text-muted-foreground">
-                                Hoàn thành TT
+                                Hoàn thành Thực tế
                               </div>
                               <div>
                                 {formatDateDDMMYYYY(c.actualCompletionDate) ||
@@ -3964,20 +4334,24 @@ export default function ThuKyHopPhanPage() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
+                      <TableRow className="sticky top-0 bg-white z-30">
                         <SortableHead
                           label="Số HĐ"
                           column="contractNumber"
                           sortColumns={pcSortColumns}
                           onSort={handlePcSort}
+                          className="sticky left-0 z-20 bg-white w-[120px] min-w-[120px]"
                         />
                         <SortableHead
                           label="Hợp phần"
                           column="component"
                           sortColumns={pcSortColumns}
                           onSort={handlePcSort}
+                          className="sticky left-[120px] z-20 bg-white w-[140px] min-w-[140px]"
                         />
-                        <TableHead>Tác phẩm</TableHead>
+                        <TableHead className="sticky left-[260px] z-10 bg-white w-[220px] min-w-[220px]">
+                          Tác phẩm
+                        </TableHead>
                         <TableHead>Người hiệu đính</TableHead>
                         <SortableHead
                           label="Số trang"
@@ -4000,6 +4374,16 @@ export default function ThuKyHopPhanPage() {
                           onSort={handlePcSort}
                           className="text-right"
                         />
+                        <TableHead className="text-right">
+                          Đã Tạm ứng đợt 1
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Đã Tạm ứng đợt 2
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Đã Quyết toán
+                        </TableHead>
+                        <TableHead className="text-right">Công nợ</TableHead>
                         <SortableHead
                           label="Bắt đầu"
                           column="startDate"
@@ -4013,7 +4397,7 @@ export default function ThuKyHopPhanPage() {
                           onSort={handlePcSort}
                         />
                         <SortableHead
-                          label="Hoàn thành TT"
+                          label="Hoàn thành Thực tế"
                           column="actualCompletionDate"
                           sortColumns={pcSortColumns}
                           onSort={handlePcSort}
@@ -4036,13 +4420,13 @@ export default function ThuKyHopPhanPage() {
                       ) : (
                         paginatedPc.map((c) => (
                           <TableRow key={c.id}>
-                            <TableCell className="font-medium">
+                            <TableCell className="sticky left-0 z-20 bg-white font-medium w-[120px] min-w-[120px]">
                               {c.contractNumber ?? "—"}
                             </TableCell>
-                            <TableCell className="max-w-[140px]">
+                            <TableCell className="sticky left-[120px] z-10 bg-white max-w-[140px] w-[140px] min-w-[140px]">
                               {getComponentName(c.componentId)}
                             </TableCell>
-                            <TableCell className="max-w-[220px]">
+                            <TableCell className="sticky left-[260px] z-10 bg-white max-w-[220px] w-[220px] min-w-[220px]">
                               <div
                                 className="font-medium truncate"
                                 title={getWorkTitle(c.workId)}>
@@ -4068,6 +4452,102 @@ export default function ThuKyHopPhanPage() {
                                     {numberToVietnameseWords(c.contractValue)}
                                   </span>
                                 )}
+                            </TableCell>
+                            <TableCell className="text-right align-top">
+                              {pcPaymentInfoById.get(c.id)?.advance1 ? (
+                                <>
+                                  <span>
+                                    {formatNumberAccounting(
+                                      pcPaymentInfoById.get(c.id)?.advance1
+                                        ?.amount,
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(
+                                      String(
+                                        pcPaymentInfoById.get(c.id)?.advance1
+                                          ?.amount,
+                                      ),
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground block">
+                                    {formatDateDDMMYYYY(
+                                      pcPaymentInfoById.get(c.id)?.advance1
+                                        ?.paymentDate,
+                                    )}
+                                  </span>
+                                </>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right align-top">
+                              {pcPaymentInfoById.get(c.id)?.advance2 ? (
+                                <>
+                                  <span>
+                                    {formatNumberAccounting(
+                                      pcPaymentInfoById.get(c.id)?.advance2
+                                        ?.amount,
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(
+                                      String(
+                                        pcPaymentInfoById.get(c.id)?.advance2
+                                          ?.amount,
+                                      ),
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground block">
+                                    {formatDateDDMMYYYY(
+                                      pcPaymentInfoById.get(c.id)?.advance2
+                                        ?.paymentDate,
+                                    )}
+                                  </span>
+                                </>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right align-top">
+                              {pcPaymentInfoById.get(c.id)?.settlement ? (
+                                <>
+                                  <span>
+                                    {formatNumberAccounting(
+                                      pcPaymentInfoById.get(c.id)?.settlement
+                                        ?.amount,
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(
+                                      String(
+                                        pcPaymentInfoById.get(c.id)?.settlement
+                                          ?.amount,
+                                      ),
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground block">
+                                    {formatDateDDMMYYYY(
+                                      pcPaymentInfoById.get(c.id)?.settlement
+                                        ?.paymentDate,
+                                    )}
+                                  </span>
+                                </>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right align-top">
+                              <span>
+                                {formatNumberAccounting(
+                                  pcOutstandingById.get(c.id) ?? 0,
+                                )}
+                              </span>
+                              <span className="text-xs text-muted-foreground block mt-0.5">
+                                {numberToVietnameseWords(
+                                  String(pcOutstandingById.get(c.id) ?? 0),
+                                )}
+                              </span>
                             </TableCell>
                             <TableCell>
                               {formatDateDDMMYYYY(c.startDate) || "—"}
@@ -4537,6 +5017,7 @@ function ContractStagesSection({
         proofreadingContractId ?? null,
       ),
     enabled: !!contractId,
+    retry: false,
   });
 
   const [adding, setAdding] = useState(false);
@@ -4845,47 +5326,83 @@ function ContractStagesSection({
 }
 
 // --- Payments (chi tiền: tạm ứng/quyết toán) subsection ---
-async function fetchPaymentsByTcId(contractId: string): Promise<
-  Array<{
-    id: string;
-    translationContractId: string | null;
-    contractId: string | null;
-    paymentType: string | null;
-    voucherNo: string | null;
-    paymentDate: string | null;
-    amount: number;
-    note: string | null;
-  }>
-> {
+async function fetchPaymentsByTcId(contractId: string): Promise<Payment[]> {
   const res = await fetch(
     buildUrl(api.payments.listByTranslationContract.path, { id: contractId }),
     { credentials: "include" },
   );
   if (!res.ok) return [];
-  return res.json();
+  return res.json() as Promise<Payment[]>;
+}
+
+async function fetchPaymentsByPcId(contractId: string): Promise<Payment[]> {
+  const res = await fetch(
+    buildUrl(api.payments.listByProofreadingContract.path, { id: contractId }),
+    { credentials: "include" },
+  );
+  if (!res.ok) return [];
+  return res.json() as Promise<Payment[]>;
 }
 
 function PaymentsSection({
   translationContractId,
+  proofreadingContractId,
+  contractValue,
+  translationValue,
+  settlementValue,
   queryClient,
   readOnly = false,
 }: {
-  translationContractId: string;
+  translationContractId?: string;
+  proofreadingContractId?: string;
+  contractValue: number | null;
+  translationValue: number | null;
+  settlementValue: number | null;
   queryClient: ReturnType<typeof useQueryClient>;
   readOnly?: boolean;
 }) {
   const { toast } = useToast();
-  const { data: payments = [], isLoading } = useQuery({
-    queryKey: ["payments", translationContractId],
-    queryFn: () => fetchPaymentsByTcId(translationContractId),
-    enabled: !!translationContractId,
+  const isPc = !!proofreadingContractId;
+  const contractId = isPc
+    ? (proofreadingContractId as string)
+    : (translationContractId as string);
+  const { data: payments = [], isLoading } = useQuery<Payment[]>({
+    queryKey: ["payments", contractId],
+    queryFn: () =>
+      isPc ? fetchPaymentsByPcId(contractId) : fetchPaymentsByTcId(contractId),
+    enabled: !!contractId,
   });
   const { data: summary } = useQuery({
-    queryKey: ["finance-summary", translationContractId],
-    queryFn: () => fetchFinanceSummary(translationContractId),
-    enabled: !!translationContractId,
+    queryKey: ["finance-summary", contractId],
+    queryFn: () =>
+      isPc
+        ? fetchFinanceSummaryPc(contractId)
+        : fetchFinanceSummary(contractId),
+    enabled: !!contractId,
     staleTime: 60_000,
   });
+  const [expandedPaymentIds, setExpandedPaymentIds] = useState<Set<string>>(
+    new Set(),
+  );
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(
+        `${isPc ? "pc" : "tc"}PaymentDetails:${contractId}`,
+      );
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setExpandedPaymentIds(new Set(arr));
+      }
+    } catch {}
+  }, [contractId, isPc]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        `${isPc ? "pc" : "tc"}PaymentDetails:${contractId}`,
+        JSON.stringify(Array.from(expandedPaymentIds)),
+      );
+    } catch {}
+  }, [expandedPaymentIds, contractId, isPc]);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({
     paymentType: "advance",
@@ -4894,6 +5411,107 @@ function PaymentsSection({
     amount: "",
     note: "",
   });
+  const [advanceIncludeOverview, setAdvanceIncludeOverview] = useState(true);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(
+        `${isPc ? "pc" : "tc"}AdvanceIncludeOverview:${contractId}`,
+      );
+      if (raw) setAdvanceIncludeOverview(!!JSON.parse(raw));
+    } catch {}
+  }, [contractId, isPc]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        `${isPc ? "pc" : "tc"}AdvanceIncludeOverview:${contractId}`,
+        JSON.stringify(advanceIncludeOverview),
+      );
+    } catch {}
+  }, [advanceIncludeOverview, contractId, isPc]);
+  const [advanceRate, setAdvanceRate] = useState<string>("");
+  const computedAdvanceAmount = useMemo(() => {
+    if (form.paymentType !== "advance") return null;
+    const r = advanceRate.trim() === "" ? NaN : parseFloat(advanceRate) / 100;
+    const base = isPc
+      ? (contractValue ?? null)
+      : advanceIncludeOverview
+        ? (contractValue ?? null)
+        : (translationValue ?? null);
+    if (Number.isNaN(r) || base == null) return null;
+    return base * r;
+  }, [
+    form.paymentType,
+    advanceRate,
+    advanceIncludeOverview,
+    contractValue,
+    translationValue,
+    isPc,
+  ]);
+  const computedSettlementAmount = useMemo(() => {
+    if (form.paymentType !== "settlement") return null;
+    const adv = summary?.totalAdvance ?? null;
+    if (isPc) {
+      const base = contractValue ?? null;
+      if (base == null || adv == null) return null;
+      return Math.max(base - adv, 0);
+    } else {
+      const sv = settlementValue ?? null;
+      if (sv == null || adv == null) return null;
+      return Math.max(sv - adv, 0);
+    }
+  }, [
+    form.paymentType,
+    settlementValue,
+    summary?.totalAdvance,
+    contractValue,
+    isPc,
+  ]);
+  const settlementClamped = useMemo(() => {
+    if (form.paymentType !== "settlement") return false;
+    const adv = summary?.totalAdvance ?? null;
+    if (isPc) {
+      const base = contractValue ?? null;
+      if (base == null || adv == null) return false;
+      return adv > base;
+    } else {
+      const sv = settlementValue ?? null;
+      if (sv == null || adv == null) return false;
+      return adv > sv;
+    }
+  }, [
+    form.paymentType,
+    settlementValue,
+    summary?.totalAdvance,
+    contractValue,
+    isPc,
+  ]);
+  const formAmountNumber = useMemo(() => {
+    if (form.paymentType === "advance") return computedAdvanceAmount ?? null;
+    if (form.paymentType === "settlement")
+      return computedSettlementAmount ?? null;
+    const v = form.amount.trim() === "" ? NaN : parseFloat(form.amount);
+    return Number.isNaN(v) ? null : v;
+  }, [
+    form.paymentType,
+    form.amount,
+    computedAdvanceAmount,
+    computedSettlementAmount,
+  ]);
+  const formMgmtFee = useMemo(() => {
+    if (formAmountNumber == null) return null;
+    return formAmountNumber * 0.05;
+  }, [formAmountNumber]);
+  const formPit = useMemo(() => {
+    if (formAmountNumber == null) return null;
+    const m = formAmountNumber * 0.05;
+    return (formAmountNumber - m) * 0.1;
+  }, [formAmountNumber]);
+  const formNet = useMemo(() => {
+    if (formAmountNumber == null) return null;
+    const m = formAmountNumber * 0.05;
+    const t = (formAmountNumber - m) * 0.1;
+    return formAmountNumber - m - t;
+  }, [formAmountNumber]);
   const reset = () => {
     setForm({
       paymentType: "advance",
@@ -4902,16 +5520,26 @@ function PaymentsSection({
       amount: "",
       note: "",
     });
+    setAdvanceRate("");
     setAdding(false);
   };
   const createMutation = useMutation({
     mutationFn: async () => {
+      const amountStr =
+        form.paymentType === "advance" && computedAdvanceAmount != null
+          ? String(computedAdvanceAmount)
+          : form.paymentType === "settlement" &&
+              computedSettlementAmount != null
+            ? String(computedSettlementAmount)
+            : form.amount
+              ? String(Number(form.amount))
+              : null;
       const body = {
-        translationContractId,
+        contractId: contractId ?? null,
         paymentType: form.paymentType || null,
         voucherNo: form.voucherNo || null,
         paymentDate: form.paymentDate || null,
-        amount: form.amount ? String(Number(form.amount)) : null,
+        amount: amountStr,
         note: form.note || null,
       };
       const res = await fetch(api.payments.create.path, {
@@ -4925,10 +5553,10 @@ function PaymentsSection({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["payments", translationContractId],
+        queryKey: ["payments", contractId],
       });
       queryClient.invalidateQueries({
-        queryKey: ["finance-summary", translationContractId],
+        queryKey: ["finance-summary", contractId],
       });
       reset();
       toast({ title: "Đã thêm chi tiền" });
@@ -4946,12 +5574,53 @@ function PaymentsSection({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["payments", translationContractId],
+        queryKey: ["payments", contractId],
       });
       queryClient.invalidateQueries({
-        queryKey: ["finance-summary", translationContractId],
+        queryKey: ["finance-summary", contractId],
       });
       toast({ title: "Đã xóa chi tiền" });
+    },
+    onError: (e) =>
+      toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    voucherNo: "",
+    paymentDate: "",
+    amount: "",
+    note: "",
+  });
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingId) throw new Error("Không có khoản để cập nhật");
+      const body = {
+        voucherNo: editForm.voucherNo || null,
+        paymentDate: editForm.paymentDate || null,
+        amount: editForm.amount ? String(Number(editForm.amount)) : undefined,
+        note: editForm.note || null,
+      };
+      const res = await fetch(
+        buildUrl(api.payments.update.path, { id: editingId }),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(body),
+        },
+      );
+      if (!res.ok) throw new Error("Cập nhật chi tiền thất bại");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["payments", contractId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["finance-summary", contractId],
+      });
+      setEditingId(null);
+      toast({ title: "Đã cập nhật chi tiền" });
     },
     onError: (e) =>
       toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
@@ -4962,16 +5631,30 @@ function PaymentsSection({
         <Label className="text-sm font-medium">
           Thanh toán (tạm ứng/quyết toán)
         </Label>
-        {!readOnly && !adding && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setAdding(true)}>
-            <Plus className="w-4 h-4 mr-1" />
-            Thêm chi tiền
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          {!isPc && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={advanceIncludeOverview}
+                onCheckedChange={(checked) =>
+                  setAdvanceIncludeOverview(!!checked)
+                }
+                disabled={readOnly}
+              />
+              <span className="text-sm">Tạm ứng bao gồm bài tổng quan</span>
+            </div>
+          )}
+          {!readOnly && !adding && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setAdding(true)}>
+              <Plus className="w-4 h-4 mr-1" />
+              Thêm chi tiền
+            </Button>
+          )}
+        </div>
       </div>
       {summary && (
         <div className="text-sm text-muted-foreground">
@@ -5010,44 +5693,236 @@ function PaymentsSection({
                 </TableHeader>
                 <TableBody>
                   {payments.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>{p.paymentType ?? "—"}</TableCell>
-                      <TableCell>{p.voucherNo ?? "—"}</TableCell>
-                      <TableCell>
-                        {formatDateDDMMYYYY(p.paymentDate) || "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatNumberAccounting(p.amount)}
-                      </TableCell>
-                      <TableCell
-                        className="max-w-[240px] truncate"
-                        title={p.note ?? undefined}>
-                        {p.note ?? "—"}
-                      </TableCell>
-                      {!readOnly && (
+                    <Fragment key={p.id}>
+                      <TableRow key={p.id}>
+                        <TableCell>{p.paymentType ?? "—"}</TableCell>
+                        <TableCell>{p.voucherNo ?? "—"}</TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => deleteMutation.mutate(p.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {formatDateDDMMYYYY(p.paymentDate) || "—"}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <div>{formatNumberAccounting(p.amount)}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {numberToVietnameseWords(String(p.amount))}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="px-0 underline text-primary"
+                            onClick={() =>
+                              setExpandedPaymentIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(p.id)) next.delete(p.id);
+                                else next.add(p.id);
+                                return next;
+                              })
+                            }>
+                            {expandedPaymentIds.has(p.id)
+                              ? "Ẩn chi tiết"
+                              : "Chi tiết"}
+                          </Button>
+                          {expandedPaymentIds.has(p.id) && (
+                            <div className="mt-1 p-1 border rounded bg-muted/10 space-y-0.5">
+                              <div className="text-xs">
+                                Phí quản lý:{" "}
+                                <span className="font-medium">
+                                  {formatNumberAccounting(
+                                    Number(p.amount) * 0.05,
+                                  )}
+                                </span>{" "}
+                                (5%)
+                              </div>
+                              <div className="text-xs">
+                                Thuế TNCN:{" "}
+                                <span className="font-medium">
+                                  {formatNumberAccounting(
+                                    (Number(p.amount) -
+                                      Number(p.amount) * 0.05) *
+                                      0.1,
+                                  )}
+                                </span>{" "}
+                                (10% sau khi trừ phí quản lý)
+                              </div>
+                              <div className="text-xs">
+                                Giá trị thực nhận:{" "}
+                                <span className="font-medium">
+                                  {formatNumberAccounting(
+                                    Number(p.amount) -
+                                      Number(p.amount) * 0.05 -
+                                      (Number(p.amount) -
+                                        Number(p.amount) * 0.05) *
+                                        0.1,
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell
+                          className="max-w-[240px] truncate"
+                          title={p.note ?? undefined}>
+                          {p.note ?? "—"}
+                        </TableCell>
+                        {!readOnly && (
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                setEditingId(p.id);
+                                setEditForm({
+                                  voucherNo: p.voucherNo ?? "",
+                                  paymentDate: p.paymentDate
+                                    ? typeof p.paymentDate === "string"
+                                      ? p.paymentDate
+                                      : (p.paymentDate as Date)
+                                          .toISOString()
+                                          .slice(0, 10)
+                                    : "",
+                                  amount:
+                                    (p.paymentType || "").toLowerCase() ===
+                                    "other"
+                                      ? String(p.amount ?? "")
+                                      : "",
+                                  note: p.note ?? "",
+                                });
+                              }}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => deleteMutation.mutate(p.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                      {editingId === p.id && (
+                        <TableRow>
+                          <TableCell colSpan={6}>
+                            <div
+                              className="mt-2 p-2 border rounded bg-muted/10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }
+                              }}>
+                              <div className="grid gap-1">
+                                <Label>Số chứng từ</Label>
+                                <Input
+                                  value={editForm.voucherNo}
+                                  onChange={(e) =>
+                                    setEditForm((f) => ({
+                                      ...f,
+                                      voucherNo: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="VD: PT-001"
+                                />
+                              </div>
+                              <div className="grid gap-1">
+                                <Label>Ngày</Label>
+                                <DateInput
+                                  value={editForm.paymentDate || null}
+                                  onChange={(v) =>
+                                    setEditForm((f) => ({
+                                      ...f,
+                                      paymentDate: v || "",
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div className="grid gap-1">
+                                <Label>Số tiền</Label>
+                                <NumberInput
+                                  value={
+                                    (p.paymentType || "").toLowerCase() ===
+                                    "other"
+                                      ? editForm.amount
+                                      : String(p.amount)
+                                  }
+                                  onChange={(v) =>
+                                    (p.paymentType || "").toLowerCase() ===
+                                    "other"
+                                      ? setEditForm((f) => ({
+                                          ...f,
+                                          amount: v,
+                                        }))
+                                      : undefined
+                                  }
+                                  decimals={2}
+                                  showFormatted={true}
+                                  placeholder="0"
+                                  className={
+                                    (p.paymentType || "").toLowerCase() ===
+                                    "other"
+                                      ? undefined
+                                      : "bg-muted"
+                                  }
+                                  readOnly={
+                                    (p.paymentType || "").toLowerCase() !==
+                                    "other"
+                                  }
+                                />
+                              </div>
+                              <div className="grid gap-1">
+                                <Label>Ghi chú</Label>
+                                <Input
+                                  value={editForm.note}
+                                  onChange={(e) =>
+                                    setEditForm((f) => ({
+                                      ...f,
+                                      note: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="Ghi chú"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={updateMutation.isPending}
+                                  onClick={() => updateMutation.mutate()}>
+                                  {updateMutation.isPending && (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  )}
+                                  Cập nhật
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditingId(null)}>
+                                  Hủy
+                                </Button>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableRow>
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
             </div>
           )}
           {adding && !readOnly && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                createMutation.mutate();
-              }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end mt-2">
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end mt-2"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}>
               <div className="grid gap-1">
                 <Label>Loại</Label>
                 <Select
@@ -5065,6 +5940,18 @@ function PaymentsSection({
                   </SelectContent>
                 </Select>
               </div>
+              {form.paymentType === "advance" && (
+                <div className="grid gap-1">
+                  <Label>Tỷ lệ tạm ứng (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={advanceRate}
+                    onChange={(e) => setAdvanceRate(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              )}
               <div className="grid gap-1">
                 <Label>Số chứng từ</Label>
                 <Input
@@ -5087,12 +5974,73 @@ function PaymentsSection({
               <div className="grid gap-1">
                 <Label>Số tiền</Label>
                 <NumberInput
-                  value={form.amount}
-                  onChange={(v) => setForm((f) => ({ ...f, amount: v }))}
+                  value={
+                    form.paymentType === "advance"
+                      ? computedAdvanceAmount != null
+                        ? String(computedAdvanceAmount)
+                        : ""
+                      : form.paymentType === "settlement"
+                        ? computedSettlementAmount != null
+                          ? String(computedSettlementAmount)
+                          : ""
+                        : form.amount
+                  }
+                  onChange={(v) =>
+                    form.paymentType === "advance"
+                      ? undefined
+                      : form.paymentType === "settlement"
+                        ? undefined
+                        : setForm((f) => ({ ...f, amount: v }))
+                  }
                   decimals={2}
                   showFormatted={true}
                   placeholder="0"
+                  className={
+                    form.paymentType === "advance" ||
+                    form.paymentType === "settlement"
+                      ? "bg-muted"
+                      : undefined
+                  }
+                  readOnly={
+                    form.paymentType === "advance" ||
+                    form.paymentType === "settlement"
+                  }
                 />
+                {form.paymentType === "settlement" && settlementClamped && (
+                  <p className="text-xs text-destructive mt-1">
+                    Tổng tạm ứng vượt Giá trị quyết toán; số tiền quyết toán
+                    được đưa về 0.
+                  </p>
+                )}
+                {formAmountNumber != null && (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      {numberToVietnameseWords(String(formAmountNumber))}
+                    </p>
+                    <div className="mt-1 p-2 border rounded bg-muted/10 space-y-1">
+                      <div className="text-xs">
+                        Phí quản lý:{" "}
+                        <span className="font-medium">
+                          {formatNumberAccounting(formMgmtFee ?? 0)}
+                        </span>{" "}
+                        (5%)
+                      </div>
+                      <div className="text-xs">
+                        Thuế TNCN:{" "}
+                        <span className="font-medium">
+                          {formatNumberAccounting(formPit ?? 0)}
+                        </span>{" "}
+                        (10% sau khi trừ phí quản lý)
+                      </div>
+                      <div className="text-xs">
+                        Giá trị thực nhận:{" "}
+                        <span className="font-medium">
+                          {formatNumberAccounting(formNet ?? 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="grid gap-1">
                 <Label>Ghi chú</Label>
@@ -5106,9 +6054,10 @@ function PaymentsSection({
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <Button
-                  type="submit"
+                  type="button"
                   size="sm"
-                  disabled={createMutation.isPending}>
+                  disabled={createMutation.isPending}
+                  onClick={() => createMutation.mutate()}>
                   {createMutation.isPending && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   )}
@@ -5122,7 +6071,7 @@ function PaymentsSection({
                   Hủy
                 </Button>
               </div>
-            </form>
+            </div>
           )}
         </>
       )}
@@ -5439,6 +6388,28 @@ function TranslationContractForm({
   const [settlementValue, setSettlementValue] = useState(
     contract?.settlementValue != null ? String(contract.settlementValue) : "",
   );
+  const [advanceRate, setAdvanceRate] = useState<string>("");
+  const [advanceIncludeOverview, setAdvanceIncludeOverview] = useState(true);
+  useEffect(() => {
+    try {
+      const rawRate = window.localStorage.getItem("tcAdvanceRate");
+      if (rawRate != null) setAdvanceRate(rawRate);
+      const rawInc = window.localStorage.getItem("tcAdvanceIncludeOverview");
+      if (rawInc) {
+        const parsed = JSON.parse(rawInc);
+        setAdvanceIncludeOverview(!!parsed);
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("tcAdvanceRate", advanceRate);
+      window.localStorage.setItem(
+        "tcAdvanceIncludeOverview",
+        JSON.stringify(advanceIncludeOverview),
+      );
+    } catch {}
+  }, [advanceRate, advanceIncludeOverview]);
   const [note, setNote] = useState(contract?.note ?? "");
   const [status, setStatus] = useState(contract?.status ?? "Active");
   const [translatorUsers, setTranslatorUsers] = useState<
@@ -5690,6 +6661,55 @@ function TranslationContractForm({
     overviewValue,
     works,
   ]);
+  const contractMgmtFee = useMemo(() => {
+    const v = contractValue.trim() === "" ? NaN : parseFloat(contractValue);
+    if (Number.isNaN(v)) return null;
+    return v * 0.05;
+  }, [contractValue]);
+  const contractPit = useMemo(() => {
+    const v = contractValue.trim() === "" ? NaN : parseFloat(contractValue);
+    if (Number.isNaN(v)) return null;
+    const m = v * 0.05;
+    return (v - m) * 0.1;
+  }, [contractValue]);
+  const contractNet = useMemo(() => {
+    const v = contractValue.trim() === "" ? NaN : parseFloat(contractValue);
+    if (Number.isNaN(v)) return null;
+    const m = v * 0.05;
+    const t = (v - m) * 0.1;
+    return v - m - t;
+  }, [contractValue]);
+  const settlementMgmtFee = useMemo(() => {
+    const v = settlementValue.trim() === "" ? NaN : parseFloat(settlementValue);
+    if (Number.isNaN(v)) return null;
+    return v * 0.05;
+  }, [settlementValue]);
+  const settlementPit = useMemo(() => {
+    const v = settlementValue.trim() === "" ? NaN : parseFloat(settlementValue);
+    if (Number.isNaN(v)) return null;
+    const m = v * 0.05;
+    return (v - m) * 0.1;
+  }, [settlementValue]);
+  const settlementNet = useMemo(() => {
+    const v = settlementValue.trim() === "" ? NaN : parseFloat(settlementValue);
+    if (Number.isNaN(v)) return null;
+    const m = v * 0.05;
+    const t = (v - m) * 0.1;
+    return v - m - t;
+  }, [settlementValue]);
+  const computedAdvance = useMemo(() => {
+    const rateStr = advanceRate.trim();
+    const r = rateStr === "" ? NaN : parseFloat(rateStr) / 100;
+    const base = advanceIncludeOverview
+      ? contractValue.trim() === ""
+        ? NaN
+        : parseFloat(contractValue)
+      : translationValue.trim() === ""
+        ? NaN
+        : parseFloat(translationValue);
+    if (Number.isNaN(r) || Number.isNaN(base)) return null;
+    return base * r;
+  }, [advanceRate, advanceIncludeOverview, contractValue, translationValue]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -5928,6 +6948,65 @@ function TranslationContractForm({
               )}
           </div>
         </div>
+        <div className="p-3 border rounded-md bg-muted/10 space-y-1">
+          <div className="text-xs text-muted-foreground">
+            Các khoản khấu trừ áp dụng cho Giá trị HĐ:
+          </div>
+          <div className="text-xs">
+            Phí quản lý:{" "}
+            <span className="font-medium">
+              {contractMgmtFee != null
+                ? formatNumberAccounting(contractMgmtFee)
+                : "—"}
+            </span>{" "}
+            (5%)
+          </div>
+          <div className="text-xs">
+            Thuế TNCN:{" "}
+            <span className="font-medium">
+              {contractPit != null ? formatNumberAccounting(contractPit) : "—"}
+            </span>{" "}
+            (10% sau khi trừ phí quản lý)
+          </div>
+          <div className="text-xs">
+            Giá trị thực nhận:{" "}
+            <span className="font-medium">
+              {contractNet != null ? formatNumberAccounting(contractNet) : "—"}
+            </span>
+          </div>
+          <div className="h-px my-1 bg-muted" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
+            <div className="grid gap-1">
+              <Label>Tỷ lệ tạm ứng (%)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={advanceRate}
+                onChange={(e) => setAdvanceRate(e.target.value)}
+                placeholder="0"
+                disabled={readOnly}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={advanceIncludeOverview}
+                onCheckedChange={(checked) =>
+                  setAdvanceIncludeOverview(!!checked)
+                }
+                disabled={readOnly}
+              />
+              <span className="text-sm">Bao gồm bài tổng quan</span>
+            </div>
+            <div className="sm:col-span-2 text-xs">
+              Giá trị tạm ứng ước tính:{" "}
+              <span className="font-medium">
+                {computedAdvance != null
+                  ? formatNumberAccounting(computedAdvance)
+                  : "—"}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Thời gian */}
@@ -6039,6 +7118,34 @@ function TranslationContractForm({
                   {numberToVietnameseWords(settlementValue)}
                 </p>
               )}
+            <div className="mt-2 p-2 border rounded bg-muted/10 space-y-1">
+              <div className="text-xs">
+                Phí quản lý:{" "}
+                <span className="font-medium">
+                  {settlementMgmtFee != null
+                    ? formatNumberAccounting(settlementMgmtFee)
+                    : "—"}
+                </span>{" "}
+                (5%)
+              </div>
+              <div className="text-xs">
+                Thuế TNCN:{" "}
+                <span className="font-medium">
+                  {settlementPit != null
+                    ? formatNumberAccounting(settlementPit)
+                    : "—"}
+                </span>{" "}
+                (10% sau khi trừ phí quản lý)
+              </div>
+              <div className="text-xs">
+                Giá trị thực nhận:{" "}
+                <span className="font-medium">
+                  {settlementNet != null
+                    ? formatNumberAccounting(settlementNet)
+                    : "—"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -6249,6 +7356,15 @@ function TranslationContractForm({
       {contract && (
         <PaymentsSection
           translationContractId={contract.id}
+          contractValue={
+            contractValue.trim() === "" ? null : parseFloat(contractValue)
+          }
+          translationValue={
+            translationValue.trim() === "" ? null : parseFloat(translationValue)
+          }
+          settlementValue={
+            settlementValue.trim() === "" ? null : parseFloat(settlementValue)
+          }
           queryClient={queryClient}
           readOnly={readOnly}
         />
@@ -6656,6 +7772,18 @@ function ProofreadingContractForm({
       {contract && (
         <ContractStagesSection
           proofreadingContractId={contract.id}
+          queryClient={queryClient}
+          readOnly={readOnly}
+        />
+      )}
+      {contract && (
+        <PaymentsSection
+          proofreadingContractId={contract.id}
+          contractValue={
+            contractValue.trim() === "" ? null : parseFloat(contractValue)
+          }
+          translationValue={null}
+          settlementValue={null}
           queryClient={queryClient}
           readOnly={readOnly}
         />

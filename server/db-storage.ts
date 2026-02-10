@@ -483,21 +483,55 @@ export async function updateComponent(
 export async function getContractStagesByTranslationContractId(
   translationContractId: string,
 ): Promise<ContractStage[]> {
-  return requireDb()
-    .select()
-    .from(contractStages)
-    .where(eq(contractStages.translationContractId, translationContractId))
-    .orderBy(asc(contractStages.stageOrder), asc(contractStages.stageCode));
+  try {
+    return requireDb()
+      .select()
+      .from(contractStages)
+      .where(eq(contractStages.translationContractId, translationContractId))
+      .orderBy(asc(contractStages.stageOrder), asc(contractStages.stageCode));
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Error in getContractStagesByTranslationContractId:", msg);
+    if (
+      msg.includes("contract_stages") &&
+      (msg.includes("relation") ||
+        msg.includes("does not exist") ||
+        msg.includes("column"))
+    ) {
+      console.error(
+        "Database schema mismatch: contract_stages table/columns missing. Please run migration: attached_assets/KDPD_DB_migration_components_contract_stages.sql",
+      );
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function getContractStagesByProofreadingContractId(
   proofreadingContractId: string,
 ): Promise<ContractStage[]> {
-  return requireDb()
-    .select()
-    .from(contractStages)
-    .where(eq(contractStages.proofreadingContractId, proofreadingContractId))
-    .orderBy(asc(contractStages.stageOrder), asc(contractStages.stageCode));
+  try {
+    return requireDb()
+      .select()
+      .from(contractStages)
+      .where(eq(contractStages.proofreadingContractId, proofreadingContractId))
+      .orderBy(asc(contractStages.stageOrder), asc(contractStages.stageCode));
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Error in getContractStagesByProofreadingContractId:", msg);
+    if (
+      msg.includes("contract_stages") &&
+      (msg.includes("relation") ||
+        msg.includes("does not exist") ||
+        msg.includes("column"))
+    ) {
+      console.error(
+        "Database schema mismatch: contract_stages table/columns missing. Please run migration: attached_assets/KDPD_DB_migration_components_contract_stages.sql",
+      );
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function createContractStage(
@@ -664,7 +698,17 @@ export async function getPaymentsByTranslationContractId(
   return requireDb()
     .select()
     .from(payments)
-    .where(eq(payments.translationContractId, translationContractId))
+    .where(eq(payments.contractId, translationContractId))
+    .orderBy(desc(payments.paymentDate), desc(payments.createdAt));
+}
+
+export async function getPaymentsByProofreadingContractId(
+  proofreadingContractId: string,
+): Promise<Payment[]> {
+  return requireDb()
+    .select()
+    .from(payments)
+    .where(eq(payments.contractId, proofreadingContractId))
     .orderBy(desc(payments.paymentDate), desc(payments.createdAt));
 }
 
@@ -676,6 +720,19 @@ export async function createPayment(data: InsertPayment): Promise<Payment> {
 
 export async function deletePayment(id: string): Promise<void> {
   await requireDb().delete(payments).where(eq(payments.id, id));
+}
+
+export async function updatePayment(
+  id: string,
+  data: Partial<InsertPayment>,
+): Promise<Payment> {
+  const rows = await requireDb()
+    .update(payments)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(payments.id, id))
+    .returning();
+  if (!rows[0]) throw new Error(`Payment ${id} not found`);
+  return rows[0];
 }
 
 /** Tính tổng chi (SUM(payments.amount)) và công nợ theo chuẩn: (settlementValue|contractValue) - SUM(payments.amount) */
@@ -700,7 +757,31 @@ export async function getTranslationContractFinanceSummary(
       : tc?.contractValue != null && !Number.isNaN(Number(tc.contractValue))
         ? Number(tc.contractValue)
         : 0;
-  const outstanding = base - totalPaid;
+  const outstanding = Math.max(base - totalPaid, 0);
+  return { totalPaid, totalAdvance, outstanding };
+}
+
+/** Finance summary for proofreading contract: base = contractValue */
+export async function getProofreadingContractFinanceSummary(
+  proofreadingContractId: string,
+): Promise<{
+  totalPaid: number;
+  totalAdvance: number;
+  outstanding: number;
+}> {
+  const [pc, list] = await Promise.all([
+    getProofreadingContractById(proofreadingContractId),
+    getPaymentsByProofreadingContractId(proofreadingContractId),
+  ]);
+  const totalPaid = list.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const totalAdvance = list
+    .filter((p) => (p.paymentType || "").toLowerCase() === "advance")
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const base =
+    pc?.contractValue != null && !Number.isNaN(Number(pc.contractValue))
+      ? Number(pc.contractValue)
+      : 0;
+  const outstanding = Math.max(base - totalPaid, 0);
   return { totalPaid, totalAdvance, outstanding };
 }
 

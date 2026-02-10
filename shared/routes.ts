@@ -1017,9 +1017,23 @@ export const api = {
       path: "/api/translation-contracts/:id/payments",
       responses: { 200: z.array(z.custom<typeof payments.$inferSelect>()) },
     },
+    listByProofreadingContract: {
+      method: "GET" as const,
+      path: "/api/proofreading-contracts/:id/payments",
+      responses: { 200: z.array(z.custom<typeof payments.$inferSelect>()) },
+    },
     get: {
       method: "GET" as const,
       path: "/api/payments/:id",
+      responses: {
+        200: z.custom<typeof payments.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    update: {
+      method: "PATCH" as const,
+      path: "/api/payments/:id",
+      input: insertPaymentSchema.partial().omit({ id: true }),
       responses: {
         200: z.custom<typeof payments.$inferSelect>(),
         404: errorSchemas.notFound,
@@ -1047,6 +1061,18 @@ export const api = {
     translationContractSummary: {
       method: "GET" as const,
       path: "/api/translation-contracts/:id/finance-summary",
+      responses: {
+        200: z.object({
+          totalPaid: z.number(),
+          totalAdvance: z.number(),
+          outstanding: z.number(),
+        }),
+        404: errorSchemas.notFound,
+      },
+    },
+    proofreadingContractSummary: {
+      method: "GET" as const,
+      path: "/api/proofreading-contracts/:id/finance-summary",
       responses: {
         200: z.object({
           totalPaid: z.number(),
