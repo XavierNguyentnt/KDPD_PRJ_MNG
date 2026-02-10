@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDateDDMMYYYY } from "@/lib/utils";
 import { GripVertical, Loader2 } from "lucide-react";
 
-const COLUMN_PREFIX = "group-column-";
+const COLUMN_PREFIX = "status-column-";
 const TASK_PREFIX = "task-";
 
 export interface TaskKanbanBoardProps {
@@ -45,19 +45,39 @@ export function TaskKanbanBoard({
   const { toast } = useToast();
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  const STATUS_ORDER = useMemo(
+    () => ["Not Started", "In Progress", "Completed", "Pending", "Cancelled"],
+    [],
+  );
+
+  const getStatusLabel = useCallback(
+    (status: string) => {
+      const map: Record<string, string> = {
+        "Not Started": t.status.notStarted,
+        "In Progress": t.status.inProgress,
+        Completed: t.status.completed,
+        Pending: t.status.pending,
+        Cancelled: t.status.cancelled,
+      };
+      return map[status] ?? status;
+    },
+    [t],
+  );
+
   const columns = useMemo(() => {
-    const groups = new Map<string, TaskWithAssignmentDetails[]>();
-    const displayNoGroup = noGroupLabel;
+    const byStatus = new Map<string, TaskWithAssignmentDetails[]>();
+    STATUS_ORDER.forEach((s) => byStatus.set(s, []));
     for (const task of tasks) {
-      const key = (task.group ?? "").trim() ? (task.group ?? "").trim() : displayNoGroup;
-      groups.set(key, [...(groups.get(key) ?? []), task]);
+      const key = task.status && STATUS_ORDER.includes(task.status) ? task.status : task.status || "Not Started";
+      byStatus.set(key, [...(byStatus.get(key) ?? []), task]);
     }
-    return Array.from(groups.entries()).sort(([a], [b]) => {
-      if (a === displayNoGroup) return 1;
-      if (b === displayNoGroup) return -1;
-      return a.localeCompare(b);
-    });
-  }, [tasks, noGroupLabel]);
+    const unknownStatuses = Array.from(byStatus.keys()).filter((s) => !STATUS_ORDER.includes(s));
+    const ordered = [
+      ...STATUS_ORDER.map((s) => [s, byStatus.get(s) ?? []] as [string, TaskWithAssignmentDetails[]]),
+      ...unknownStatuses.map((s) => [s, byStatus.get(s) ?? []] as [string, TaskWithAssignmentDetails[]]),
+    ];
+    return ordered;
+  }, [tasks, STATUS_ORDER]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -78,20 +98,19 @@ export function TaskKanbanBoard({
       const overIdStr = String(over.id);
       if (activeIdStr.startsWith(TASK_PREFIX) && overIdStr.startsWith(COLUMN_PREFIX)) {
         const taskId = activeIdStr.slice(TASK_PREFIX.length);
-        const targetGroup = overIdStr.slice(COLUMN_PREFIX.length);
-        const decodedGroup = targetGroup === noGroupLabel ? "" : decodeURIComponent(targetGroup);
+        const targetStatus = decodeURIComponent(overIdStr.slice(COLUMN_PREFIX.length));
         const task = tasks.find((x) => x.id === taskId);
-        if (!task || (task.group ?? "").trim() === decodedGroup) return;
+        if (!task || task.status === targetStatus) return;
         updateTask(
-          { id: taskId, group: decodedGroup || undefined },
+          { id: taskId, status: targetStatus },
           {
             onSuccess: () => {
               toast({
                 title: t.common.success,
                 description:
                   language === "vi"
-                    ? "Đã chuyển công việc sang nhóm mới."
-                    : "Task moved to new group.",
+                    ? "Đã chuyển trạng thái công việc."
+                    : "Task moved to new status.",
               });
             },
             onError: (err) => {
@@ -105,7 +124,7 @@ export function TaskKanbanBoard({
         );
       }
     },
-    [tasks, updateTask, toast, t, language, noGroupLabel]
+    [tasks, updateTask, toast, t, language]
   );
 
   const activeTask = useMemo(
@@ -113,7 +132,9 @@ export function TaskKanbanBoard({
     [activeId, tasks]
   );
 
-  if (columns.length === 0) {
+  // Hiển thị đầy đủ 5 cột trạng thái ngay cả khi chưa có công việc ở một số cột
+  const hasAnyTask = tasks.length > 0;
+  if (!hasAnyTask) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-border bg-muted/20 min-h-[320px] p-8">
         <p className="text-sm text-muted-foreground">{t.dashboard.noTasksFound}</p>
@@ -125,13 +146,13 @@ export function TaskKanbanBoard({
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <ScrollArea className="w-full whitespace-nowrap rounded-md border border-border">
         <div className="flex gap-4 p-4 min-h-[420px]">
-          {columns.map(([groupName, columnTasks]) => {
-            const columnId = COLUMN_PREFIX + (groupName === noGroupLabel ? noGroupLabel : encodeURIComponent(groupName));
+          {columns.map(([statusName, columnTasks]) => {
+            const columnId = COLUMN_PREFIX + encodeURIComponent(statusName);
             return (
               <KanbanColumn
                 key={columnId}
                 id={columnId}
-                title={groupName}
+                title={getStatusLabel(statusName)}
                 tasks={columnTasks}
                 onTaskClick={onTaskClick}
                 getPriorityColor={getPriorityColor}
@@ -224,7 +245,7 @@ function KanbanCard({
   getStatusColor: (s: string) => string;
   isDragOverlay?: boolean;
 }) {
-  const { language } = useI18n();
+  const { language, t } = useI18n();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: TASK_PREFIX + task.id,
     data: { task },
@@ -262,7 +283,19 @@ function KanbanCard({
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium line-clamp-2">{task.title ?? ""}</p>
             <div className="flex flex-wrap gap-1 mt-2">
-              <Badge className={`text-xs ${getStatusColor(task.status)}`}>{task.status}</Badge>
+              <Badge className={`text-xs ${getStatusColor(task.status)}`}>
+                {task.status === "Not Started"
+                  ? t.status.notStarted
+                  : task.status === "In Progress"
+                  ? t.status.inProgress
+                  : task.status === "Completed"
+                  ? t.status.completed
+                  : task.status === "Pending"
+                  ? t.status.pending
+                  : task.status === "Cancelled"
+                  ? t.status.cancelled
+                  : task.status}
+              </Badge>
               <Badge variant="outline" className={`text-xs ${getPriorityColor(task.priority ?? "")}`}>
                 {task.priority ?? "—"}
               </Badge>

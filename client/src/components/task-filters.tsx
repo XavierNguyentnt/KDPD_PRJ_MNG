@@ -190,7 +190,6 @@ export function TaskFilters({
             <SelectItem value="Completed">{t.status.completed}</SelectItem>
             <SelectItem value="Pending">{t.status.pending}</SelectItem>
             <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
-            <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
           </SelectContent>
         </Select>
       </div>

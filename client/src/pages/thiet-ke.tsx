@@ -244,7 +244,7 @@ export default function ThietKePage() {
 
       <section className="section-card">
         <div className="section-header">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
             <Badge variant="secondary" className="font-normal">
               {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
@@ -307,6 +307,11 @@ export default function ThietKePage() {
                 {t.dashboard.viewBoard}
               </ToggleGroupItem>
             </ToggleGroup>
+            <Button
+              onClick={() => handleExportTasks(filteredTasks, language, toast)}
+              disabled={filteredTasks.length === 0}>
+              Xuất Excel
+            </Button>
           </div>
         </div>
 
@@ -374,13 +379,7 @@ export default function ThietKePage() {
         )}
       </section>
 
-      <div className="flex justify-end p-4">
-        <Button
-          onClick={() => handleExportTasks(filteredTasks, language, toast)}
-          disabled={filteredTasks.length === 0}>
-          Xuất Excel
-        </Button>
-      </div>
+      
 
       <TaskDialog
         open={!!selectedTask}

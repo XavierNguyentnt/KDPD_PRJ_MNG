@@ -261,7 +261,7 @@ export default function CNTTPage() {
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -308,6 +308,11 @@ export default function CNTTPage() {
                 {t.dashboard.viewBoard}
               </ToggleGroupItem>
             </ToggleGroup>
+            <Button
+              onClick={() => handleExportTasks(filteredTasks, language, toast)}
+              disabled={filteredTasks.length === 0}>
+              Xuất Excel
+            </Button>
           </div>
         </div>
 
@@ -375,13 +380,7 @@ export default function CNTTPage() {
         )}
       </section>
 
-      <div className="flex justify-end p-4">
-        <Button
-          onClick={() => handleExportTasks(filteredTasks, language, toast)}
-          disabled={filteredTasks.length === 0}>
-          Xuất Excel
-        </Button>
-      </div>
+      
 
       <TaskDialog
         open={!!selectedTask}

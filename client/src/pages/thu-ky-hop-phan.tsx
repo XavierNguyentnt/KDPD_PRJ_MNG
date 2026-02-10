@@ -131,6 +131,13 @@ import {
 } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
+function buildExportPrefix(): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const now = new Date();
+  return `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(
+    now.getDate(),
+  )}.[${pad(now.getHours())}.${pad(now.getMinutes())}]`;
+}
 
 // Sort types for each table
 export type WorkSortColumn =
@@ -1868,12 +1875,8 @@ export default function ThuKyHopPhanPage() {
       XLSX.utils.book_append_sheet(workbook, tasksSheet, "Cong_viec");
       XLSX.utils.book_append_sheet(workbook, assignmentsSheet, "Phan_cong");
 
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const now = new Date();
-      const dateStamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
-        now.getDate(),
-      )}`;
-      const fileName = `thu-ky-hop-phan-cong-viec-${dateStamp}.xlsx`;
+      const prefix = buildExportPrefix();
+      const fileName = `${prefix}_thu-ky-hop-phan-cong-viec.xlsx`;
       XLSX.writeFile(workbook, fileName, { bookType: "xlsx" });
 
       toast({
@@ -1946,11 +1949,11 @@ export default function ThuKyHopPhanPage() {
     const worksheet = XLSX.utils.aoa_to_sheet([workHeaders, ...workData]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Danh_Muc_Tac_Pham");
-
-    XLSX.writeFile(workbook, "Danh_Muc_Tac_Pham.xlsx");
+    const prefix = buildExportPrefix();
+    XLSX.writeFile(workbook, `${prefix}_Danh_Muc_Tac_Pham.xlsx`);
   };
 
-  const handleExportTranslationContracts = (
+  const handleExportTranslationContracts = async (
     filteredTc: TranslationContract[],
     toast: (opts: any) => any,
   ) => {
@@ -1962,60 +1965,127 @@ export default function ThuKyHopPhanPage() {
       return;
     }
 
-    const headers = [
-      "ID",
-      "Số HĐ",
-      "Hợp phần",
-      "Tác phẩm",
-      "Dịch giả",
-      "Đơn giá",
-      "Kinh phí tổng quan",
-      "Kinh phí dịch thuật",
-      "Giá trị HĐ",
-      "Ngày bắt đầu",
-      "Ngày kết thúc",
-      "Gia hạn từ",
-      "Gia hạn đến",
-      "Hoàn thành thực tế",
-      "Số chữ Thực tế",
-      "Số trang Thực tế",
-      "Tỷ lệ hoàn thành",
-      "Giá trị quyết toán",
-      "Trạng thái",
-      "Ghi chú",
-    ];
-
-    const data = filteredTc.map((c) => [
-      c.id,
-      c.contractNumber ?? "—",
-      getComponentName(c.componentId),
-      getWorkTitle(c.workId),
-      getTranslatorName(c.id),
-      formatNumberAccounting(c.unitPrice),
-      formatNumberAccounting(c.overviewValue),
-      formatNumberAccounting(c.translationValue),
-      formatNumberAccounting(c.contractValue),
-      formatDateDDMMYYYY(c.startDate),
-      formatDateDDMMYYYY(c.endDate),
-      formatDateDDMMYYYY(c.extensionStartDate),
-      formatDateDDMMYYYY(c.extensionEndDate),
-      formatDateDDMMYYYY(c.actualCompletionDate),
-      formatNumberAccounting(c.actualWordCount),
-      formatNumberAccounting(c.actualPageCount),
-      c.completionRate != null ? formatPercent(c.completionRate) : "—",
-      formatNumberAccounting(c.settlementValue),
-      c.status ?? "—",
-      c.note ?? "—",
-    ]);
-
-    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Hop_Dong_Dich_Thuat");
-
-    XLSX.writeFile(workbook, "Hop_Dong_Dich_Thuat.xlsx");
+    try {
+      const paymentsList = await Promise.all(
+        filteredTc.map((c) => fetchPaymentsByTcId(c.id)),
+      );
+      const summaries = await Promise.all(
+        filteredTc.map((c) =>
+          fetchFinanceSummary(c.id).catch(() => ({
+            totalPaid: 0,
+            totalAdvance: 0,
+            outstanding: 0,
+          })),
+        ),
+      );
+      const baseHeaders = [
+        "ID",
+        "Số HĐ",
+        "Hợp phần",
+        "Tác phẩm",
+        "Dịch giả",
+        "Đơn giá",
+        "Kinh phí tổng quan",
+        "Kinh phí dịch thuật",
+        "Giá trị HĐ",
+        "Ngày bắt đầu",
+        "Ngày kết thúc",
+        "Gia hạn từ",
+        "Gia hạn đến",
+        "Hoàn thành thực tế",
+        "Số chữ Thực tế",
+        "Số trang Thực tế",
+        "Tỷ lệ hoàn thành",
+        "Giá trị quyết toán",
+        "Chênh lệch",
+        "Tạm ứng lần 1",
+        "Ngày tạm ứng lần 1",
+        "Tạm ứng lần 2",
+        "Ngày tạm ứng lần 2",
+        "Quyết toán",
+        "Ngày quyết toán",
+        "Công nợ",
+        "Trạng thái",
+        "Ghi chú",
+      ];
+      const headers = baseHeaders;
+      const data = filteredTc.map((c, idx) => {
+        const payments = paymentsList[idx] ?? [];
+        const s = summaries[idx];
+        const advances = payments
+          .filter(
+            (p) => String(p.paymentType || "").toLowerCase() === "advance",
+          )
+          .sort((a, b) => {
+            const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
+            const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
+            return ad - bd;
+          });
+        const settlements = payments
+          .filter(
+            (p) => String(p.paymentType || "").toLowerCase() === "settlement",
+          )
+          .sort((a, b) => {
+            const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
+            const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
+            return bd - ad;
+          });
+        const adv1 = advances[0];
+        const adv2 = advances[1];
+        const stl = settlements[0];
+        const valueDiff =
+          c.settlementValue != null && c.contractValue != null
+            ? Number(c.settlementValue) - Number(c.contractValue)
+            : null;
+        const baseRow = [
+          c.id,
+          c.contractNumber ?? "—",
+          getComponentName(c.componentId),
+          getWorkTitle(c.workId),
+          getTranslatorName(c.id),
+          formatNumberAccounting(c.unitPrice),
+          formatNumberAccounting(c.overviewValue),
+          formatNumberAccounting(c.translationValue),
+          formatNumberAccounting(c.contractValue),
+          formatDateDDMMYYYY(c.startDate),
+          formatDateDDMMYYYY(c.endDate),
+          formatDateDDMMYYYY(c.extensionStartDate),
+          formatDateDDMMYYYY(c.extensionEndDate),
+          formatDateDDMMYYYY(c.actualCompletionDate),
+          formatNumberAccounting(c.actualWordCount),
+          formatNumberAccounting(c.actualPageCount),
+          c.completionRate != null ? formatPercent(c.completionRate) : "—",
+          formatNumberAccounting(c.settlementValue),
+          valueDiff != null ? formatNumberAccounting(valueDiff) : "—",
+          adv1 ? formatNumberAccounting(adv1.amount) : "—",
+          adv1 ? formatDateDDMMYYYY(adv1.paymentDate) : "—",
+          adv2 ? formatNumberAccounting(adv2.amount) : "—",
+          adv2 ? formatDateDDMMYYYY(adv2.paymentDate) : "—",
+          stl ? formatNumberAccounting(stl.amount) : "—",
+          stl ? formatDateDDMMYYYY(stl.paymentDate) : "—",
+          formatNumberAccounting(Math.max(s.outstanding ?? 0, 0)),
+          c.status ?? "—",
+          c.note ?? "—",
+        ];
+        return baseRow;
+      });
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Hop_Dong_Dich_Thuat");
+      const prefix = buildExportPrefix();
+      XLSX.writeFile(workbook, `${prefix}_Hop_Dong_Dich_Thuat.xlsx`);
+      toast({
+        title: "Xuất Excel thành công",
+        description: `Đã xuất ${filteredTc.length} hợp đồng dịch thuật.`,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Xuất Excel thất bại.";
+      toast({ title: "Lỗi", description: message, variant: "destructive" });
+    }
   };
 
-  const handleExportProofreadingContracts = (
+  const handleExportProofreadingContracts = async (
     filteredPc: ProofreadingContract[],
     toast: (opts: any) => any,
   ) => {
@@ -2027,48 +2097,107 @@ export default function ThuKyHopPhanPage() {
       return;
     }
 
-    const headers = [
-      "ID",
-      "Số HĐ",
-      "Hợp phần",
-      "Tác phẩm",
-      "HĐ Dịch thuật (liên kết)",
-      "Người hiệu đính",
-      "Số trang",
-      "Tỷ lệ (%)",
-      "Giá trị HĐ",
-      "Ngày bắt đầu",
-      "Ngày kết thúc",
-      "Hoàn thành thực tế",
-      "Ghi chú",
-    ];
-
-    const data = filteredPc.map((c: ProofreadingContract) => {
-      const tc = c.translationContractId
-        ? tcById.get(c.translationContractId)
-        : null;
-      return [
-        c.id,
-        c.contractNumber ?? "—",
-        getComponentName(c.componentId),
-        getWorkTitle(c.workId),
-        tc?.contractNumber ?? "—",
-        getProofreaderName(c.id),
-        formatNumberAccounting(c.pageCount),
-        c.rateRatio != null ? formatPercent(c.rateRatio) : "—",
-        formatNumberAccounting(c.contractValue),
-        formatDateDDMMYYYY(c.startDate),
-        formatDateDDMMYYYY(c.endDate),
-        formatDateDDMMYYYY(c.actualCompletionDate),
-        c.note ?? "—",
+    try {
+      const paymentsList = await Promise.all(
+        filteredPc.map((c) => fetchPaymentsByPcId(c.id)),
+      );
+      const summaries = await Promise.all(
+        filteredPc.map((c) =>
+          fetchFinanceSummaryPc(c.id).catch(() => ({
+            totalPaid: 0,
+            totalAdvance: 0,
+            outstanding: 0,
+          })),
+        ),
+      );
+      const baseHeaders = [
+        "ID",
+        "Số HĐ",
+        "Hợp phần",
+        "Tác phẩm",
+        "HĐ Dịch thuật (liên kết)",
+        "Người hiệu đính",
+        "Số trang",
+        "Tỷ lệ (%)",
+        "Giá trị HĐ",
+        "Ngày bắt đầu",
+        "Ngày kết thúc",
+        "Hoàn thành thực tế",
+        "Tạm ứng lần 1",
+        "Ngày tạm ứng lần 1",
+        "Tạm ứng lần 2",
+        "Ngày tạm ứng lần 2",
+        "Quyết toán",
+        "Ngày quyết toán",
+        "Công nợ",
+        "Ghi chú",
       ];
-    });
-
-    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Proofreading Contracts");
-
-    XLSX.writeFile(workbook, "Hop_Dong_Hieu_Dinh.xlsx");
+      const headers = baseHeaders;
+      const data = filteredPc.map((c, idx) => {
+        const tc = c.translationContractId
+          ? tcById.get(c.translationContractId)
+          : null;
+        const payments = paymentsList[idx] ?? [];
+        const s = summaries[idx];
+        const advances = payments
+          .filter(
+            (p) => String(p.paymentType || "").toLowerCase() === "advance",
+          )
+          .sort((a, b) => {
+            const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
+            const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
+            return ad - bd;
+          });
+        const settlements = payments
+          .filter(
+            (p) => String(p.paymentType || "").toLowerCase() === "settlement",
+          )
+          .sort((a, b) => {
+            const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
+            const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
+            return bd - ad;
+          });
+        const adv1 = advances[0];
+        const adv2 = advances[1];
+        const stl = settlements[0];
+        const baseRow = [
+          c.id,
+          c.contractNumber ?? "—",
+          getComponentName(c.componentId),
+          getWorkTitle(c.workId),
+          tc?.contractNumber ?? "—",
+          getProofreaderName(c.id),
+          formatNumberAccounting(c.pageCount),
+          c.rateRatio != null ? formatPercent(c.rateRatio) : "—",
+          formatNumberAccounting(c.contractValue),
+          formatDateDDMMYYYY(c.startDate),
+          formatDateDDMMYYYY(c.endDate),
+          formatDateDDMMYYYY(c.actualCompletionDate),
+          adv1 ? formatNumberAccounting(adv1.amount) : "—",
+          adv1 ? formatDateDDMMYYYY(adv1.paymentDate) : "—",
+          adv2 ? formatNumberAccounting(adv2.amount) : "—",
+          adv2 ? formatDateDDMMYYYY(adv2.paymentDate) : "—",
+          stl ? formatNumberAccounting(stl.amount) : "—",
+          stl ? formatDateDDMMYYYY(stl.paymentDate) : "—",
+          formatNumberAccounting(Math.max(s.outstanding ?? 0, 0)),
+          c.note ?? "—",
+        ];
+        return baseRow;
+      });
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Hop_Dong_Hieu_Dinh");
+      const prefix = buildExportPrefix();
+      XLSX.writeFile(workbook, `${prefix}_Hop_Dong_Hieu_Dinh.xlsx`);
+      toast({
+        title: "Xuất Excel thành công",
+        description: `Đã xuất ${filteredPc.length} hợp đồng hiệu đính.`,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Xuất Excel thất bại.";
+      toast({ title: "Lỗi", description: message, variant: "destructive" });
+    }
   };
 
   const createWorkMutation = useMutation({
