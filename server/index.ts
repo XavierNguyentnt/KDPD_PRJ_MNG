@@ -25,6 +25,11 @@ app.use(
 
 app.use(express.urlencoded({ extended: true }));
 
+const trustProxy = parseInt(process.env.TRUST_PROXY || "0", 10);
+if (trustProxy > 0) {
+  app.set("trust proxy", trustProxy);
+}
+
 initSession(app);
 
 export function log(message: string, source = "express") {

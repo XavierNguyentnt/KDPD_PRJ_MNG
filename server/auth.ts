@@ -11,6 +11,9 @@ import type { UserWithRolesAndGroups } from "@shared/schema";
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "kdpd-session-secret-change-in-production";
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_SECURE =
+  (process.env.SESSION_SECURE ??
+    (process.env.NODE_ENV === "production" ? "true" : "false")) === "true";
 
 // -----------------------------------------------------------------------------
 // Passport: Local strategy (email + password)
@@ -99,7 +102,7 @@ export function initSession(app: Express): void {
       saveUninitialized: false,
       store: getSessionStore(),
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: SESSION_SECURE,
         httpOnly: true,
         maxAge: SESSION_MAX_AGE_MS,
         sameSite: "lax",
