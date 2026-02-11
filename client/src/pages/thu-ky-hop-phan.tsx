@@ -1674,48 +1674,32 @@ export default function ThuKyHopPhanPage() {
       const xlsxModule = await import("xlsx");
       const XLSX = xlsxModule.default || xlsxModule;
 
-      const taskHeaders = [
+      const headers = [
         "ID",
         "Tiêu đề",
         "Nhóm",
         "Trạng thái",
         "Mức độ ưu tiên",
         "Tiến độ (%)",
-        "Phân công chi tiết",
-        "Người kiểm soát:",
-        "Ngày nhận công việc",
-        "Hạn hoàn thành",
-        "Ngày hoàn thành thực tế",
+        "Mô tả",
         "Đánh giá",
         "Tác phẩm",
         "Mã tài liệu",
         "Tiêu đề Hán Nôm",
         "Hợp phần",
         "Giai đoạn",
+        "Nhân sự",
+        "Ngày nhận công việc",
+        "Hạn hoàn thành",
+        "Ngày hoàn thành thực tế",
         "Ghi chú",
         "Ngày tạo",
         "Ngày cập nhật",
       ];
+      const sheetData: any[][] = [headers];
+      const rowBlocks: Array<{ startRow: number; height: number }> = [];
 
-      const assignmentHeaders = [
-        "Task ID",
-        "Tiêu đề",
-        "Nhóm",
-        "Tác phẩm",
-        "Mã tài liệu",
-        "Hợp phần",
-        "Giai đoạn",
-        "Vai trò",
-        "Nhân sự",
-        "Ngày nhận",
-        "Hạn",
-        "Hoàn thành thực tế",
-        "Trạng thái",
-        "Tiến độ (%)",
-        "Đánh giá",
-      ];
-
-      const tasksRows = filteredTasks.map((task) => {
+      filteredTasks.forEach((task) => {
         const work = getWorkForTask(task);
         const workTitle =
           work?.titleVi ?? work?.documentCode ?? work?.titleHannom ?? "—";
@@ -1723,151 +1707,124 @@ export default function ThuKyHopPhanPage() {
           ? getComponentName(work.componentId)
           : "—";
         const stageDisplay = work?.stage ? formatStageDisplay(work.stage) : "—";
-        const assignmentSummary = buildStaffAssignmentDetails(task);
-        const supervisorName = getSupervisorName(task);
+        const assignments = sortAssignments(task.assignments ?? []).filter(
+          (a) => a.stageType !== "kiem_soat",
+        );
+        const persons =
+          assignments.length > 0
+            ? assignments.map((a) => ({
+                label: getAssignmentLabel(a.stageType),
+                name: a.displayName ?? a.userId ?? "",
+                received: formatDateDDMMYYYY(a.receivedAt),
+                due: formatDateDDMMYYYY(a.dueDate),
+                completed: formatDateDDMMYYYY(a.completedAt),
+              }))
+            : [
+                {
+                  label: "",
+                  name: "",
+                  received: "",
+                  due: "",
+                  completed: "",
+                },
+              ];
+
         const noteValue =
           (task as TaskWithAssignmentDetails & { note?: string | null }).note ??
           task.notes ??
           "";
-        const detailText = assignmentSummary ? `'${assignmentSummary}` : "";
-        const noteText = noteValue ? `'${noteValue}` : "";
-        return {
-          ID: task.id,
-          "Tiêu đề": task.title ?? "",
-          Nhóm: task.group ?? "",
-          "Trạng thái": getTaskStatusLabel(task.status),
-          "Mức độ ưu tiên": getPriorityLabel(task.priority),
-          "Tiến độ (%)": typeof task.progress === "number" ? task.progress : "",
-          "Phân công chi tiết": detailText,
-          "Người kiểm soát:": supervisorName,
-          "Ngày nhận công việc": formatDateDDMMYYYY(
-            (
-              task as TaskWithAssignmentDetails & {
-                receivedAt?: string | Date | null;
-              }
-            ).receivedAt,
-          ),
-          "Hạn hoàn thành": formatDateDDMMYYYY(task.dueDate),
-          "Ngày hoàn thành thực tế": formatDateDDMMYYYY(task.actualCompletedAt),
-          "Đánh giá": getVoteLabel(task.vote),
-          "Tác phẩm": workTitle,
-          "Mã tài liệu": work?.documentCode ?? "",
-          "Tiêu đề Hán Nôm": work?.titleHannom ?? "",
-          "Hợp phần": componentName,
-          "Giai đoạn": stageDisplay,
-          "Ghi chú": noteText,
-          "Ngày tạo": formatDateDDMMYYYY(task.createdAt),
-          "Ngày cập nhật": formatDateDDMMYYYY(task.updatedAt),
-        };
+
+        const startRow = sheetData.length + 1;
+        rowBlocks.push({ startRow, height: persons.length });
+
+        persons.forEach((p) => {
+          sheetData.push([
+            task.id,
+            task.title ?? "",
+            task.group ?? "",
+            getTaskStatusLabel(task.status),
+            getPriorityLabel(task.priority),
+            typeof task.progress === "number" ? task.progress : "",
+            "", // Mô tả hiện không có trường riêng
+            getVoteLabel(task.vote),
+            workTitle,
+            work?.documentCode ?? "",
+            work?.titleHannom ?? "",
+            componentName,
+            stageDisplay,
+            (p.label ? `${p.label}: ` : "") + (p.name || ""),
+            p.received,
+            p.due,
+            p.completed,
+            noteValue ?? "",
+            formatDateDDMMYYYY(task.createdAt),
+            formatDateDDMMYYYY(task.updatedAt),
+          ]);
+        });
       });
 
-      const assignmentRows = filteredTasks.flatMap((task) => {
-        const work = getWorkForTask(task);
-        const workTitle =
-          work?.titleVi ?? work?.documentCode ?? work?.titleHannom ?? "—";
-        const componentName = work?.componentId
-          ? getComponentName(work.componentId)
-          : "—";
-        const stageDisplay = work?.stage ? formatStageDisplay(work.stage) : "—";
-        const assignments = sortAssignments(task.assignments ?? []);
-        return assignments.map((assignment) => ({
-          "Task ID": task.id,
-          "Tiêu đề": task.title ?? "",
-          Nhóm: task.group ?? "",
-          "Tác phẩm": workTitle,
-          "Mã tài liệu": work?.documentCode ?? "",
-          "Hợp phần": componentName,
-          "Giai đoạn": stageDisplay,
-          "Vai trò": getAssignmentLabel(assignment.stageType),
-          "Nhân sự": assignment.displayName ?? assignment.userId ?? "",
-          "Ngày nhận": formatDateDDMMYYYY(assignment.receivedAt),
-          Hạn: formatDateDDMMYYYY(assignment.dueDate),
-          "Hoàn thành thực tế": formatDateDDMMYYYY(assignment.completedAt),
-          "Trạng thái": getAssignmentStatusLabel(assignment.status),
-          "Tiến độ (%)":
-            typeof assignment.progress === "number" ? assignment.progress : "",
-          "Đánh giá":
-            assignment.stageType === "kiem_soat" ? getVoteLabel(task.vote) : "",
-        }));
+      const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+      const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+      const mergeColsShared = [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18, 19,
+      ];
+      rowBlocks.forEach((blk) => {
+        if (blk.height <= 1) return;
+        const startR0 = blk.startRow - 1;
+        const endR0 = startR0 + blk.height - 1;
+        mergeColsShared.forEach((c) => {
+          worksheet["!merges"] = worksheet["!merges"] || [];
+          worksheet["!merges"].push({
+            s: { r: startR0, c },
+            e: { r: endR0, c },
+          });
+        });
       });
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+        const cell = worksheet[addr];
+        if (cell) {
+          cell.s = {
+            font: { bold: true },
+            alignment: {
+              horizontal: "center",
+              vertical: "center",
+              wrapText: true,
+            },
+            border: {
+              top: { style: "thin" },
+              bottom: { style: "thin" },
+              left: { style: "thin" },
+              right: { style: "thin" },
+            },
+          };
+        }
+      }
+      const dateCols = [14, 15, 16, 18, 19];
+      for (let R = 1; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const addr = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = worksheet[addr];
+          if (!cell) continue;
+          const isDate = dateCols.includes(C);
+          cell.s = {
+            alignment: {
+              horizontal: isDate ? "center" : "left",
+              vertical: "center",
+              wrapText: true,
+            },
+            border: {
+              top: { style: "thin" },
+              bottom: { style: "thin" },
+              left: { style: "thin" },
+              right: { style: "thin" },
+            },
+          };
+        }
+      }
 
       const workbook = XLSX.utils.book_new();
-      const tasksSheet = XLSX.utils.json_to_sheet(tasksRows, {
-        header: taskHeaders,
-      });
-      const detailColIndex = taskHeaders.indexOf("Phân công chi tiết");
-      const noteColIndex = taskHeaders.indexOf("Ghi chú");
-      if (detailColIndex >= 0) {
-        for (let i = 0; i < tasksRows.length; i += 1) {
-          const cellRef = XLSX.utils.encode_cell({
-            r: i + 1,
-            c: detailColIndex,
-          });
-          if (tasksSheet[cellRef]) {
-            tasksSheet[cellRef].t = "s";
-            tasksSheet[cellRef].s = {
-              alignment: { wrapText: true, vertical: "top" },
-            };
-          } else {
-            tasksSheet[cellRef] = {
-              t: "s",
-              v: "",
-              s: { alignment: { wrapText: true, vertical: "top" } },
-            };
-          }
-        }
-      }
-
-      const countLines = (value: unknown) => {
-        if (value == null) return 1;
-        const text = String(value);
-        if (!text) return 1;
-        return text.split(/\r\n|\n/).length;
-      };
-      const detailKey = "Phân công chi tiết";
-      const noteKey = "Ghi chú";
-      const rowsMeta: Array<{ hpt?: number }> = [];
-      for (let i = 0; i < tasksRows.length; i += 1) {
-        const row = tasksRows[i] as Record<string, unknown>;
-        const lines = Math.max(
-          countLines(row[detailKey]),
-          countLines(row[noteKey]),
-        );
-        if (lines > 1) {
-          rowsMeta[i + 1] = { hpt: Math.max(18, lines * 16) };
-        }
-      }
-      if (rowsMeta.length > 0) {
-        tasksSheet["!rows"] = rowsMeta;
-      }
-      if (noteColIndex >= 0) {
-        for (let i = 0; i < tasksRows.length; i += 1) {
-          const cellRef = XLSX.utils.encode_cell({
-            r: i + 1,
-            c: noteColIndex,
-          });
-          if (tasksSheet[cellRef]) {
-            tasksSheet[cellRef].t = "s";
-            tasksSheet[cellRef].s = {
-              alignment: { wrapText: true, vertical: "top" },
-            };
-          } else {
-            tasksSheet[cellRef] = {
-              t: "s",
-              v: "",
-              s: { alignment: { wrapText: true, vertical: "top" } },
-            };
-          }
-        }
-      }
-      const assignmentsSheet =
-        assignmentRows.length > 0
-          ? XLSX.utils.json_to_sheet(assignmentRows, {
-              header: assignmentHeaders,
-            })
-          : XLSX.utils.aoa_to_sheet([assignmentHeaders]);
-      XLSX.utils.book_append_sheet(workbook, tasksSheet, "Cong_viec");
-      XLSX.utils.book_append_sheet(workbook, assignmentsSheet, "Phan_cong");
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Cong_viec");
 
       const prefix = buildExportPrefix();
       const fileName = `${prefix}_thu-ky-hop-phan-cong-viec.xlsx`;
