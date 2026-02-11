@@ -128,16 +128,10 @@ import {
   formatPercent,
   numberToVietnameseWords,
   normalizeSearch,
+  buildExportPrefix,
 } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
-function buildExportPrefix(): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const now = new Date();
-  return `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(
-    now.getDate(),
-  )}.[${pad(now.getHours())}.${pad(now.getMinutes())}]`;
-}
 
 // Sort types for each table
 export type WorkSortColumn =

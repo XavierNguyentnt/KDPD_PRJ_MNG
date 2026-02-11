@@ -173,3 +173,11 @@ export function numberToVietnameseWords(value: number | string | null | undefine
   if (decPart > 0) result += " phẩy " + readBlock(decPart, true);
   return (result.charAt(0).toUpperCase() + result.slice(1)).trim() + " đồng.";
 }
+
+export function buildExportPrefix(): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const now = new Date();
+  return `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(
+    now.getDate(),
+  )}.[${pad(now.getHours())}.${pad(now.getMinutes())}]`;
+}

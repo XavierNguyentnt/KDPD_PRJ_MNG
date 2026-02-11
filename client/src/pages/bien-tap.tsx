@@ -55,7 +55,11 @@ import {
 } from "lucide-react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
-import { normalizeSearch } from "@/lib/utils";
+import {
+  normalizeSearch,
+  buildExportPrefix,
+  formatDateDDMMYYYY,
+} from "@/lib/utils";
 import * as XLSX from "xlsx";
 import type { TaskWithAssignmentDetails as TTask } from "@shared/schema";
 
@@ -63,6 +67,15 @@ function handleExportTasks(
   filteredTasks: TTask[],
   language: string,
   toast: (opts: any) => any,
+  works: Array<{
+    id: string;
+    titleVi?: string | null;
+    titleHannom?: string | null;
+    documentCode?: string | null;
+    componentId?: string | null;
+    stage?: string | null;
+  }>,
+  components: Array<{ id: string; name?: string | null }>,
 ) {
   if (filteredTasks.length === 0) {
     toast({
@@ -75,26 +88,229 @@ function handleExportTasks(
     return;
   }
 
-  const taskHeaders = [
+  const viStatus = (s: string | null | undefined): string => {
+    switch (s) {
+      case "Not Started":
+        return "Chưa bắt đầu";
+      case "In Progress":
+        return "Đang thực hiện";
+      case "Completed":
+        return "Hoàn thành";
+      case "Pending":
+        return "Tạm dừng";
+      case "Cancelled":
+        return "Đã hủy";
+      default:
+        return s ?? "";
+    }
+  };
+  const viPriority = (p: string | null | undefined): string => {
+    switch (p) {
+      case "Critical":
+        return "Khẩn cấp";
+      case "High":
+        return "Cao";
+      case "Medium":
+        return "Trung bình";
+      case "Low":
+        return "Thấp";
+      default:
+        return p ?? "";
+    }
+  };
+  const viVote = (v: string | null | undefined): string => {
+    if (!v) return "";
+    const s = v.toLowerCase();
+    if (s === "tot") return "Hoàn thành tốt";
+    if (s === "kha") return "Hoàn thành khá";
+    if (s === "khong_tot") return "Không tốt";
+    if (s === "khong_hoan_thanh") return "Không hoàn thành";
+    return v;
+  };
+  const workById = new Map((works || []).map((w) => [w.id, w]));
+  const compById = new Map((components || []).map((c) => [c.id, c]));
+
+  const headers = [
     "ID",
     "Tiêu đề",
+    "Loại bông",
     "Nhóm",
     "Trạng thái",
-    "Người thực hiện",
+    "Mức độ ưu tiên",
+    "Tiến độ (%)",
+    "Mô tả",
+    "Loại công việc",
+    "Đánh giá",
+    "Tác phẩm liên quan",
+    "Hợp phần",
+    "GĐ",
+    "Nhân sự",
+    "Ngày nhận công việc",
+    "Hạn hoàn thành",
+    "Ngày hoàn thành thực tế",
+    "Ghi chú",
+    "Ngày tạo",
+    "Ngày cập nhật",
   ];
-  const taskData = filteredTasks.map((task) => [
-    task.id,
-    task.title,
-    task.group,
-    task.status,
-    task.assignee,
-  ]);
+  const sheetData: any[][] = [headers];
+  const rowBlocks: Array<{ startRow: number; height: number }> = [];
 
-  const worksheet = XLSX.utils.aoa_to_sheet([taskHeaders, ...taskData]);
+  filteredTasks.forEach((task) => {
+    const assignments = Array.isArray(task.assignments) ? task.assignments : [];
+    const persons: Array<{
+      roleLabel: string;
+      name: string;
+      received: string;
+      due: string;
+      completed: string;
+    }> = [];
+    const getName = (a: any) => a?.displayName ?? a?.userId ?? "";
+    const btv1 = assignments.find((a) => a.stageType === "btv1");
+    const btv2 = assignments.find((a) => a.stageType === "btv2");
+    const doc = assignments.find((a) => a.stageType === "doc_duyet");
+    if (btv1)
+      persons.push({
+        roleLabel: "BTV 1",
+        name: getName(btv1),
+        received: formatDateDDMMYYYY(btv1.receivedAt as any),
+        due: formatDateDDMMYYYY(btv1.dueDate as any),
+        completed: formatDateDDMMYYYY(btv1.completedAt as any),
+      });
+    if (btv2)
+      persons.push({
+        roleLabel: "BTV 2",
+        name: getName(btv2),
+        received: formatDateDDMMYYYY(btv2.receivedAt as any),
+        due: formatDateDDMMYYYY(btv2.dueDate as any),
+        completed: formatDateDDMMYYYY(btv2.completedAt as any),
+      });
+    if (doc)
+      persons.push({
+        roleLabel: "Người đọc duyệt",
+        name: getName(doc),
+        received: formatDateDDMMYYYY(doc.receivedAt as any),
+        due: formatDateDDMMYYYY(doc.dueDate as any),
+        completed: formatDateDDMMYYYY(doc.completedAt as any),
+      });
+    if (persons.length === 0) {
+      persons.push({
+        roleLabel: "",
+        name: "",
+        received: "",
+        due: "",
+        completed: "",
+      });
+    }
+
+    let loaiBong = "";
+    try {
+      const wf = (
+        task.workflow && typeof task.workflow === "string"
+          ? JSON.parse(task.workflow)
+          : task.workflow
+      ) as any;
+      if (wf?.rounds && Array.isArray(wf.rounds)) {
+        const current =
+          wf.rounds.find((r: any) => r?.roundNumber === wf.currentRound) ||
+          wf.rounds[0];
+        loaiBong = current?.roundType ?? "";
+      }
+    } catch {}
+    const w = task.relatedWorkId ? workById.get(task.relatedWorkId) : null;
+    const tacPham = w?.titleVi ?? w?.documentCode ?? w?.titleHannom ?? "";
+    const hopPhan = w?.componentId
+      ? (compById.get(w.componentId)?.name ?? "")
+      : "";
+    const giaiDoan = w?.stage ?? "";
+
+    const startRow = sheetData.length + 1; // header is row 1
+    rowBlocks.push({ startRow, height: persons.length });
+
+    persons.forEach((p) => {
+      sheetData.push([
+        task.id,
+        task.title ?? "",
+        loaiBong,
+        task.group ?? "",
+        viStatus(task.status),
+        viPriority(task.priority),
+        typeof task.progress === "number" ? task.progress : "",
+        task.description ?? "",
+        (task as any).taskType ?? "",
+        viVote((task as any).vote),
+        tacPham,
+        hopPhan,
+        giaiDoan,
+        (p.roleLabel ? `${p.roleLabel}: ` : "") + (p.name || ""),
+        p.received,
+        p.due,
+        p.completed,
+        (task as any).notes ?? "",
+        formatDateDDMMYYYY(task.createdAt as any),
+        formatDateDDMMYYYY(task.updatedAt as any),
+      ]);
+    });
+  });
+
+  const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+  const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+  const mergeColsShared = [
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18, 19,
+  ];
+  rowBlocks.forEach((blk) => {
+    if (blk.height <= 1) return;
+    const startR0 = blk.startRow - 1;
+    const endR0 = startR0 + blk.height - 1;
+    mergeColsShared.forEach((c) => {
+      worksheet["!merges"] = worksheet["!merges"] || [];
+      worksheet["!merges"].push({ s: { r: startR0, c }, e: { r: endR0, c } });
+    });
+  });
+
+  // Style header: bold + centered; borders for all cells; center dates
+  for (let C = range.s.c; C <= range.e.c; ++C) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+    const cell = worksheet[addr];
+    if (cell) {
+      cell.s = {
+        font: { bold: true },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
+        },
+      };
+    }
+  }
+  const dateCols = [14, 15, 16];
+  for (let R = 1; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = worksheet[addr];
+      if (!cell) continue;
+      const isDate = dateCols.includes(C);
+      cell.s = {
+        alignment: {
+          horizontal: isDate ? "center" : "left",
+          vertical: "center",
+          wrapText: true,
+        },
+        border: {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
+        },
+      };
+    }
+  }
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
 
-  XLSX.writeFile(workbook, "Bien_Tap_Tasks.xlsx");
+  const prefix = buildExportPrefix();
+  XLSX.writeFile(workbook, `${prefix}_Bien_Tap_Tasks.xlsx`);
 }
 
 export default function BienTapPage() {
@@ -324,7 +540,13 @@ export default function BienTapPage() {
                 </ToggleGroup>
                 <Button
                   onClick={() =>
-                    handleExportTasks(filteredTasks, language, toast)
+                    handleExportTasks(
+                      filteredTasks,
+                      language,
+                      toast,
+                      works,
+                      components,
+                    )
                   }
                   disabled={filteredTasks.length === 0}>
                   Xuất Excel

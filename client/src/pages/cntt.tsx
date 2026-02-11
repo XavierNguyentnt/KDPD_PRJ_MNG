@@ -61,7 +61,11 @@ import {
 } from "lucide-react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
-import { normalizeSearch } from "@/lib/utils";
+import {
+  normalizeSearch,
+  buildExportPrefix,
+  formatDateDDMMYYYY,
+} from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
@@ -91,21 +95,56 @@ function handleExportTasks(
     "Tiêu đề",
     "Nhóm",
     "Trạng thái",
+    "Mức độ ưu tiên",
+    "Tiến độ (%)",
     "Người thực hiện",
+    "ID người thực hiện",
+    "Ngày nhận",
+    "Hạn hoàn thành",
+    "Ngày hoàn thành thực tế",
+    "Mô tả",
+    "Ghi chú",
+    "Loại công việc",
+    "Bỏ phiếu",
+    "Tác phẩm liên quan (ID)",
+    "Hợp đồng liên quan (ID)",
+    "Hợp đồng (ID)",
+    "Nguồn sheet ID",
+    "Nguồn sheet Name",
+    "Ngày tạo",
+    "Ngày cập nhật",
   ];
   const taskData = filteredTasks.map((task) => [
     task.id,
-    task.title,
-    task.group,
-    task.status,
-    task.assignee,
+    task.title ?? "",
+    task.group ?? "",
+    task.status ?? "",
+    task.priority ?? "",
+    typeof task.progress === "number" ? task.progress : "",
+    task.assignee ?? "",
+    task.assigneeId ?? "",
+    formatDateDDMMYYYY(task.receivedAt as any),
+    formatDateDDMMYYYY(task.dueDate as any),
+    formatDateDDMMYYYY(task.actualCompletedAt as any),
+    task.description ?? "",
+    (task as any).notes ?? "",
+    (task as any).taskType ?? "",
+    (task as any).vote ?? "",
+    (task as any).relatedWorkId ?? "",
+    (task as any).relatedContractId ?? "",
+    (task as any).contractId ?? "",
+    (task as any).sourceSheetId ?? "",
+    (task as any).sourceSheetName ?? "",
+    formatDateDDMMYYYY(task.createdAt as any),
+    formatDateDDMMYYYY(task.updatedAt as any),
   ]);
 
   const worksheet = XLSX.utils.aoa_to_sheet([taskHeaders, ...taskData]);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
 
-  XLSX.writeFile(workbook, "CNTT_Tasks.xlsx");
+  const prefix = buildExportPrefix();
+  XLSX.writeFile(workbook, `${prefix}_CNTT_Tasks.xlsx`);
 }
 
 export default function CNTTPage() {
@@ -379,8 +418,6 @@ export default function CNTTPage() {
           />
         )}
       </section>
-
-      
 
       <TaskDialog
         open={!!selectedTask}

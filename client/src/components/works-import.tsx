@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Download, Upload, Loader2, FileSpreadsheet } from "lucide-react";
 import { api } from "@shared/routes";
+import { buildExportPrefix } from "@/lib/utils";
 
 interface WorksImportProps {
   open: boolean;
@@ -43,7 +44,8 @@ export function WorksImport({ open, onOpenChange }: WorksImportProps) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "mau-tac-pham-tuyen-dich.xlsx";
+      const prefix = buildExportPrefix();
+      a.download = `${prefix}_mau-tac-pham-tuyen-dich.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
