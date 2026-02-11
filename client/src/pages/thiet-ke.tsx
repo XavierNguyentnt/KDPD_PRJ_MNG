@@ -86,56 +86,178 @@ function handleExportTasks(
     return;
   }
 
-  const taskHeaders = [
+  const viStatus = (s: string | null | undefined): string => {
+    switch (s) {
+      case "Not Started":
+        return "Chưa bắt đầu";
+      case "In Progress":
+        return "Đang thực hiện";
+      case "Completed":
+        return "Hoàn thành";
+      case "Pending":
+        return "Tạm dừng";
+      case "Cancelled":
+        return "Đã hủy";
+      default:
+        return s ?? "";
+    }
+  };
+  const viPriority = (p: string | null | undefined): string => {
+    switch (p) {
+      case "Critical":
+        return "Khẩn cấp";
+      case "High":
+        return "Cao";
+      case "Medium":
+        return "Trung bình";
+      case "Low":
+        return "Thấp";
+      default:
+        return p ?? "";
+    }
+  };
+  const viVote = (v: string | null | undefined): string => {
+    if (!v) return "";
+    const s = v.toLowerCase();
+    if (s === "tot") return "Hoàn thành tốt";
+    if (s === "kha") return "Hoàn thành khá";
+    if (s === "khong_tot") return "Không tốt";
+    if (s === "khong_hoan_thanh") return "Không hoàn thành";
+    return v;
+  };
+  const getAssignmentLabel = (stageType: string): string => {
+    if (stageType === "kiem_soat") return "Người kiểm soát";
+    if (stageType.startsWith("nhan_su_"))
+      return "Nhân sự " + stageType.replace("nhan_su_", "");
+    if (stageType === "primary") return "Người thực hiện";
+    if (stageType === "ktv_chinh") return "KTV chính";
+    if (stageType.startsWith("tro_ly_"))
+      return "Trợ lý " + stageType.replace("tro_ly_", "");
+    return stageType;
+  };
+
+  const headers = [
     "ID",
     "Tiêu đề",
     "Nhóm",
     "Trạng thái",
     "Mức độ ưu tiên",
     "Tiến độ (%)",
-    "Người thực hiện",
-    "ID người thực hiện",
-    "Ngày nhận",
+    "Mô tả",
+    "Đánh giá",
+    "Nhân sự",
+    "Ngày nhận công việc",
     "Hạn hoàn thành",
     "Ngày hoàn thành thực tế",
-    "Mô tả",
     "Ghi chú",
-    "Loại công việc",
-    "Bỏ phiếu",
-    "Tác phẩm liên quan (ID)",
-    "Hợp đồng liên quan (ID)",
-    "Hợp đồng (ID)",
-    "Nguồn sheet ID",
-    "Nguồn sheet Name",
     "Ngày tạo",
     "Ngày cập nhật",
   ];
-  const taskData = filteredTasks.map((task) => [
-    task.id,
-    task.title ?? "",
-    task.group ?? "",
-    task.status ?? "",
-    task.priority ?? "",
-    typeof task.progress === "number" ? task.progress : "",
-    task.assignee ?? "",
-    task.assigneeId ?? "",
-    formatDateDDMMYYYY(task.receivedAt as any),
-    formatDateDDMMYYYY(task.dueDate as any),
-    formatDateDDMMYYYY(task.actualCompletedAt as any),
-    task.description ?? "",
-    (task as any).notes ?? "",
-    (task as any).taskType ?? "",
-    (task as any).vote ?? "",
-    (task as any).relatedWorkId ?? "",
-    (task as any).relatedContractId ?? "",
-    (task as any).contractId ?? "",
-    (task as any).sourceSheetId ?? "",
-    (task as any).sourceSheetName ?? "",
-    formatDateDDMMYYYY(task.createdAt as any),
-    formatDateDDMMYYYY(task.updatedAt as any),
-  ]);
+  const sheetData: any[][] = [headers];
+  const rowBlocks: Array<{ startRow: number; height: number }> = [];
 
-  const worksheet = XLSX.utils.aoa_to_sheet([taskHeaders, ...taskData]);
+  filteredTasks.forEach((task) => {
+    const assignments = Array.isArray(task.assignments) ? task.assignments : [];
+    const persons: Array<{
+      label: string;
+      name: string;
+      received: string;
+      due: string;
+      completed: string;
+    }> = [];
+    assignments.forEach((a: any) => {
+      persons.push({
+        label: getAssignmentLabel(a.stageType || ""),
+        name: a.displayName ?? a.userId ?? "",
+        received: formatDateDDMMYYYY(a.receivedAt as any),
+        due: formatDateDDMMYYYY(a.dueDate as any),
+        completed: formatDateDDMMYYYY(a.completedAt as any),
+      });
+    });
+    if (persons.length === 0) {
+      persons.push({
+        label: "",
+        name: "",
+        received: "",
+        due: "",
+        completed: "",
+      });
+    }
+
+    const startRow = sheetData.length + 1;
+    rowBlocks.push({ startRow, height: persons.length });
+
+    persons.forEach((p) => {
+      sheetData.push([
+        task.id,
+        task.title ?? "",
+        task.group ?? "",
+        viStatus(task.status),
+        viPriority(task.priority),
+        typeof task.progress === "number" ? task.progress : "",
+        task.description ?? "",
+        viVote((task as any).vote),
+        (p.label ? `${p.label}: ` : "") + (p.name || ""),
+        p.received,
+        p.due,
+        p.completed,
+        (task as any).notes ?? "",
+        formatDateDDMMYYYY(task.createdAt as any),
+        formatDateDDMMYYYY(task.updatedAt as any),
+      ]);
+    });
+  });
+
+  const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+  const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+  const mergeColsShared = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14];
+  rowBlocks.forEach((blk) => {
+    if (blk.height <= 1) return;
+    const startR0 = blk.startRow - 1;
+    const endR0 = startR0 + blk.height - 1;
+    mergeColsShared.forEach((c) => {
+      worksheet["!merges"] = worksheet["!merges"] || [];
+      worksheet["!merges"].push({ s: { r: startR0, c }, e: { r: endR0, c } });
+    });
+  });
+  for (let C = range.s.c; C <= range.e.c; ++C) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+    const cell = worksheet[addr];
+    if (cell) {
+      cell.s = {
+        font: { bold: true },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
+        },
+      };
+    }
+  }
+  const dateCols = [9, 10, 11, 13, 14];
+  for (let R = 1; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = worksheet[addr];
+      if (!cell) continue;
+      const isDate = dateCols.includes(C);
+      cell.s = {
+        alignment: {
+          horizontal: isDate ? "center" : "left",
+          vertical: "center",
+          wrapText: true,
+        },
+        border: {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
+        },
+      };
+    }
+  }
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
 
