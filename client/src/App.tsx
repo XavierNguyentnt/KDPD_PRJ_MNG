@@ -52,6 +52,22 @@ function hasGroup(user: ReturnType<typeof useAuth>["user"], group: string) {
   });
 }
 
+function hasRoleOrGroup(
+  user: ReturnType<typeof useAuth>["user"],
+  roleCodes: string[],
+  groupCodes: string[],
+) {
+  const roles = user?.roles ?? [];
+  const groups = user?.groups ?? [];
+  const hasRole = roles.some((r) =>
+    roleCodes.includes(normalize(r.code ?? "")),
+  );
+  const hasGroup = groups.some((g) =>
+    groupCodes.includes(normalize(g.code ?? "")),
+  );
+  return hasRole || hasGroup;
+}
+
 function GuardedGroupPage({
   group,
   Component,
@@ -70,6 +86,31 @@ function GuardedGroupPage({
   return <Component />;
 }
 
+function GuardedThietKePage() {
+  const { user, role } = useAuth();
+  const [_, navigate] = useLocation();
+  const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
+  const allowed =
+    isAdminManager || hasRoleOrGroup(user, ["designer"], ["thiet_ke"]);
+  if (!allowed) {
+    navigate("/");
+    return null;
+  }
+  return <ThietKePage />;
+}
+
+function GuardedCNTTPage() {
+  const { user, role } = useAuth();
+  const [_, navigate] = useLocation();
+  const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
+  const allowed = isAdminManager || hasRoleOrGroup(user, ["technical"], ["it"]);
+  if (!allowed) {
+    navigate("/");
+    return null;
+  }
+  return <CNTTPage />;
+}
+
 function Router() {
   return (
     <Layout>
@@ -82,18 +123,8 @@ function Router() {
             <GuardedGroupPage group="Biên tập" Component={BienTapPage} />
           )}
         />
-        <Route
-          path="/thiet-ke"
-          component={() => (
-            <GuardedGroupPage group="Thiết kế" Component={ThietKePage} />
-          )}
-        />
-        <Route
-          path="/cntt"
-          component={() => (
-            <GuardedGroupPage group="CNTT" Component={CNTTPage} />
-          )}
-        />
+        <Route path="/thiet-ke" component={GuardedThietKePage} />
+        <Route path="/cntt" component={GuardedCNTTPage} />
         <Route path="/tasks" component={Dashboard} /> {/* Legacy route */}
         <Route path="/team" component={Team} />
         <Route path="/admin" component={AdminPage} />
