@@ -23,6 +23,16 @@ function normalize(text: string) {
   return text.toLowerCase().replace(/\s+/g, "");
 }
 
+function normalizeStrict(text: string) {
+  return (text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "")
+    .replace(/\t/g, "")
+    .replace(/[_\-.]/g, "");
+}
+
 function hasGroup(user: ReturnType<typeof useAuth>["user"], group: string) {
   const target = normalize(group);
   const list = user?.groups ?? [];
@@ -54,17 +64,27 @@ function hasGroup(user: ReturnType<typeof useAuth>["user"], group: string) {
 
 function hasRoleOrGroup(
   user: ReturnType<typeof useAuth>["user"],
-  roleCodes: string[],
-  groupCodes: string[],
+  roleTargets: string[],
+  groupTargets: string[],
 ) {
   const roles = user?.roles ?? [];
   const groups = user?.groups ?? [];
-  const hasRole = roles.some((r) =>
-    roleCodes.includes(normalize(r.code ?? "")),
+  const normalizedRoleTargets = new Set(
+    roleTargets.map((t) => normalizeStrict(t)),
   );
-  const hasGroup = groups.some((g) =>
-    groupCodes.includes(normalize(g.code ?? "")),
+  const normalizedGroupTargets = new Set(
+    groupTargets.map((t) => normalizeStrict(t)),
   );
+  const hasRole = roles.some((r) => {
+    const code = normalizeStrict(r.code ?? "");
+    const name = normalizeStrict(r.name ?? "");
+    return normalizedRoleTargets.has(code) || normalizedRoleTargets.has(name);
+  });
+  const hasGroup = groups.some((g) => {
+    const code = normalizeStrict(g.code ?? "");
+    const name = normalizeStrict(g.name ?? "");
+    return normalizedGroupTargets.has(code) || normalizedGroupTargets.has(name);
+  });
   return hasRole || hasGroup;
 }
 
@@ -91,7 +111,12 @@ function GuardedThietKePage() {
   const [_, navigate] = useLocation();
   const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
   const allowed =
-    isAdminManager || hasRoleOrGroup(user, ["designer"], ["thiet_ke"]);
+    isAdminManager ||
+    hasRoleOrGroup(
+      user,
+      ["designer", "hoasithietke"],
+      ["thiet_ke", "thietke", "thiet-ke", "thiet k e", "thiet ke", "thietk e"],
+    );
   if (!allowed) {
     navigate("/");
     return null;
@@ -103,7 +128,9 @@ function GuardedCNTTPage() {
   const { user, role } = useAuth();
   const [_, navigate] = useLocation();
   const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
-  const allowed = isAdminManager || hasRoleOrGroup(user, ["technical"], ["it"]);
+  const allowed =
+    isAdminManager ||
+    hasRoleOrGroup(user, ["technical", "kythuatvien"], ["it", "kythuat"]);
   if (!allowed) {
     navigate("/");
     return null;
