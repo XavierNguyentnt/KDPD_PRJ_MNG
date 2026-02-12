@@ -14,11 +14,13 @@ type ViewMode = "table" | "board";
 export function useTaskListControls(params: {
   tasks?: TaskWithAssignmentDetails[] | null;
   role: UserRoleType;
+  userId?: string | null;
   userDisplayName?: string | null;
   works: Work[];
   includedGroups?: string[] | null;
 }) {
-  const { tasks, role, userDisplayName, works, includedGroups } = params;
+  const { tasks, role, userId, userDisplayName, works, includedGroups } =
+    params;
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<TaskFilterState>(
     getDefaultTaskFilters,
@@ -53,8 +55,19 @@ export function useTaskListControls(params: {
       list = list.filter((t) => t.group === groupFilter);
     }
     if (role === UserRole.EMPLOYEE) {
-      const firstName = (userDisplayName ?? "").split(" ")[0];
-      list = list.filter((t) => t.assignee?.includes(firstName));
+      const uid = userId ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else if (userDisplayName) {
+        const exact = (userDisplayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
     }
     if (search.trim()) {
       const q = normalizeSearch(search.trim());
@@ -73,6 +86,7 @@ export function useTaskListControls(params: {
     includedGroups,
     groupFilter,
     role,
+    userId,
     userDisplayName,
     search,
     filters,

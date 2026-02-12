@@ -94,9 +94,19 @@ export default function Dashboard() {
     if (!tasks) return [];
     let filtered: TaskWithAssignmentDetails[] = tasks;
     if (role === UserRole.EMPLOYEE) {
-      filtered = filtered.filter((t) =>
-        t.assignee?.includes((user?.displayName ?? "").split(" ")[0])
-      );
+      const uid = user?.id ?? null;
+      if (uid) {
+        filtered = filtered.filter(
+          (t) =>
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else {
+        const exact = (user?.displayName ?? "").trim();
+        filtered = filtered.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
     }
     if (groupFilter !== "all") {
       filtered = filtered.filter((t) => t.group === groupFilter);
@@ -108,7 +118,7 @@ export default function Dashboard() {
           normalizeSearch(t.title ?? "").includes(lower) ||
           normalizeSearch(t.description ?? "").includes(lower) ||
           normalizeSearch(t.assignee ?? "").includes(lower) ||
-          normalizeSearch(t.group ?? "").includes(lower)
+          normalizeSearch(t.group ?? "").includes(lower),
       );
     }
     if (statusFilter !== "all") {
@@ -143,8 +153,8 @@ export default function Dashboard() {
         task.status === "Completed"
           ? t.dashboard.taskCompleted
           : task.status === "In Progress"
-          ? t.dashboard.reviewCompleted
-          : t.dashboard.addNewTask;
+            ? t.dashboard.reviewCompleted
+            : t.dashboard.addNewTask;
       return {
         id: task.id,
         title: task.title ?? "",
@@ -162,7 +172,7 @@ export default function Dashboard() {
   const inProgressTasks = useMemo(
     () =>
       baseFilteredTasks.filter((t) => t.status === "In Progress").slice(0, 5),
-    [baseFilteredTasks]
+    [baseFilteredTasks],
   );
 
   // Danh sách nhân sự để lọc bảng (từ baseFilteredTasks)
@@ -173,11 +183,14 @@ export default function Dashboard() {
       counts[name] = (counts[name] || 0) + 1;
     });
     return Object.entries(counts)
-      .map(([name, count]) => ({ name, count, display: name || t.task.unassigned }))
+      .map(([name, count]) => ({
+        name,
+        count,
+        display: name || t.task.unassigned,
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 20);
   }, [baseFilteredTasks, t]);
-
 
   const handleBadgeFilter = useCallback((filter: DashboardBadgeFilter) => {
     setBadgeFilter(filter);
@@ -187,7 +200,7 @@ export default function Dashboard() {
           behavior: "smooth",
           block: "start",
         }),
-      100
+      100,
     );
   }, []);
 
@@ -318,7 +331,7 @@ export default function Dashboard() {
                     className="flex gap-3 px-5 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
                     onClick={() =>
                       setSelectedTask(
-                        baseFilteredTasks.find((t) => t.id === item.id) ?? null
+                        baseFilteredTasks.find((t) => t.id === item.id) ?? null,
                       )
                     }>
                     <span
@@ -402,7 +415,7 @@ export default function Dashboard() {
                       taskListRef.current?.scrollIntoView({
                         behavior: "smooth",
                       }),
-                    100
+                    100,
                   );
                 }}>
                 {t.dashboard.seeAll} →
@@ -422,9 +435,7 @@ export default function Dashboard() {
       </section>
 
       {/* Task List — Protend-style table card */}
-      <section
-        ref={taskListRef}
-        className="section-card">
+      <section ref={taskListRef} className="section-card">
         <div className="section-header">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
@@ -498,9 +509,10 @@ export default function Dashboard() {
             <ToggleGroup
               type="single"
               value={viewMode}
-              onValueChange={(v) => v && (v === "table" || v === "board") && setViewMode(v)}
-              className="border rounded-md bg-background"
-            >
+              onValueChange={(v) =>
+                v && (v === "table" || v === "board") && setViewMode(v)
+              }
+              className="border rounded-md bg-background">
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
                 <List className="h-4 w-4 mr-1.5" />
                 {t.dashboard.viewTable}
@@ -521,23 +533,26 @@ export default function Dashboard() {
           <Badge
             variant={badgeFilter?.type !== "assignee" ? "default" : "outline"}
             className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
-            onClick={() => handleBadgeFilter(null)}
-          >
+            onClick={() => handleBadgeFilter(null)}>
             {t.filter.allStaff}
           </Badge>
           {byAssignee.map(({ name, count, display }) => (
             <Badge
               key={name || "_unassigned"}
-              variant={badgeFilter?.type === "assignee" && badgeFilter?.value === name ? "default" : "outline"}
+              variant={
+                badgeFilter?.type === "assignee" && badgeFilter?.value === name
+                  ? "default"
+                  : "outline"
+              }
               className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
               onClick={() =>
                 handleBadgeFilter(
-                  badgeFilter?.type === "assignee" && badgeFilter?.value === name
+                  badgeFilter?.type === "assignee" &&
+                    badgeFilter?.value === name
                     ? null
-                    : { type: "assignee", value: name }
+                    : { type: "assignee", value: name },
                 )
-              }
-            >
+              }>
               {display} ({count})
             </Badge>
           ))}

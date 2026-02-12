@@ -61,7 +61,11 @@ import {
 } from "lucide-react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
-import { normalizeSearch, buildExportPrefix, formatDateDDMMYYYY } from "@/lib/utils";
+import {
+  normalizeSearch,
+  buildExportPrefix,
+  formatDateDDMMYYYY,
+} from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
@@ -292,6 +296,7 @@ export default function ThietKePage() {
   } = useTaskListControls({
     tasks,
     role,
+    userId: user?.id,
     userDisplayName: user?.displayName,
     works,
     includedGroups: INCLUDED_GROUPS,
@@ -535,8 +540,6 @@ export default function ThietKePage() {
           />
         )}
       </section>
-
-      
 
       <TaskDialog
         open={!!selectedTask}

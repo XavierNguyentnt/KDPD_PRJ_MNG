@@ -302,9 +302,19 @@ export default function CVChungPage() {
     );
 
     if (role === UserRole.EMPLOYEE) {
-      list = list.filter((t) =>
-        t.assignee?.includes((user?.displayName ?? "").split(" ")[0]),
-      );
+      const uid = user?.id ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else {
+        const exact = (user?.displayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
     }
 
     if (search.trim()) {

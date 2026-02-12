@@ -74,7 +74,19 @@ export default function ThietKeCNTTPage() {
     let list = tasks.filter((t) => includedGroups.includes(t.group || ""));
     if (groupFilter !== "all") list = list.filter((t) => t.group === groupFilter);
     if (role === UserRole.EMPLOYEE) {
-      list = list.filter((t) => t.assignee?.includes((user?.displayName ?? "").split(" ")[0]));
+      const uid = user?.id ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else {
+        const exact = (user?.displayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
     }
     if (search.trim()) {
       const q = normalizeSearch(search.trim());

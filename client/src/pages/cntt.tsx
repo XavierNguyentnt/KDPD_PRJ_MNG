@@ -296,6 +296,7 @@ export default function CNTTPage() {
   } = useTaskListControls({
     tasks,
     role,
+    userId: user?.id,
     userDisplayName: user?.displayName,
     works,
     includedGroups: INCLUDED_GROUPS,
