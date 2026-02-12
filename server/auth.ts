@@ -9,11 +9,14 @@ import { pool } from "./db";
 import * as dbStorage from "./db-storage";
 import type { UserWithRolesAndGroups } from "@shared/schema";
 
-const SESSION_SECRET = process.env.SESSION_SECRET || "kdpd-session-secret-change-in-production";
+const SESSION_SECRET =
+  process.env.SESSION_SECRET || "kdpd-session-secret-change-in-production";
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-const SESSION_SECURE =
-  (process.env.SESSION_SECURE ??
-    (process.env.NODE_ENV === "production" ? "true" : "false")) === "true";
+const SESSION_SECURE: boolean | "auto" =
+  process.env.SESSION_SECURE === "auto"
+    ? "auto"
+    : (process.env.SESSION_SECURE ??
+        (process.env.NODE_ENV === "production" ? "true" : "false")) === "true";
 
 // -----------------------------------------------------------------------------
 // Passport: Local strategy (email + password)
@@ -29,10 +32,16 @@ passport.use(
       try {
         const normalizedEmail = email.toLowerCase().trim();
         const user = await dbStorage.getUserByEmail(email);
-        const userWithRg = user ? await dbStorage.getUserByIdWithRolesAndGroups(user.id) : undefined;
+        const userWithRg = user
+          ? await dbStorage.getUserByIdWithRolesAndGroups(user.id)
+          : undefined;
         if (!user) {
           if (process.env.NODE_ENV === "development") {
-            console.log("[auth] Login failed: no user for email", normalizedEmail, "- run KDPD_DB_seed_admin.sql on Neon?");
+            console.log(
+              "[auth] Login failed: no user for email",
+              normalizedEmail,
+              "- run KDPD_DB_seed_admin.sql on Neon?",
+            );
           }
           return done(null, false, { message: "Invalid email or password" });
         }
@@ -42,14 +51,21 @@ passport.use(
         const hash = user.passwordHash;
         if (!hash) {
           if (process.env.NODE_ENV === "development") {
-            console.log("[auth] Login failed: user has no password set:", normalizedEmail);
+            console.log(
+              "[auth] Login failed: user has no password set:",
+              normalizedEmail,
+            );
           }
           return done(null, false, { message: "Account has no password set" });
         }
         const ok = await bcrypt.compare(password, hash);
         if (!ok) {
           if (process.env.NODE_ENV === "development") {
-            console.log("[auth] Login failed: wrong password for", normalizedEmail, "- admin: Admin01092016@, seed users: 123456");
+            console.log(
+              "[auth] Login failed: wrong password for",
+              normalizedEmail,
+              "- admin: Admin01092016@, seed users: 123456",
+            );
           }
           return done(null, false, { message: "Invalid email or password" });
         }
@@ -61,8 +77,8 @@ passport.use(
         }
         return done(err);
       }
-    }
-  )
+    },
+  ),
 );
 
 passport.serializeUser((user: any, done) => {
@@ -108,7 +124,7 @@ export function initSession(app: Express): void {
         sameSite: "lax",
       },
       name: "kdpd.sid",
-    })
+    }),
   );
   app.use(passport.initialize());
   app.use(passport.session());

@@ -197,18 +197,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       const name = (g.name ?? "").toLowerCase().replace(/\s+/g, "");
       const code = (g.code ?? "").toLowerCase().replace(/\s+/g, "");
       if (target === "thiếtkế" || target === "thietke") {
-        return name.includes("thiếtkế") || code.includes("thietke") || code.includes("thiet-ke");
+        return (
+          name.includes("thiếtkế") ||
+          code.includes("thietke") ||
+          code.includes("thiet-ke")
+        );
       }
       if (target === "cntt") {
-        return name.includes("cntt") || code.includes("cntt");
+        return (
+          name.includes("cntt") ||
+          code.includes("cntt") ||
+          code.includes("it") ||
+          name.includes("kỹthuật") ||
+          name.includes("kythuat")
+        );
       }
       if (target === "biêntập" || target === "bientap") {
-        return name.includes("biêntập") || name.includes("bientap") || code.includes("bientap") || code.includes("bien-tap");
+        return (
+          name.includes("biêntập") ||
+          name.includes("bientap") ||
+          code.includes("bientap") ||
+          code.includes("bien-tap")
+        );
       }
       return name.includes(target) || code.includes(target);
     });
   };
-  const canViewGroupPages = role === UserRole.ADMIN || role === UserRole.MANAGER;
+  const canViewGroupPages =
+    role === UserRole.ADMIN || role === UserRole.MANAGER;
   const canViewThietKe = canViewGroupPages || hasGroup("Thiết kế");
   const canViewCNTT = canViewGroupPages || hasGroup("CNTT");
   const canViewBienTap = canViewGroupPages || hasGroup("Biên tập");
@@ -216,8 +232,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: "/", label: t.dashboard.title, icon: LayoutDashboard },
     { href: "/cv-chung", label: "Công việc chung", icon: Clipboard },
-    ...(canViewBienTap ? [{ href: "/bien-tap", label: "Biên tập", icon: Edit }] : []),
-    ...(canViewThietKe ? [{ href: "/thiet-ke", label: "Thiết kế", icon: Palette }] : []),
+    ...(canViewBienTap
+      ? [{ href: "/bien-tap", label: "Biên tập", icon: Edit }]
+      : []),
+    ...(canViewThietKe
+      ? [{ href: "/thiet-ke", label: "Thiết kế", icon: Palette }]
+      : []),
     ...(canViewCNTT ? [{ href: "/cntt", label: "CNTT", icon: Code }] : []),
     { href: "/team", label: "Team", icon: Users },
     ...(canViewThuKyHopPhan
