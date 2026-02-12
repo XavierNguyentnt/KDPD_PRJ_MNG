@@ -61,12 +61,41 @@ app.use((req, res, next) => {
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
+  function redactSensitive(obj: any): any {
+    const SENSITIVE_KEYS = new Set([
+      "password",
+      "newPassword",
+      "passwordHash",
+      "token",
+      "accessToken",
+      "refreshToken",
+      "session",
+      "sid",
+    ]);
+    if (obj == null) return obj;
+    if (Array.isArray(obj)) return obj.map(redactSensitive);
+    if (typeof obj === "object") {
+      const out: Record<string, any> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        out[k] = SENSITIVE_KEYS.has(k) ? "[redacted]" : redactSensitive(v);
+      }
+      return out;
+    }
+    return obj;
+  }
+
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (capturedJsonResponse && process.env.LOG_RESPONSE_BODY === "true") {
+        try {
+          const sanitized = redactSensitive(capturedJsonResponse);
+          const text = JSON.stringify(sanitized);
+          logLine += ` :: ${text.slice(0, 1000)}`;
+        } catch {
+          // ignore serialization errors
+        }
       }
 
       log(logLine);

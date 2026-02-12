@@ -2,7 +2,12 @@ import type { Request, Response, NextFunction } from "express";
 import type { UserRoleType, EmployeeGroupType } from "@shared/schema";
 import type { UserWithRolesAndGroups } from "@shared/schema";
 
-type ReqUser = UserWithRolesAndGroups | ({ role?: string | null; employeeGroup?: string | null } & { roles?: { code: string; name: string }[]; groups?: { code: string }[] });
+type ReqUser =
+  | UserWithRolesAndGroups
+  | ({ role?: string | null; employeeGroup?: string | null } & {
+      roles?: { code: string; name: string }[];
+      groups?: { code: string }[];
+    });
 
 function userHasRole(u: ReqUser, allowed: UserRoleType[]): boolean {
   const roles = (u as UserWithRolesAndGroups).roles;
@@ -13,7 +18,8 @@ function userHasRole(u: ReqUser, allowed: UserRoleType[]): boolean {
         return true;
       }
       // Compare by code (case-insensitive)
-      const roleCode = (r.code && typeof r.code === "string") ? r.code : String(r.code || "");
+      const roleCode =
+        r.code && typeof r.code === "string" ? r.code : String(r.code || "");
       return allowed.some((a) => {
         if (a == null) return false;
         const aStr = typeof a === "string" ? a : String(a);
@@ -34,7 +40,11 @@ function userHasGroup(u: ReqUser, allowed: EmployeeGroupType[]): boolean {
   return !!leg && allowed.includes(leg as EmployeeGroupType);
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
   if (!req.isAuthenticated || !req.isAuthenticated()) {
     res.status(401).json({ message: "Unauthorized. Please log in." });
     return;
@@ -46,7 +56,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
-export function requireRole(...allowedRoles: UserRoleType[]): (req: Request, res: Response, next: NextFunction) => void {
+export function requireRole(
+  ...allowedRoles: UserRoleType[]
+): (req: Request, res: Response, next: NextFunction) => void {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       res.status(401).json({ message: "Unauthorized. Please log in." });
@@ -63,7 +75,9 @@ export function requireRole(...allowedRoles: UserRoleType[]): (req: Request, res
   };
 }
 
-export function requireEmployeeGroup(...allowedGroups: EmployeeGroupType[]): (req: Request, res: Response, next: NextFunction) => void {
+export function requireEmployeeGroup(
+  ...allowedGroups: EmployeeGroupType[]
+): (req: Request, res: Response, next: NextFunction) => void {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       res.status(401).json({ message: "Unauthorized. Please log in." });
@@ -71,7 +85,8 @@ export function requireEmployeeGroup(...allowedGroups: EmployeeGroupType[]): (re
     }
     if (!userHasGroup(req.user as ReqUser, allowedGroups)) {
       res.status(403).json({
-        message: "Forbidden. Required employee group: " + allowedGroups.join(" or "),
+        message:
+          "Forbidden. Required employee group: " + allowedGroups.join(" or "),
         requiredGroups: allowedGroups,
       });
       return;
@@ -99,19 +114,44 @@ export function requireRoleOrGroup(options: {
       return;
     }
     res.status(403).json({
-      message: "Forbidden. Required: role " + roles.join("/") + " or group " + groups.join("/"),
+      message:
+        "Forbidden. Required: role " +
+        roles.join("/") +
+        " or group " +
+        groups.join("/"),
     });
   };
 }
 
 /** Thiết lập header bảo mật cơ bản cho mọi response. */
-export function securityHeaders(_req: Request, res: Response, next: NextFunction): void {
+export function securityHeaders(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
-  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  res.setHeader(
+    "Permissions-Policy",
+    "geolocation=(), microphone=(), camera=()",
+  );
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
   res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  if (process.env.CSP_ENABLED === "true") {
+    const csp = [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' ws:",
+      "frame-ancestors 'none'",
+    ].join("; ");
+    res.setHeader("Content-Security-Policy", csp);
+  }
   next();
 }
 
@@ -120,7 +160,10 @@ export function rateLimit(options: { windowMs: number; max: number }) {
   const hits = new Map<string, { count: number; resetAt: number }>();
   const { windowMs, max } = options;
   return (req: Request, res: Response, next: NextFunction) => {
-    const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
+    const ip =
+      (req.headers["x-forwarded-for"] as string) ||
+      req.socket.remoteAddress ||
+      "unknown";
     const now = Date.now();
     const entry = hits.get(ip);
     if (!entry || now > entry.resetAt) {
@@ -131,7 +174,9 @@ export function rateLimit(options: { windowMs: number; max: number }) {
     if (entry.count > max) {
       const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
       res.setHeader("Retry-After", String(retryAfter));
-      return res.status(429).json({ message: "Too many requests. Please try again later." });
+      return res
+        .status(429)
+        .json({ message: "Too many requests. Please try again later." });
     }
     next();
   };
