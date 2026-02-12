@@ -57,28 +57,60 @@ async function sendEmail(input: SendEmailInput): Promise<void> {
   await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
 }
 
+type NotificationEmailExtra = {
+  taskTitle?: string | null;
+  taskId?: string | null;
+  group?: string | null;
+  dueDate?: string | null;
+  vote?: string | null;
+  assignerName?: string | null;
+  assignedAt?: string | null;
+  assignmentDueDate?: string | null;
+  assignmentNotes?: string | null;
+  daysRemaining?: number | null;
+  assigneeName?: string | null;
+  completedAt?: string | null;
+  controllerNames?: string[] | null;
+  recipientIsController?: boolean | null;
+};
+
 export async function sendNotificationEmail(
   userId: string,
   notification: Notification,
-  extra?: {
-    dueDate?: string | null;
-    vote?: string | null;
-    taskTitle?: string | null;
-  },
+  extra?: NotificationEmailExtra,
 ): Promise<void> {
   const user = await dbStorage.getUserById(userId);
   if (!user?.email) return;
   const subjectPrefix = process.env.MAIL_SUBJECT_PREFIX || "[KDPD]";
-  const content = buildNotificationContent(
-    notification.type as any,
-    extra?.taskTitle || "",
-    extra?.dueDate || null,
-    extra?.vote || null,
-  );
+  const content = buildNotificationContent(notification.type as any, {
+    taskTitle: extra?.taskTitle || "",
+    taskId: extra?.taskId ?? notification.taskId ?? null,
+    group: extra?.group ?? null,
+    dueDate: extra?.dueDate ?? null,
+    vote: extra?.vote ?? null,
+    assignerName: extra?.assignerName ?? null,
+    assignedAt: extra?.assignedAt ?? null,
+    assignmentDueDate: extra?.assignmentDueDate ?? null,
+    assignmentNotes: extra?.assignmentNotes ?? null,
+    recipientName: user.displayName ?? null,
+    daysRemaining: extra?.daysRemaining ?? null,
+    assigneeName: extra?.assigneeName ?? null,
+    completedAt: extra?.completedAt ?? null,
+    controllerNames: extra?.controllerNames ?? null,
+    recipientIsController: extra?.recipientIsController ?? null,
+  });
   const subject = `${subjectPrefix} ${content.title}`;
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6">
-  <p><strong>${content.title}</strong></p>
-  <p>${content.message}</p>
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;background:#f8fafc;padding:24px 0">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+    <div style="height:4px;background:#0ea5e9"></div>
+    <div style="padding:18px 22px">
+      <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px">${content.title}</div>
+      <div style="font-size:14px;color:#334155;line-height:1.7">${content.message}</div>
+    </div>
+    <div style="border-top:1px solid #e5e7eb;padding:12px 22px;font-size:12px;color:#64748b">
+      Đây là email thông báo tự động từ Hệ thống KDPD.
+    </div>
+  </div>
   </div>`;
   try {
     await sendEmail({ to: user.email, subject, html });

@@ -468,6 +468,19 @@ export async function registerRoutes(
       }
 
       const prevTask = await storage.getTask(id);
+      const prevAssignmentsList = db
+        ? await dbStorage.getTaskAssignmentsByTaskId(id)
+        : [];
+      const prevAssignmentKeys = new Set(
+        prevAssignmentsList.map(
+          (x) => `${x.userId}|${x.stageType}|${x.roundNumber ?? 1}`,
+        ),
+      );
+      const prevCompletedKeys = new Set(
+        prevAssignmentsList
+          .filter((x) => x.completedAt != null)
+          .map((x) => `${x.userId}|${x.stageType}|${x.roundNumber ?? 1}`),
+      );
       const task = await storage.updateTask(id, input);
 
       if (db && assignmentsInput !== undefined) {
@@ -494,20 +507,46 @@ export async function registerRoutes(
                   ? new Date(a.completedAt)
                   : new Date(a.completedAt)
                 : null,
+              assignedBy: (req.user as UserWithRolesAndGroups)?.id ?? undefined,
               status: a.status ?? "not_started",
               progress: a.progress ?? 0,
               notes: a.notes ?? null,
             });
+            const key = `${a.userId}|${a.stageType}|${a.roundNumber ?? 1}`;
             const existing = await dbStorage.getNotificationByTaskType(
               a.userId,
               id,
               "task_assigned",
             );
-            if (!existing) {
-              const content = buildNotificationContent(
-                "task_assigned",
-                task.title ?? "",
+            if (!prevAssignmentKeys.has(key) && !existing) {
+              const controllerIdsInput = assignmentsInput
+                .filter((x) => x.stageType === "kiem_soat")
+                .map((x) => x.userId);
+              const controllerIdsDb = (
+                await dbStorage.getTaskAssignmentsByTaskId(id)
+              )
+                .filter((x) => x.stageType === "kiem_soat")
+                .map((x) => x.userId);
+              const controllerIds = Array.from(
+                new Set([...controllerIdsDb, ...controllerIdsInput]),
               );
+              const controllerUsers = controllerIds.length
+                ? await dbStorage.getUsersByIds(controllerIds)
+                : [];
+              const controllerNames = controllerUsers
+                .map((u) => u.displayName)
+                .filter(Boolean) as string[];
+              const content = buildNotificationContent("task_assigned", {
+                taskTitle: task.title ?? "",
+                taskId: id,
+                group: task.group ?? null,
+                assignerName:
+                  (req.user as UserWithRolesAndGroups)?.displayName ?? null,
+                assignedAt: new Date().toISOString(),
+                assignmentDueDate: a.dueDate ?? null,
+                assignmentNotes: a.notes ?? null,
+                controllerNames,
+              });
               const created = await dbStorage.createNotification({
                 userId: a.userId,
                 type: "task_assigned",
@@ -521,11 +560,106 @@ export async function registerRoutes(
               });
               await sendNotificationEmail(a.userId, created, {
                 taskTitle: task.title ?? "",
+                taskId: id,
+                group: task.group ?? null,
+                assignerName:
+                  (req.user as UserWithRolesAndGroups)?.displayName ?? null,
+                assignedAt: new Date().toISOString(),
+                assignmentDueDate: a.dueDate ?? null,
+                assignmentNotes: a.notes ?? null,
+                controllerNames,
               });
+            }
+
+            if (a.completedAt && !prevCompletedKeys.has(key)) {
+              const controllers =
+                await dbStorage.getTaskAssignmentsByTaskId(id);
+              const controllerIds = Array.from(
+                new Set(
+                  controllers
+                    .filter((c) => c.stageType === "kiem_soat")
+                    .map((c) => c.userId),
+                ),
+              ).filter((uid) => uid !== a.userId);
+              const assigneeUser = await dbStorage.getUserById(a.userId);
+              const assigneeName = assigneeUser?.displayName ?? null;
+              const assignerId =
+                assignment.assignedBy &&
+                typeof assignment.assignedBy === "string"
+                  ? (assignment.assignedBy as string)
+                  : null;
+              const assignerUser = assignerId
+                ? await dbStorage.getUserById(assignerId)
+                : undefined;
+              const assignerName = assignerUser?.displayName ?? null;
+              const recipientIds = Array.from(
+                new Set([
+                  ...controllerIds,
+                  ...(assignerId && assignerId !== a.userId
+                    ? [assignerId]
+                    : []),
+                ]),
+              );
+              for (const uid of recipientIds) {
+                const recipientIsController = controllerIds.includes(uid);
+                const existingCompleted =
+                  await dbStorage.getNotificationByTaskType(
+                    uid,
+                    id,
+                    "task_completed",
+                  );
+                if (!existingCompleted) {
+                  const content = buildNotificationContent("task_completed", {
+                    taskTitle: task.title ?? "",
+                    taskId: id,
+                    group: task.group ?? null,
+                    assigneeName,
+                    assignerName,
+                    completedAt:
+                      typeof a.completedAt === "string"
+                        ? a.completedAt
+                        : ((a.completedAt as Date)?.toISOString() ?? null),
+                    recipientIsController,
+                  });
+                  const created = await dbStorage.createNotification({
+                    userId: uid,
+                    type: "task_completed",
+                    taskId: id,
+                    taskAssignmentId: assignment.id,
+                    title: content.title,
+                    message: content.message,
+                    isRead: false,
+                    createdAt: new Date(),
+                    readAt: null,
+                  });
+                  await sendNotificationEmail(uid, created, {
+                    taskTitle: task.title ?? "",
+                    taskId: id,
+                    group: task.group ?? null,
+                    assigneeName,
+                    assignerName,
+                    completedAt:
+                      typeof a.completedAt === "string"
+                        ? a.completedAt
+                        : ((a.completedAt as Date)?.toISOString() ?? null),
+                    recipientIsController,
+                  });
+                }
+              }
             }
           }
         }
-        if ((prevTask?.vote ?? null) !== (task.vote ?? null) && task.vote) {
+        {
+          const prevVote =
+            (prevTask?.vote ?? null) != null
+              ? String(prevTask?.vote).trim().toLowerCase()
+              : null;
+          const nextVote =
+            (task.vote ?? null) != null
+              ? String(task.vote).trim().toLowerCase()
+              : null;
+          const voteChanged = prevVote !== nextVote && nextVote != null;
+          if (voteChanged) {
           const allAssignments = await dbStorage.getTaskAssignmentsByTaskId(id);
           for (const a of allAssignments) {
             if (a.stageType === "kiem_soat") continue;
@@ -535,12 +669,12 @@ export async function registerRoutes(
               "task_reviewed",
             );
             if (!existing) {
-              const content = buildNotificationContent(
-                "task_reviewed",
-                task.title ?? "",
-                null,
-                task.vote ?? null,
-              );
+              const content = buildNotificationContent("task_reviewed", {
+                taskTitle: task.title ?? "",
+                taskId: id,
+                group: task.group ?? null,
+                vote: task.vote ?? null,
+              });
               const created = await dbStorage.createNotification({
                 userId: a.userId,
                 type: "task_reviewed",
@@ -554,9 +688,12 @@ export async function registerRoutes(
               });
               await sendNotificationEmail(a.userId, created, {
                 taskTitle: task.title ?? "",
+                taskId: id,
+                group: task.group ?? null,
                 vote: task.vote ?? null,
               });
             }
+          }
           }
         }
       }
@@ -666,6 +803,7 @@ export async function registerRoutes(
                 ? new Date(a.completedAt)
                 : new Date(a.completedAt)
               : null,
+            assignedBy: (req.user as UserWithRolesAndGroups)?.id ?? undefined,
             status: a.status ?? "not_started",
             progress: a.progress ?? 0,
             notes: a.notes ?? null,
@@ -676,10 +814,34 @@ export async function registerRoutes(
             "task_assigned",
           );
           if (!existing) {
-            const content = buildNotificationContent(
-              "task_assigned",
-              task.title ?? "",
+            const controllerIdsInput = assignmentsInput
+              .filter((x) => x.stageType === "kiem_soat")
+              .map((x) => x.userId);
+            const controllerIdsDb = (
+              await dbStorage.getTaskAssignmentsByTaskId(task.id)
+            )
+              .filter((x) => x.stageType === "kiem_soat")
+              .map((x) => x.userId);
+            const controllerIds = Array.from(
+              new Set([...controllerIdsDb, ...controllerIdsInput]),
             );
+            const controllerUsers = controllerIds.length
+              ? await dbStorage.getUsersByIds(controllerIds)
+              : [];
+            const controllerNames = controllerUsers
+              .map((u) => u.displayName)
+              .filter(Boolean) as string[];
+            const content = buildNotificationContent("task_assigned", {
+              taskTitle: task.title ?? "",
+              taskId: task.id,
+              group: task.group ?? null,
+              assignerName:
+                (req.user as UserWithRolesAndGroups)?.displayName ?? null,
+              assignedAt: new Date().toISOString(),
+              assignmentDueDate: a.dueDate ?? null,
+              assignmentNotes: a.notes ?? null,
+              controllerNames,
+            });
             const created = await dbStorage.createNotification({
               userId: a.userId,
               type: "task_assigned",
@@ -693,6 +855,14 @@ export async function registerRoutes(
             });
             await sendNotificationEmail(a.userId, created, {
               taskTitle: task.title ?? "",
+              taskId: task.id,
+              group: task.group ?? null,
+              assignerName:
+                (req.user as UserWithRolesAndGroups)?.displayName ?? null,
+              assignedAt: new Date().toISOString(),
+              assignmentDueDate: a.dueDate ?? null,
+              assignmentNotes: a.notes ?? null,
+              controllerNames,
             });
           }
         }

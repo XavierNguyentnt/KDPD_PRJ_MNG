@@ -306,6 +306,9 @@ export const taskAssignments = pgTable("task_assignments", {
   receivedAt: date("received_at"),
   dueDate: date("due_date"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  assignedBy: uuid("assigned_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
   status: text("status").notNull().default("not_started"),
   progress: integer("progress").notNull().default(0),
   notes: text("notes"),

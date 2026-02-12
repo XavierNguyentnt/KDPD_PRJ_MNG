@@ -2,8 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import type { Notification } from "@shared/schema";
 
-export function useNotifications(options?: { unreadOnly?: boolean }) {
+export function useNotifications(options?: { unreadOnly?: boolean; refetchInterval?: number }) {
   const unreadOnly = options?.unreadOnly ?? false;
+  const refetchInterval = options?.refetchInterval ?? 15000;
   return useQuery({
     queryKey: ["notifications", unreadOnly],
     queryFn: async () => {
@@ -12,6 +13,7 @@ export function useNotifications(options?: { unreadOnly?: boolean }) {
       if (!res.ok) throw new Error("Failed to fetch notifications");
       return res.json() as Promise<Notification[]>;
     },
+    refetchInterval,
   });
 }
 

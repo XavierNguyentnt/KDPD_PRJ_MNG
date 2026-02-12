@@ -92,6 +92,7 @@ import {
 } from "@/components/ui/pagination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -115,6 +116,11 @@ import {
   List,
   Eye,
   X,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  BarChart3,
+  AlertTriangle,
 } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { WorksImport } from "@/components/works-import";
@@ -488,6 +494,21 @@ function parseDateOnly(value: string | Date | null | undefined): Date | null {
   return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
 
+function getTcDueDate(c: TranslationContract): Date | null {
+  return parseDateOnly(c.extensionEndDate ?? c.endDate);
+}
+
+function getPcDueDate(c: ProofreadingContract): Date | null {
+  return parseDateOnly(c.endDate);
+}
+
+function daysUntil(from: Date, to: Date): number {
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.ceil((end.getTime() - start.getTime()) / MS_PER_DAY);
+}
+
 function formatDurationMonths(
   startDate: string | Date | null | undefined,
   endDate: string | Date | null | undefined,
@@ -749,6 +770,12 @@ export default function ThuKyHopPhanPage() {
   const [worksPage, setWorksPage] = useState(1);
   const [tcPage, setTcPage] = useState(1);
   const [pcPage, setPcPage] = useState(1);
+  const [tcQuickFilter, setTcQuickFilter] = useState<
+    "all" | "valid" | "completed" | "expired" | "expiring"
+  >("all");
+  const [pcQuickFilter, setPcQuickFilter] = useState<
+    "all" | "valid" | "completed" | "expired" | "expiring"
+  >("all");
   const [tasksSearch, setTasksSearch] = useState("");
   const [taskFilters, setTaskFilters] = useState<TaskFilterState>(
     getDefaultTaskFilters,
@@ -1214,6 +1241,79 @@ export default function ThuKyHopPhanPage() {
     getTranslatorName,
   ]);
 
+  const tcStats = useMemo(() => {
+    const today = new Date();
+    const total = filteredTc.length;
+    const completed = filteredTc.filter((c) => !!c.actualCompletionDate).length;
+    const valid = filteredTc.filter((c) => {
+      if (c.actualCompletionDate) return false;
+      const due = getTcDueDate(c);
+      if (!due) return true;
+      return due >= today;
+    }).length;
+    const expired = filteredTc.filter((c) => {
+      if (c.actualCompletionDate) return false;
+      const due = getTcDueDate(c);
+      if (!due) return false;
+      return due < today;
+    }).length;
+    const expiring = filteredTc.filter((c) => {
+      if (c.actualCompletionDate) return false;
+      const due = getTcDueDate(c);
+      if (!due) return false;
+      const d = daysUntil(today, due);
+      return d >= 1 && d <= 90;
+    }).length;
+    return { total, valid, completed, expired, expiring };
+  }, [filteredTc]);
+
+  const applyTcQuickFilter = useMemo(() => {
+    return (list: TranslationContract[], key: typeof tcQuickFilter) => {
+      const today = new Date();
+      if (key === "all") return list;
+      if (key === "completed")
+        return list.filter((c) => !!c.actualCompletionDate);
+      if (key === "valid")
+        return list.filter((c) => {
+          if (c.actualCompletionDate) return false;
+          const due = getTcDueDate(c);
+          if (!due) return true;
+          return due >= today;
+        });
+      if (key === "expired")
+        return list.filter((c) => {
+          if (c.actualCompletionDate) return false;
+          const due = getTcDueDate(c);
+          if (!due) return false;
+          return due < today;
+        });
+      if (key === "expiring")
+        return list.filter((c) => {
+          if (c.actualCompletionDate) return false;
+          const due = getTcDueDate(c);
+          if (!due) return false;
+          const d = daysUntil(today, due);
+          return d >= 1 && d <= 90;
+        });
+      return list;
+    };
+  }, []);
+
+  useEffect(() => {
+    setTcPage(1);
+  }, [
+    tcQuickFilter,
+    tcComponentFilter,
+    tcStageFilter,
+    tcSearch,
+    tcTranslatorSearch,
+  ]);
+
+  const tcDisplayList = useMemo(
+    () => applyTcQuickFilter(filteredTc, tcQuickFilter),
+    [filteredTc, tcQuickFilter, applyTcQuickFilter],
+  );
+
   // Filter and sort ALL data from DB (before pagination)
   // Order: Filter -> Sort -> Paginate (in paginatedPc)
   const filteredPc = useMemo(() => {
@@ -1255,6 +1355,73 @@ export default function ThuKyHopPhanPage() {
     worksScoped,
     componentsList,
   ]);
+
+  const pcStats = useMemo(() => {
+    const today = new Date();
+    const total = filteredPc.length;
+    const completed = filteredPc.filter((c) => !!c.actualCompletionDate).length;
+    const valid = filteredPc.filter((c) => {
+      if (c.actualCompletionDate) return false;
+      const due = getPcDueDate(c);
+      if (!due) return true;
+      return due >= today;
+    }).length;
+    const expired = filteredPc.filter((c) => {
+      if (c.actualCompletionDate) return false;
+      const due = getPcDueDate(c);
+      if (!due) return false;
+      return due < today;
+    }).length;
+    const expiring = filteredPc.filter((c) => {
+      if (c.actualCompletionDate) return false;
+      const due = getPcDueDate(c);
+      if (!due) return false;
+      const d = daysUntil(today, due);
+      return d >= 1 && d <= 90;
+    }).length;
+    return { total, valid, completed, expired, expiring };
+  }, [filteredPc]);
+
+  const applyPcQuickFilter = useMemo(() => {
+    return (list: ProofreadingContract[], key: typeof pcQuickFilter) => {
+      const today = new Date();
+      if (key === "all") return list;
+      if (key === "completed")
+        return list.filter((c) => !!c.actualCompletionDate);
+      if (key === "valid")
+        return list.filter((c) => {
+          if (c.actualCompletionDate) return false;
+          const due = getPcDueDate(c);
+          if (!due) return true;
+          return due >= today;
+        });
+      if (key === "expired")
+        return list.filter((c) => {
+          if (c.actualCompletionDate) return false;
+          const due = getPcDueDate(c);
+          if (!due) return false;
+          return due < today;
+        });
+      if (key === "expiring")
+        return list.filter((c) => {
+          if (c.actualCompletionDate) return false;
+          const due = getPcDueDate(c);
+          if (!due) return false;
+          const d = daysUntil(today, due);
+          return d >= 1 && d <= 90;
+        });
+      return list;
+    };
+  }, []);
+
+  useEffect(() => {
+    setPcPage(1);
+  }, [pcQuickFilter, pcComponentFilter, pcStageFilter, pcSearch]);
+
+  const pcDisplayList = useMemo(
+    () => applyPcQuickFilter(filteredPc, pcQuickFilter),
+    [filteredPc, pcQuickFilter, applyPcQuickFilter],
+  );
 
   const proofreadingCompletionByTcId = useMemo(() => {
     const map = new Map<string, string>();
@@ -1356,10 +1523,9 @@ export default function ThuKyHopPhanPage() {
 
   const paginatedTc = useMemo(() => {
     const start = (tcPage - 1) * PAGE_SIZE;
-    // filteredTc is already sorted, we just slice the correct page
-    return filteredTc.slice(start, start + PAGE_SIZE);
-  }, [filteredTc, tcPage]);
-  const totalTcPages = Math.max(1, Math.ceil(filteredTc.length / PAGE_SIZE));
+    return tcDisplayList.slice(start, start + PAGE_SIZE);
+  }, [tcDisplayList, tcPage]);
+  const totalTcPages = Math.max(1, Math.ceil(tcDisplayList.length / PAGE_SIZE));
 
   const financeQueries = useQueries({
     queries: paginatedTc.map((c) => ({
@@ -1426,10 +1592,9 @@ export default function ThuKyHopPhanPage() {
   }, [paymentsQueries, paginatedTc]);
   const paginatedPc = useMemo(() => {
     const start = (pcPage - 1) * PAGE_SIZE;
-    // filteredPc is already sorted, we just slice the correct page
-    return filteredPc.slice(start, start + PAGE_SIZE);
-  }, [filteredPc, pcPage]);
-  const totalPcPages = Math.max(1, Math.ceil(filteredPc.length / PAGE_SIZE));
+    return pcDisplayList.slice(start, start + PAGE_SIZE);
+  }, [pcDisplayList, pcPage]);
+  const totalPcPages = Math.max(1, Math.ceil(pcDisplayList.length / PAGE_SIZE));
 
   const pcFinanceQueries = useQueries({
     queries: paginatedPc.map((c) => ({
@@ -3166,195 +3331,191 @@ export default function ThuKyHopPhanPage() {
             ) : (
               <>
                 {tcViewMode === "table" ? (
-                  <div className="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm sticky top-0 z-20">
-                          <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] min-w-[80px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
-                            <Checkbox
-                              checked={
-                                allSelectedOnPage
-                                  ? true
-                                  : someSelectedOnPage
-                                    ? "indeterminate"
-                                    : false
+                  <Table
+                    className="border-collapse"
+                    containerClassName="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
+                    <TableHeader className="sticky top-0 z-20">
+                      <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm">
+                        <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] min-w-[80px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
+                          <Checkbox
+                            checked={
+                              allSelectedOnPage
+                                ? true
+                                : someSelectedOnPage
+                                  ? "indeterminate"
+                                  : false
+                            }
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedWorkIds((prev) => {
+                                  const next = new Set(prev);
+                                  paginatedWorks.forEach((w) => next.add(w.id));
+                                  return Array.from(next);
+                                });
+                              } else {
+                                setSelectedWorkIds((prev) =>
+                                  prev.filter(
+                                    (id) => !paginatedWorkIds.has(id),
+                                  ),
+                                );
                               }
-                              onCheckedChange={(checked) => {
-                                if (checked) {
+                            }}
+                            aria-label="Chọn tất cả"
+                          />
+                        </TableHead>
+                        <SortableHead
+                          label="Hợp phần"
+                          column="component"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] min-w-[140px]"
+                        />
+                        <SortableHead
+                          label="Tiêu đề (VI)"
+                          column="titleVi"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[25%] min-w-[200px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                          style={{ left: 80 }}
+                        />
+                        <SortableHead
+                          label="Tiêu đề Hán Nôm"
+                          column="titleHannom"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px] min-w-[140px]"
+                        />
+                        <SortableHead
+                          label="Giai đoạn"
+                          column="stage"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                        />
+                        <SortableHead
+                          label="Mã tài liệu"
+                          column="documentCode"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                        />
+                        <SortableHead
+                          label="Số chữ gốc"
+                          column="baseWordCount"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                          className="text-right"
+                        />
+                        <SortableHead
+                          label="Số trang gốc"
+                          column="basePageCount"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                          className="text-right"
+                        />
+                        <SortableHead
+                          label="Hệ số ước tính"
+                          column="estimateFactor"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                          className="text-right"
+                        />
+                        <SortableHead
+                          label="Số chữ ước tính"
+                          column="estimateWordCount"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                          className="text-right"
+                        />
+                        <SortableHead
+                          label="Số trang ước tính"
+                          column="estimatePageCount"
+                          sortColumns={worksSortColumns}
+                          onSort={handleWorksSort}
+                          className="text-right"
+                        />
+                        <TableHead className="max-w-[120px] truncate">
+                          Ghi chú
+                        </TableHead>
+                        <TableHead className="w-[120px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedWorks.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={13}
+                            className="text-center text-muted-foreground py-8">
+                            Chưa có tác phẩm nào.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        paginatedWorks.map((w) => (
+                          <TableRow key={w.id}>
+                            <TableCell className="p-4 align-middle sticky left-0 z-10 bg-card border-r border-border/50 min-w-[80px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
+                              <Checkbox
+                                checked={selectedWorkSet.has(w.id)}
+                                onCheckedChange={(checked) => {
                                   setSelectedWorkIds((prev) => {
                                     const next = new Set(prev);
-                                    paginatedWorks.forEach((w) =>
-                                      next.add(w.id),
-                                    );
+                                    if (checked) next.add(w.id);
+                                    else next.delete(w.id);
                                     return Array.from(next);
                                   });
-                                } else {
-                                  setSelectedWorkIds((prev) =>
-                                    prev.filter(
-                                      (id) => !paginatedWorkIds.has(id),
-                                    ),
-                                  );
-                                }
-                              }}
-                              aria-label="Chọn tất cả"
-                            />
-                          </TableHead>
-                          <SortableHead
-                            label="Hợp phần"
-                            column="component"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] min-w-[140px]"
-                          />
-                          <SortableHead
-                            label="Tiêu đề (VI)"
-                            column="titleVi"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[25%] min-w-[200px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                            style={{ left: 80 }}
-                          />
-                          <SortableHead
-                            label="Tiêu đề Hán Nôm"
-                            column="titleHannom"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px] min-w-[140px]"
-                          />
-                          <SortableHead
-                            label="Giai đoạn"
-                            column="stage"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                          />
-                          <SortableHead
-                            label="Mã tài liệu"
-                            column="documentCode"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                          />
-                          <SortableHead
-                            label="Số chữ gốc"
-                            column="baseWordCount"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                            className="text-right"
-                          />
-                          <SortableHead
-                            label="Số trang gốc"
-                            column="basePageCount"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                            className="text-right"
-                          />
-                          <SortableHead
-                            label="Hệ số ước tính"
-                            column="estimateFactor"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                            className="text-right"
-                          />
-                          <SortableHead
-                            label="Số chữ ước tính"
-                            column="estimateWordCount"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                            className="text-right"
-                          />
-                          <SortableHead
-                            label="Số trang ước tính"
-                            column="estimatePageCount"
-                            sortColumns={worksSortColumns}
-                            onSort={handleWorksSort}
-                            className="text-right"
-                          />
-                          <TableHead className="max-w-[120px] truncate">
-                            Ghi chú
-                          </TableHead>
-                          <TableHead className="w-[120px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedWorks.length === 0 ? (
-                          <TableRow>
+                                }}
+                                aria-label={`Chọn tác phẩm ${
+                                  w.titleVi ?? w.id
+                                }`}
+                              />
+                            </TableCell>
+                            <TableCell className="p-4 align-middle">
+                              {getComponentName(w.componentId)}
+                            </TableCell>
                             <TableCell
-                              colSpan={13}
-                              className="text-center text-muted-foreground py-8">
-                              Chưa có tác phẩm nào.
+                              className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[200px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                              style={{ left: 80 }}>
+                              {w.titleVi ?? "—"}
+                            </TableCell>
+                            <TableCell className="p-4 align-middle">
+                              {w.titleHannom ?? "—"}
+                            </TableCell>
+                            <TableCell>{formatStageDisplay(w.stage)}</TableCell>
+                            <TableCell>{w.documentCode ?? "—"}</TableCell>
+                            <TableCell className="text-right">
+                              {formatNumberAccounting(w.baseWordCount)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumberAccounting(w.basePageCount)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {w.estimateFactor != null
+                                ? formatNumberAccounting(w.estimateFactor, 1)
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumberAccounting(w.estimateWordCount)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumberAccounting(w.estimatePageCount)}
+                            </TableCell>
+                            <TableCell
+                              className="max-w-[120px] truncate"
+                              title={w.note ?? undefined}>
+                              {w.note ?? "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  setWorkDialog({ open: true, work: w })
+                                }>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          paginatedWorks.map((w) => (
-                            <TableRow key={w.id}>
-                              <TableCell className="p-4 align-middle sticky left-0 z-10 bg-card border-r border-border/50 min-w-[80px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
-                                <Checkbox
-                                  checked={selectedWorkSet.has(w.id)}
-                                  onCheckedChange={(checked) => {
-                                    setSelectedWorkIds((prev) => {
-                                      const next = new Set(prev);
-                                      if (checked) next.add(w.id);
-                                      else next.delete(w.id);
-                                      return Array.from(next);
-                                    });
-                                  }}
-                                  aria-label={`Chọn tác phẩm ${
-                                    w.titleVi ?? w.id
-                                  }`}
-                                />
-                              </TableCell>
-                              <TableCell className="p-4 align-middle">
-                                {getComponentName(w.componentId)}
-                              </TableCell>
-                              <TableCell
-                                className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[200px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                                style={{ left: 80 }}>
-                                {w.titleVi ?? "—"}
-                              </TableCell>
-                              <TableCell className="p-4 align-middle">
-                                {w.titleHannom ?? "—"}
-                              </TableCell>
-                              <TableCell>
-                                {formatStageDisplay(w.stage)}
-                              </TableCell>
-                              <TableCell>{w.documentCode ?? "—"}</TableCell>
-                              <TableCell className="text-right">
-                                {formatNumberAccounting(w.baseWordCount)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatNumberAccounting(w.basePageCount)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {w.estimateFactor != null
-                                  ? formatNumberAccounting(w.estimateFactor, 1)
-                                  : "—"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatNumberAccounting(w.estimateWordCount)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatNumberAccounting(w.estimatePageCount)}
-                              </TableCell>
-                              <TableCell
-                                className="max-w-[120px] truncate"
-                                title={w.note ?? undefined}>
-                                {w.note ?? "—"}
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() =>
-                                    setWorkDialog({ open: true, work: w })
-                                  }>
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 ) : (
                   <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {paginatedTc.length === 0 ? (
@@ -3563,6 +3724,109 @@ export default function ThuKyHopPhanPage() {
 
         {/* Tab: Hợp đồng dịch thuật */}
         <TabsContent value="translation" className="mt-6">
+          <div className="mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <Card
+                onClick={() =>
+                  setTcQuickFilter((k) => (k === "all" ? "all" : "all"))
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${tcQuickFilter === "all" ? "ring-2 ring-primary" : ""} bg-white dark:bg-slate-900/30 text-slate-700 dark:text-slate-100`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-200/60 dark:bg-slate-700/40">
+                    <BarChart3 className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Tổng số HĐ
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {tcStats.total}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                onClick={() =>
+                  setTcQuickFilter((k) => (k === "valid" ? "all" : "valid"))
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${tcQuickFilter === "valid" ? "ring-2 ring-primary" : ""} bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-200/60 dark:bg-blue-700/40">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Còn hạn
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {tcStats.valid}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                onClick={() =>
+                  setTcQuickFilter((k) =>
+                    k === "completed" ? "all" : "completed",
+                  )
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${tcQuickFilter === "completed" ? "ring-2 ring-primary" : ""} bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-200/60 dark:bg-emerald-700/40">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Đã hoàn thành
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {tcStats.completed}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                onClick={() =>
+                  setTcQuickFilter((k) => (k === "expired" ? "all" : "expired"))
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${tcQuickFilter === "expired" ? "ring-2 ring-primary" : ""} bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-200/60 dark:bg-orange-700/40">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Hết hạn/ quá hạn
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {tcStats.expired}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                onClick={() =>
+                  setTcQuickFilter((k) =>
+                    k === "expiring" ? "all" : "expiring",
+                  )
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${tcQuickFilter === "expiring" ? "ring-2 ring-primary" : ""} bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-200/60 dark:bg-amber-700/40">
+                    <AlertCircle className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Sắp hết hạn (1–90 ngày)
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {tcStats.expiring}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
           <div className="rounded-xl border bg-card overflow-hidden">
             <div className="p-4 border-b flex flex-col gap-4 bg-muted/20">
               <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
@@ -3577,7 +3841,7 @@ export default function ThuKyHopPhanPage() {
                     />
                   </div>
                   <Badge variant="secondary">
-                    {filteredTc.length} hợp đồng
+                    {tcDisplayList.length} hợp đồng
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
@@ -3601,9 +3865,9 @@ export default function ThuKyHopPhanPage() {
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      handleExportTranslationContracts(filteredTc, toast)
+                      handleExportTranslationContracts(tcDisplayList, toast)
                     }
-                    disabled={filteredTc.length === 0}>
+                    disabled={tcDisplayList.length === 0}>
                     <FileText className="w-4 h-4 mr-2" />
                     Xuất Excel
                   </Button>
@@ -3677,6 +3941,7 @@ export default function ThuKyHopPhanPage() {
                   </Select>
                 </div>
               </div>
+              {/* moved stats outside container */}
             </div>
             {tcLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -3684,476 +3949,465 @@ export default function ThuKyHopPhanPage() {
               </div>
             ) : (
               <>
-                {pcViewMode === "table" ? (
-                  <div className="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm sticky top-0 z-20">
-                          <SortableHead
-                            label="Số HĐ"
-                            column="contractNumber"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px] min-w-[120px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                          />
-                          <SortableHead
-                            label="Hợp phần"
-                            column="component"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] min-w-[140px]"
-                          />
-                          <TableHead
-                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[220px] min-w-[220px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                            style={{ left: 120 }}>
-                            Tác phẩm
-                          </TableHead>
-                          <SortableHead
-                            label="Đơn giá"
-                            column="unitPrice"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className="text-right"
-                          />
-                          <SortableHead
-                            label="Kinh phí viết bài tổng quan"
-                            column="overviewValue"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className={
-                              tcColumnVis.overviewValue
-                                ? "text-right"
-                                : "hidden"
-                            }
-                          />
-                          <SortableHead
-                            label="Kinh phí dịch thuật"
-                            column="translationValue"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className={
-                              tcColumnVis.translationValue
-                                ? "text-right"
-                                : "hidden"
-                            }
-                          />
-                          <SortableHead
-                            label="Giá trị HĐ"
-                            column="contractValue"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className={
-                              tcColumnVis.contractValue
-                                ? "text-right"
-                                : "hidden"
-                            }
-                          />
-                          <TableHead>Thời gian (tháng)</TableHead>
-                          <SortableHead
-                            label="Bắt đầu"
-                            column="startDate"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                          />
-                          <SortableHead
-                            label="Kết thúc"
-                            column="endDate"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                          />
-                          <SortableHead
-                            label="Gia hạn từ"
-                            column="extensionStartDate"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                          />
-                          <SortableHead
-                            label="Gia hạn đến"
-                            column="extensionEndDate"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                          />
-                          <SortableHead
-                            label="Hoàn thành Thực tế"
-                            column="actualCompletionDate"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                          />
-                          <SortableHead
-                            label="Số chữ Thực tế"
-                            column="actualWordCount"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className="text-right"
-                          />
-                          <SortableHead
-                            label="Số trang Thực tế"
-                            column="actualPageCount"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className="text-right"
-                          />
-                          <SortableHead
-                            label="Tỷ lệ hoàn thành"
-                            column="completionRate"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className="text-right"
-                          />
-                          <SortableHead
-                            label="Giá trị quyết toán"
-                            column="settlementValue"
-                            sortColumns={tcSortColumns}
-                            onSort={handleTcSort}
-                            className={
-                              tcColumnVis.settlementValue
-                                ? "text-right"
-                                : "hidden"
-                            }
-                          />
-                          <TableHead className="text-right">
-                            Chênh lệch so với GTHĐ
-                          </TableHead>
-                          <TableHead>Đã Tạm ứng đợt 1</TableHead>
-                          <TableHead>Đã Tạm ứng đợt 2</TableHead>
-                          <TableHead>Đã Quyết toán</TableHead>
-                          <TableHead
-                            className={
-                              tcColumnVis.outstanding ? undefined : "hidden"
-                            }>
-                            Công nợ
-                          </TableHead>
-                          <TableHead>Tiến độ</TableHead>
-                          <TableHead className="max-w-[100px] truncate">
-                            Ghi chú
-                          </TableHead>
-                          <TableHead className="w-[120px]"></TableHead>
+                {tcViewMode === "table" ? (
+                  <Table
+                    className="border-collapse"
+                    containerClassName="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
+                    <TableHeader className="sticky top-0 z-20">
+                      <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm">
+                        <SortableHead
+                          label="Số HĐ"
+                          column="contractNumber"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px] min-w-[120px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                        />
+                        <SortableHead
+                          label="Hợp phần"
+                          column="component"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] min-w-[140px]"
+                        />
+                        <TableHead
+                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px] min-w-[180px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                          style={{ left: 120 }}>
+                          Tác phẩm
+                        </TableHead>
+                        <SortableHead
+                          label="Đơn giá"
+                          column="unitPrice"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className="text-right"
+                        />
+                        <SortableHead
+                          label="Kinh phí viết bài tổng quan"
+                          column="overviewValue"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className={
+                            tcColumnVis.overviewValue ? "text-right" : "hidden"
+                          }
+                        />
+                        <SortableHead
+                          label="Kinh phí dịch thuật"
+                          column="translationValue"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className={
+                            tcColumnVis.translationValue
+                              ? "text-right"
+                              : "hidden"
+                          }
+                        />
+                        <SortableHead
+                          label="Giá trị HĐ"
+                          column="contractValue"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className={
+                            tcColumnVis.contractValue ? "text-right" : "hidden"
+                          }
+                        />
+                        <TableHead>Thời gian (tháng)</TableHead>
+                        <SortableHead
+                          label="Bắt đầu"
+                          column="startDate"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                        />
+                        <SortableHead
+                          label="Kết thúc"
+                          column="endDate"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                        />
+                        <SortableHead
+                          label="Gia hạn từ"
+                          column="extensionStartDate"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                        />
+                        <SortableHead
+                          label="Gia hạn đến"
+                          column="extensionEndDate"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                        />
+                        <SortableHead
+                          label="Hoàn thành Thực tế"
+                          column="actualCompletionDate"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                        />
+                        <SortableHead
+                          label="Số chữ Thực tế"
+                          column="actualWordCount"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className="text-right"
+                        />
+                        <SortableHead
+                          label="Số trang Thực tế"
+                          column="actualPageCount"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className="text-right"
+                        />
+                        <SortableHead
+                          label="Tỷ lệ hoàn thành"
+                          column="completionRate"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className="text-right"
+                        />
+                        <SortableHead
+                          label="Giá trị quyết toán"
+                          column="settlementValue"
+                          sortColumns={tcSortColumns}
+                          onSort={handleTcSort}
+                          className={
+                            tcColumnVis.settlementValue
+                              ? "text-right"
+                              : "hidden"
+                          }
+                        />
+                        <TableHead className="text-right">
+                          Chênh lệch so với GTHĐ
+                        </TableHead>
+                        <TableHead>Đã Tạm ứng đợt 1</TableHead>
+                        <TableHead>Đã Tạm ứng đợt 2</TableHead>
+                        <TableHead>Đã Quyết toán</TableHead>
+                        <TableHead
+                          className={
+                            tcColumnVis.outstanding ? undefined : "hidden"
+                          }>
+                          Công nợ
+                        </TableHead>
+                        <TableHead>Tiến độ</TableHead>
+                        <TableHead className="w-[260px] min-w-[240px]">
+                          Ghi chú
+                        </TableHead>
+                        <TableHead className="w-[120px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedTc.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={20}
+                            className="text-center text-muted-foreground py-8">
+                            Chưa có hợp đồng dịch thuật nào.
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedTc.length === 0 ? (
-                          <TableRow>
-                            <TableCell
-                              colSpan={20}
-                              className="text-center text-muted-foreground py-8">
-                              Chưa có hợp đồng dịch thuật nào.
+                      ) : (
+                        paginatedTc.map((c) => (
+                          <TableRow key={c.id}>
+                            <TableCell className="p-4 align-middle sticky left-0 z-10 bg-card border-r border-border/50 font-medium min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
+                              {c.contractNumber ?? "—"}
                             </TableCell>
-                          </TableRow>
-                        ) : (
-                          paginatedTc.map((c) => (
-                            <TableRow key={c.id}>
-                              <TableCell className="p-4 align-middle sticky left-0 z-10 bg-card border-r border-border/50 font-medium min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
-                                {c.contractNumber ?? "—"}
-                              </TableCell>
-                              <TableCell className="p-4 align-middle">
-                                {getComponentName(c.componentId)}
-                              </TableCell>
-                              <TableCell
-                                className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[220px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                                style={{ left: 120 }}>
-                                <div
-                                  className="font-medium truncate"
-                                  title={getWorkTitle(c.workId)}>
-                                  {getWorkTitle(c.workId)}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right align-top">
-                                <span>
-                                  {formatNumberAccounting(c.unitPrice)}
+                            <TableCell className="p-4 align-middle">
+                              {getComponentName(c.componentId)}
+                            </TableCell>
+                            <TableCell
+                              className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[180px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                              style={{ left: 120 }}>
+                              <div
+                                className="font-medium whitespace-normal break-words"
+                                title={getWorkTitle(c.workId)}>
+                                {getWorkTitle(c.workId)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right align-top">
+                              <span>{formatNumberAccounting(c.unitPrice)}</span>
+                              {c.unitPrice != null && c.unitPrice !== "" && (
+                                <span className="text-xs text-muted-foreground block mt-0.5">
+                                  {numberToVietnameseWords(c.unitPrice)}
                                 </span>
-                                {c.unitPrice != null && c.unitPrice !== "" && (
+                              )}
+                            </TableCell>
+                            <TableCell
+                              className={
+                                tcColumnVis.overviewValue
+                                  ? "text-right align-top"
+                                  : "hidden"
+                              }>
+                              <span>
+                                {formatNumberAccounting(c.overviewValue)}
+                              </span>
+                              {c.overviewValue != null &&
+                                c.overviewValue !== "" && (
                                   <span className="text-xs text-muted-foreground block mt-0.5">
-                                    {numberToVietnameseWords(c.unitPrice)}
+                                    {numberToVietnameseWords(c.overviewValue)}
                                   </span>
                                 )}
-                              </TableCell>
-                              <TableCell
-                                className={
-                                  tcColumnVis.overviewValue
-                                    ? "text-right align-top"
-                                    : "hidden"
-                                }>
-                                <span>
-                                  {formatNumberAccounting(c.overviewValue)}
-                                </span>
-                                {c.overviewValue != null &&
-                                  c.overviewValue !== "" && (
-                                    <span className="text-xs text-muted-foreground block mt-0.5">
-                                      {numberToVietnameseWords(c.overviewValue)}
-                                    </span>
-                                  )}
-                              </TableCell>
-                              <TableCell
-                                className={
-                                  tcColumnVis.translationValue
-                                    ? "text-right align-top"
-                                    : "hidden"
-                                }>
-                                <span>
-                                  {formatNumberAccounting(c.translationValue)}
-                                </span>
-                                {c.translationValue != null &&
-                                  c.translationValue !== "" && (
-                                    <span className="text-xs text-muted-foreground block mt-0.5">
-                                      {numberToVietnameseWords(
-                                        c.translationValue,
-                                      )}
-                                    </span>
-                                  )}
-                              </TableCell>
-                              <TableCell
-                                className={
-                                  tcColumnVis.contractValue
-                                    ? "text-right align-top"
-                                    : "hidden"
-                                }>
-                                <span>
-                                  {formatNumberAccounting(c.contractValue)}
-                                </span>
-                                {c.contractValue != null &&
-                                  c.contractValue !== "" && (
-                                    <span className="text-xs text-muted-foreground block mt-0.5">
-                                      {numberToVietnameseWords(c.contractValue)}
-                                    </span>
-                                  )}
-                              </TableCell>
-                              <TableCell>
-                                {formatDurationMonths(c.startDate, c.endDate)}
-                              </TableCell>
-                              <TableCell>
-                                {formatDateDDMMYYYY(c.startDate) || "—"}
-                              </TableCell>
-                              <TableCell>
-                                {formatDateDDMMYYYY(c.endDate) || "—"}
-                              </TableCell>
-                              <TableCell>
-                                {formatDateDDMMYYYY(c.extensionStartDate) ||
-                                  "—"}
-                              </TableCell>
-                              <TableCell>
-                                {formatDateDDMMYYYY(c.extensionEndDate) || "—"}
-                              </TableCell>
-                              <TableCell>
-                                {formatDateDDMMYYYY(c.actualCompletionDate) ||
-                                  "—"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatNumberAccounting(c.actualWordCount)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatNumberAccounting(c.actualPageCount)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {c.completionRate != null
-                                  ? formatPercent(c.completionRate)
+                            </TableCell>
+                            <TableCell
+                              className={
+                                tcColumnVis.translationValue
+                                  ? "text-right align-top"
+                                  : "hidden"
+                              }>
+                              <span>
+                                {formatNumberAccounting(c.translationValue)}
+                              </span>
+                              {c.translationValue != null &&
+                                c.translationValue !== "" && (
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(
+                                      c.translationValue,
+                                    )}
+                                  </span>
+                                )}
+                            </TableCell>
+                            <TableCell
+                              className={
+                                tcColumnVis.contractValue
+                                  ? "text-right align-top"
+                                  : "hidden"
+                              }>
+                              <span>
+                                {formatNumberAccounting(c.contractValue)}
+                              </span>
+                              {c.contractValue != null &&
+                                c.contractValue !== "" && (
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(c.contractValue)}
+                                  </span>
+                                )}
+                            </TableCell>
+                            <TableCell>
+                              {formatDurationMonths(c.startDate, c.endDate)}
+                            </TableCell>
+                            <TableCell>
+                              {formatDateDDMMYYYY(c.startDate) || "—"}
+                            </TableCell>
+                            <TableCell>
+                              {formatDateDDMMYYYY(c.endDate) || "—"}
+                            </TableCell>
+                            <TableCell>
+                              {formatDateDDMMYYYY(c.extensionStartDate) || "—"}
+                            </TableCell>
+                            <TableCell>
+                              {formatDateDDMMYYYY(c.extensionEndDate) || "—"}
+                            </TableCell>
+                            <TableCell>
+                              {formatDateDDMMYYYY(c.actualCompletionDate) ||
+                                "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumberAccounting(c.actualWordCount)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumberAccounting(c.actualPageCount)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {c.completionRate != null
+                                ? formatPercent(c.completionRate)
+                                : "—"}
+                            </TableCell>
+                            <TableCell
+                              className={
+                                tcColumnVis.settlementValue
+                                  ? "text-right align-top"
+                                  : "hidden"
+                              }>
+                              <span>
+                                {formatNumberAccounting(c.settlementValue)}
+                              </span>
+                              {c.settlementValue != null &&
+                                c.settlementValue !== "" && (
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(c.settlementValue)}
+                                  </span>
+                                )}
+                            </TableCell>
+                            <TableCell className="text-right align-top">
+                              <span>
+                                {c.settlementValue != null &&
+                                c.contractValue != null
+                                  ? formatNumberAccounting(
+                                      Number(c.settlementValue) -
+                                        Number(c.contractValue),
+                                    )
                                   : "—"}
-                              </TableCell>
-                              <TableCell
-                                className={
-                                  tcColumnVis.settlementValue
-                                    ? "text-right align-top"
-                                    : "hidden"
-                                }>
-                                <span>
-                                  {formatNumberAccounting(c.settlementValue)}
-                                </span>
-                                {c.settlementValue != null &&
-                                  c.settlementValue !== "" && (
-                                    <span className="text-xs text-muted-foreground block mt-0.5">
-                                      {numberToVietnameseWords(
-                                        c.settlementValue,
-                                      )}
-                                    </span>
-                                  )}
-                              </TableCell>
-                              <TableCell className="text-right align-top">
-                                <span>
-                                  {c.settlementValue != null &&
-                                  c.contractValue != null
-                                    ? formatNumberAccounting(
-                                        Number(c.settlementValue) -
-                                          Number(c.contractValue),
-                                      )
-                                    : "—"}
-                                </span>
-                                {c.settlementValue != null &&
-                                  c.contractValue != null && (
-                                    <span className="text-xs text-muted-foreground block mt-0.5">
-                                      {numberToVietnameseWords(
-                                        Number(c.settlementValue) -
-                                          Number(c.contractValue),
-                                      )}
-                                    </span>
-                                  )}
-                              </TableCell>
-                              <TableCell className="text-right align-top">
-                                <span>
-                                  {formatNumberAccounting(
-                                    paymentInfoById.get(c.id)?.advance1?.amount,
-                                  )}
-                                </span>
-                                {paymentInfoById.get(c.id)?.advance1?.amount !=
-                                  null &&
+                              </span>
+                              {c.settlementValue != null &&
+                                c.contractValue != null && (
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(
+                                      Number(c.settlementValue) -
+                                        Number(c.contractValue),
+                                    )}
+                                  </span>
+                                )}
+                            </TableCell>
+                            <TableCell className="text-right align-top">
+                              <span>
+                                {formatNumberAccounting(
+                                  paymentInfoById.get(c.id)?.advance1?.amount,
+                                )}
+                              </span>
+                              {paymentInfoById.get(c.id)?.advance1?.amount !=
+                                null &&
+                                paymentInfoById.get(c.id)?.advance1?.amount !==
+                                  "" && (
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(
+                                      paymentInfoById.get(c.id)?.advance1
+                                        ?.amount,
+                                    )}
+                                  </span>
+                                )}
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {formatDateDDMMYYYY(
                                   paymentInfoById.get(c.id)?.advance1
-                                    ?.amount !== "" && (
-                                    <span className="text-xs text-muted-foreground block mt-0.5">
-                                      {numberToVietnameseWords(
-                                        paymentInfoById.get(c.id)?.advance1
-                                          ?.amount,
-                                      )}
-                                    </span>
-                                  )}
-                                <div className="text-xs text-muted-foreground mt-0.5">
-                                  {formatDateDDMMYYYY(
-                                    paymentInfoById.get(c.id)?.advance1
-                                      ?.paymentDate,
-                                  ) || "—"}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right align-top">
-                                <span>
-                                  {formatNumberAccounting(
-                                    paymentInfoById.get(c.id)?.advance2?.amount,
-                                  )}
-                                </span>
-                                {paymentInfoById.get(c.id)?.advance2?.amount !=
-                                  null &&
+                                    ?.paymentDate,
+                                ) || "—"}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right align-top">
+                              <span>
+                                {formatNumberAccounting(
+                                  paymentInfoById.get(c.id)?.advance2?.amount,
+                                )}
+                              </span>
+                              {paymentInfoById.get(c.id)?.advance2?.amount !=
+                                null &&
+                                paymentInfoById.get(c.id)?.advance2?.amount !==
+                                  "" && (
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(
+                                      paymentInfoById.get(c.id)?.advance2
+                                        ?.amount,
+                                    )}
+                                  </span>
+                                )}
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {formatDateDDMMYYYY(
                                   paymentInfoById.get(c.id)?.advance2
-                                    ?.amount !== "" && (
-                                    <span className="text-xs text-muted-foreground block mt-0.5">
-                                      {numberToVietnameseWords(
-                                        paymentInfoById.get(c.id)?.advance2
-                                          ?.amount,
-                                      )}
-                                    </span>
-                                  )}
-                                <div className="text-xs text-muted-foreground mt-0.5">
-                                  {formatDateDDMMYYYY(
-                                    paymentInfoById.get(c.id)?.advance2
-                                      ?.paymentDate,
-                                  ) || "—"}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right align-top">
-                                <span>
-                                  {formatNumberAccounting(
-                                    paymentInfoById.get(c.id)?.settlement
-                                      ?.amount,
-                                  )}
-                                </span>
-                                {paymentInfoById.get(c.id)?.settlement
-                                  ?.amount != null &&
+                                    ?.paymentDate,
+                                ) || "—"}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right align-top">
+                              <span>
+                                {formatNumberAccounting(
+                                  paymentInfoById.get(c.id)?.settlement?.amount,
+                                )}
+                              </span>
+                              {paymentInfoById.get(c.id)?.settlement?.amount !=
+                                null &&
+                                paymentInfoById.get(c.id)?.settlement
+                                  ?.amount !== "" && (
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(
+                                      paymentInfoById.get(c.id)?.settlement
+                                        ?.amount,
+                                    )}
+                                  </span>
+                                )}
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {formatDateDDMMYYYY(
                                   paymentInfoById.get(c.id)?.settlement
-                                    ?.amount !== "" && (
-                                    <span className="text-xs text-muted-foreground block mt-0.5">
-                                      {numberToVietnameseWords(
-                                        paymentInfoById.get(c.id)?.settlement
-                                          ?.amount,
-                                      )}
-                                    </span>
-                                  )}
-                                <div className="text-xs text-muted-foreground mt-0.5">
-                                  {formatDateDDMMYYYY(
-                                    paymentInfoById.get(c.id)?.settlement
-                                      ?.paymentDate,
-                                  ) || "—"}
-                                </div>
-                              </TableCell>
-                              <TableCell
-                                className={
-                                  tcColumnVis.outstanding
-                                    ? "text-right align-top"
-                                    : "hidden"
-                                }>
-                                <span>
-                                  {formatNumberAccounting(
-                                    outstandingById.get(c.id),
-                                  )}
-                                </span>
-                                {typeof outstandingById.get(c.id) ===
-                                  "number" &&
-                                  !Number.isNaN(
-                                    outstandingById.get(c.id) as number,
-                                  ) && (
-                                    <span className="text-xs text-muted-foreground block mt-0.5">
-                                      {numberToVietnameseWords(
-                                        outstandingById.get(c.id) as number,
-                                      )}
-                                    </span>
-                                  )}
-                              </TableCell>
-                              <TableCell className="min-w-[220px]">
-                                <div className="flex flex-wrap gap-2">
-                                  {buildTranslationContractPills(c, {
-                                    proofreadingCompletedDate:
-                                      proofreadingCompletionByTcId.get(c.id) ??
-                                      (c.workId
-                                        ? proofreadingCompletionByWorkId.get(
-                                            c.workId,
-                                          )
-                                        : undefined),
-                                    editingCompletedDate: c.workId
-                                      ? editingCompletionByWorkId.get(c.workId)
-                                      : undefined,
-                                  }).map((pill, idx) => (
-                                    <Badge
-                                      key={`${c.id}-pill-${idx}`}
-                                      variant="outline"
-                                      className={contractPillClass[pill.tone]}>
-                                      {pill.label}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </TableCell>
-                              <TableCell
-                                className="max-w-[100px] truncate"
-                                title={c.note ?? undefined}>
-                                {c.note ?? "—"}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() =>
-                                      setTcDialog({
-                                        open: true,
-                                        contract: c,
-                                        mode: "view",
-                                      })
-                                    }>
-                                    <Eye className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() =>
-                                      setTcDialog({
-                                        open: true,
-                                        contract: c,
-                                        mode: "edit",
-                                      })
-                                    }>
-                                    <Pencil className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-destructive hover:text-destructive"
-                                    onClick={() => {
-                                      setTcDeleteTarget(c);
-                                      setDeleteTcConfirmOpen(true);
-                                    }}>
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                                    ?.paymentDate,
+                                ) || "—"}
+                              </div>
+                            </TableCell>
+                            <TableCell
+                              className={
+                                tcColumnVis.outstanding
+                                  ? "text-right align-top"
+                                  : "hidden"
+                              }>
+                              <span>
+                                {formatNumberAccounting(
+                                  outstandingById.get(c.id),
+                                )}
+                              </span>
+                              {typeof outstandingById.get(c.id) === "number" &&
+                                !Number.isNaN(
+                                  outstandingById.get(c.id) as number,
+                                ) && (
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    {numberToVietnameseWords(
+                                      outstandingById.get(c.id) as number,
+                                    )}
+                                  </span>
+                                )}
+                            </TableCell>
+                            <TableCell className="min-w-[220px]">
+                              <div className="flex flex-wrap gap-2">
+                                {buildTranslationContractPills(c, {
+                                  proofreadingCompletedDate:
+                                    proofreadingCompletionByTcId.get(c.id) ??
+                                    (c.workId
+                                      ? proofreadingCompletionByWorkId.get(
+                                          c.workId,
+                                        )
+                                      : undefined),
+                                  editingCompletedDate: c.workId
+                                    ? editingCompletionByWorkId.get(c.workId)
+                                    : undefined,
+                                }).map((pill, idx) => (
+                                  <Badge
+                                    key={`${c.id}-pill-${idx}`}
+                                    variant="outline"
+                                    className={contractPillClass[pill.tone]}>
+                                    {pill.label}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell
+                              className="w-[260px] min-w-[240px] whitespace-pre-wrap break-words"
+                              title={c.note ?? undefined}>
+                              {c.note ?? "—"}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    setTcDialog({
+                                      open: true,
+                                      contract: c,
+                                      mode: "view",
+                                    })
+                                  }>
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    setTcDialog({
+                                      open: true,
+                                      contract: c,
+                                      mode: "edit",
+                                    })
+                                  }>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => {
+                                    setTcDeleteTarget(c);
+                                    setDeleteTcConfirmOpen(true);
+                                  }}>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 ) : (
                   <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {paginatedPc.length === 0 ? (
@@ -4338,6 +4592,109 @@ export default function ThuKyHopPhanPage() {
 
         {/* Tab: Hợp đồng hiệu đính */}
         <TabsContent value="proofreading" className="mt-6">
+          <div className="mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <Card
+                onClick={() =>
+                  setPcQuickFilter((k) => (k === "all" ? "all" : "all"))
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${pcQuickFilter === "all" ? "ring-2 ring-primary" : ""} bg-white dark:bg-slate-900/30 text-slate-700 dark:text-slate-100`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-200/60 dark:bg-slate-700/40">
+                    <BarChart3 className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Tổng số HĐ
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {pcStats.total}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                onClick={() =>
+                  setPcQuickFilter((k) => (k === "valid" ? "all" : "valid"))
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${pcQuickFilter === "valid" ? "ring-2 ring-primary" : ""} bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-200/60 dark:bg-blue-700/40">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Còn hạn
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {pcStats.valid}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                onClick={() =>
+                  setPcQuickFilter((k) =>
+                    k === "completed" ? "all" : "completed",
+                  )
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${pcQuickFilter === "completed" ? "ring-2 ring-primary" : ""} bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-200/60 dark:bg-emerald-700/40">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Đã hoàn thành
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {pcStats.completed}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                onClick={() =>
+                  setPcQuickFilter((k) => (k === "expired" ? "all" : "expired"))
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${pcQuickFilter === "expired" ? "ring-2 ring-primary" : ""} bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-200/60 dark:bg-orange-700/40">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Hết hạn/ quá hạn
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {pcStats.expired}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                onClick={() =>
+                  setPcQuickFilter((k) =>
+                    k === "expiring" ? "all" : "expiring",
+                  )
+                }
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${pcQuickFilter === "expiring" ? "ring-2 ring-primary" : ""} bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300`}>
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-200/60 dark:bg-amber-700/40">
+                    <AlertCircle className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider opacity-90">
+                      Sắp hết hạn (1–90 ngày)
+                    </p>
+                    <h3 className="text-xl font-bold font-display tabular-nums mt-0.5">
+                      {pcStats.expiring}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
           <div className="rounded-xl border bg-card overflow-hidden">
             <div className="p-4 border-b flex flex-col gap-4 bg-muted/20">
               <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
@@ -4352,7 +4709,7 @@ export default function ThuKyHopPhanPage() {
                     />
                   </div>
                   <Badge variant="secondary">
-                    {filteredPc.length} hợp đồng
+                    {pcDisplayList.length} hợp đồng
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
@@ -4384,9 +4741,9 @@ export default function ThuKyHopPhanPage() {
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      handleExportProofreadingContracts(filteredPc, toast)
+                      handleExportProofreadingContracts(pcDisplayList, toast)
                     }
-                    disabled={filteredPc.length === 0}>
+                    disabled={pcDisplayList.length === 0}>
                     <FileText className="w-4 h-4 mr-2" />
                     Xuất Excel
                   </Button>
@@ -4439,6 +4796,7 @@ export default function ThuKyHopPhanPage() {
                   </Select>
                 </div>
               </div>
+              {/* moved stats outside container */}
             </div>
             {pcLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -4446,287 +4804,286 @@ export default function ThuKyHopPhanPage() {
               </div>
             ) : (
               <>
-                <div className="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm sticky top-0 z-20">
-                        <SortableHead
-                          label="Số HĐ"
-                          column="contractNumber"
-                          sortColumns={pcSortColumns}
-                          onSort={handlePcSort}
-                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px] min-w-[120px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                        />
-                        <SortableHead
-                          label="Hợp phần"
-                          column="component"
-                          sortColumns={pcSortColumns}
-                          onSort={handlePcSort}
-                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] min-w-[140px]"
-                        />
-                        <TableHead
-                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[220px] min-w-[220px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                          style={{ left: 120 }}>
-                          Tác phẩm
-                        </TableHead>
-                        <TableHead>Người hiệu đính</TableHead>
-                        <SortableHead
-                          label="Số trang"
-                          column="pageCount"
-                          sortColumns={pcSortColumns}
-                          onSort={handlePcSort}
-                          className="text-right"
-                        />
-                        <SortableHead
-                          label="Tỷ lệ"
-                          column="rateRatio"
-                          sortColumns={pcSortColumns}
-                          onSort={handlePcSort}
-                          className="text-right"
-                        />
-                        <SortableHead
-                          label="Giá trị HĐ"
-                          column="contractValue"
-                          sortColumns={pcSortColumns}
-                          onSort={handlePcSort}
-                          className="text-right"
-                        />
-                        <TableHead className="text-right">
-                          Đã Tạm ứng đợt 1
-                        </TableHead>
-                        <TableHead className="text-right">
-                          Đã Tạm ứng đợt 2
-                        </TableHead>
-                        <TableHead className="text-right">
-                          Đã Quyết toán
-                        </TableHead>
-                        <TableHead className="text-right">Công nợ</TableHead>
-                        <SortableHead
-                          label="Bắt đầu"
-                          column="startDate"
-                          sortColumns={pcSortColumns}
-                          onSort={handlePcSort}
-                        />
-                        <SortableHead
-                          label="Kết thúc"
-                          column="endDate"
-                          sortColumns={pcSortColumns}
-                          onSort={handlePcSort}
-                        />
-                        <SortableHead
-                          label="Hoàn thành Thực tế"
-                          column="actualCompletionDate"
-                          sortColumns={pcSortColumns}
-                          onSort={handlePcSort}
-                        />
-                        <TableHead className="max-w-[100px] truncate">
-                          Ghi chú
-                        </TableHead>
-                        <TableHead className="w-[120px]"></TableHead>
+                <Table
+                  className="border-collapse"
+                  containerClassName="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
+                  <TableHeader className="sticky top-0 z-20">
+                    <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm">
+                      <SortableHead
+                        label="Số HĐ"
+                        column="contractNumber"
+                        sortColumns={pcSortColumns}
+                        onSort={handlePcSort}
+                        className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px] min-w-[120px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                      />
+                      <SortableHead
+                        label="Hợp phần"
+                        column="component"
+                        sortColumns={pcSortColumns}
+                        onSort={handlePcSort}
+                        className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] min-w-[140px]"
+                      />
+                      <TableHead
+                        className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px] min-w-[180px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                        style={{ left: 120 }}>
+                        Tác phẩm
+                      </TableHead>
+                      <TableHead>Người hiệu đính</TableHead>
+                      <SortableHead
+                        label="Số trang"
+                        column="pageCount"
+                        sortColumns={pcSortColumns}
+                        onSort={handlePcSort}
+                        className="text-right"
+                      />
+                      <SortableHead
+                        label="Tỷ lệ"
+                        column="rateRatio"
+                        sortColumns={pcSortColumns}
+                        onSort={handlePcSort}
+                        className="text-right"
+                      />
+                      <SortableHead
+                        label="Giá trị HĐ"
+                        column="contractValue"
+                        sortColumns={pcSortColumns}
+                        onSort={handlePcSort}
+                        className="text-right"
+                      />
+                      <TableHead className="text-right">
+                        Đã Tạm ứng đợt 1
+                      </TableHead>
+                      <TableHead className="text-right">
+                        Đã Tạm ứng đợt 2
+                      </TableHead>
+                      <TableHead className="text-right">
+                        Đã Quyết toán
+                      </TableHead>
+                      <TableHead className="text-right">Công nợ</TableHead>
+                      <SortableHead
+                        label="Bắt đầu"
+                        column="startDate"
+                        sortColumns={pcSortColumns}
+                        onSort={handlePcSort}
+                      />
+                      <SortableHead
+                        label="Kết thúc"
+                        column="endDate"
+                        sortColumns={pcSortColumns}
+                        onSort={handlePcSort}
+                      />
+                      <SortableHead
+                        label="Hoàn thành Thực tế"
+                        column="actualCompletionDate"
+                        sortColumns={pcSortColumns}
+                        onSort={handlePcSort}
+                      />
+                      <TableHead className="w-[260px] min-w-[240px]">
+                        Ghi chú
+                      </TableHead>
+                      <TableHead className="w-[120px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedPc.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={12}
+                          className="text-center text-muted-foreground py-8">
+                          Chưa có hợp đồng hiệu đính nào.
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedPc.length === 0 ? (
-                        <TableRow>
+                    ) : (
+                      paginatedPc.map((c) => (
+                        <TableRow key={c.id}>
+                          <TableCell className="p-4 align-middle sticky left-0 z-10 bg-card border-r border-border/50 font-medium min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
+                            {c.contractNumber ?? "—"}
+                          </TableCell>
+                          <TableCell className="p-4 align-middle">
+                            {getComponentName(c.componentId)}
+                          </TableCell>
                           <TableCell
-                            colSpan={12}
-                            className="text-center text-muted-foreground py-8">
-                            Chưa có hợp đồng hiệu đính nào.
+                            className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[180px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                            style={{ left: 120 }}>
+                            <div
+                              className="font-medium whitespace-normal break-words"
+                              title={getWorkTitle(c.workId)}>
+                              {getWorkTitle(c.workId)}
+                            </div>
+                          </TableCell>
+                          <TableCell>{getProofreaderName(c.id)}</TableCell>
+                          <TableCell className="text-right">
+                            {formatNumberAccounting(c.pageCount)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {c.rateRatio != null
+                              ? formatPercent(c.rateRatio)
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-right align-top">
+                            <span>
+                              {formatNumberAccounting(c.contractValue)}
+                            </span>
+                            {c.contractValue != null &&
+                              c.contractValue !== "" && (
+                                <span className="text-xs text-muted-foreground block mt-0.5">
+                                  {numberToVietnameseWords(c.contractValue)}
+                                </span>
+                              )}
+                          </TableCell>
+                          <TableCell className="text-right align-top">
+                            {pcPaymentInfoById.get(c.id)?.advance1 ? (
+                              <>
+                                <span>
+                                  {formatNumberAccounting(
+                                    pcPaymentInfoById.get(c.id)?.advance1
+                                      ?.amount,
+                                  )}
+                                </span>
+                                <span className="text-xs text-muted-foreground block mt-0.5">
+                                  {numberToVietnameseWords(
+                                    String(
+                                      pcPaymentInfoById.get(c.id)?.advance1
+                                        ?.amount,
+                                    ),
+                                  )}
+                                </span>
+                                <span className="text-xs text-muted-foreground block">
+                                  {formatDateDDMMYYYY(
+                                    pcPaymentInfoById.get(c.id)?.advance1
+                                      ?.paymentDate,
+                                  )}
+                                </span>
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right align-top">
+                            {pcPaymentInfoById.get(c.id)?.advance2 ? (
+                              <>
+                                <span>
+                                  {formatNumberAccounting(
+                                    pcPaymentInfoById.get(c.id)?.advance2
+                                      ?.amount,
+                                  )}
+                                </span>
+                                <span className="text-xs text-muted-foreground block mt-0.5">
+                                  {numberToVietnameseWords(
+                                    String(
+                                      pcPaymentInfoById.get(c.id)?.advance2
+                                        ?.amount,
+                                    ),
+                                  )}
+                                </span>
+                                <span className="text-xs text-muted-foreground block">
+                                  {formatDateDDMMYYYY(
+                                    pcPaymentInfoById.get(c.id)?.advance2
+                                      ?.paymentDate,
+                                  )}
+                                </span>
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right align-top">
+                            {pcPaymentInfoById.get(c.id)?.settlement ? (
+                              <>
+                                <span>
+                                  {formatNumberAccounting(
+                                    pcPaymentInfoById.get(c.id)?.settlement
+                                      ?.amount,
+                                  )}
+                                </span>
+                                <span className="text-xs text-muted-foreground block mt-0.5">
+                                  {numberToVietnameseWords(
+                                    String(
+                                      pcPaymentInfoById.get(c.id)?.settlement
+                                        ?.amount,
+                                    ),
+                                  )}
+                                </span>
+                                <span className="text-xs text-muted-foreground block">
+                                  {formatDateDDMMYYYY(
+                                    pcPaymentInfoById.get(c.id)?.settlement
+                                      ?.paymentDate,
+                                  )}
+                                </span>
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right align-top">
+                            <span>
+                              {formatNumberAccounting(
+                                pcOutstandingById.get(c.id) ?? 0,
+                              )}
+                            </span>
+                            <span className="text-xs text-muted-foreground block mt-0.5">
+                              {numberToVietnameseWords(
+                                String(pcOutstandingById.get(c.id) ?? 0),
+                              )}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {formatDateDDMMYYYY(c.startDate) || "—"}
+                          </TableCell>
+                          <TableCell>
+                            {formatDateDDMMYYYY(c.endDate) || "—"}
+                          </TableCell>
+                          <TableCell>
+                            {formatDateDDMMYYYY(c.actualCompletionDate) || "—"}
+                          </TableCell>
+                          <TableCell
+                            className="w-[260px] min-w-[240px] whitespace-pre-wrap break-words"
+                            title={c.note ?? undefined}>
+                            {c.note ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  setPcDialog({
+                                    open: true,
+                                    contract: c,
+                                    mode: "view",
+                                  })
+                                }>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  setPcDialog({
+                                    open: true,
+                                    contract: c,
+                                    mode: "edit",
+                                  })
+                                }>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  setPcDeleteTarget(c);
+                                  setDeletePcConfirmOpen(true);
+                                }}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
-                      ) : (
-                        paginatedPc.map((c) => (
-                          <TableRow key={c.id}>
-                            <TableCell className="p-4 align-middle sticky left-0 z-10 bg-card border-r border-border/50 font-medium min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
-                              {c.contractNumber ?? "—"}
-                            </TableCell>
-                            <TableCell className="p-4 align-middle">
-                              {getComponentName(c.componentId)}
-                            </TableCell>
-                            <TableCell
-                              className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[220px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                              style={{ left: 120 }}>
-                              <div
-                                className="font-medium truncate"
-                                title={getWorkTitle(c.workId)}>
-                                {getWorkTitle(c.workId)}
-                              </div>
-                            </TableCell>
-                            <TableCell>{getProofreaderName(c.id)}</TableCell>
-                            <TableCell className="text-right">
-                              {formatNumberAccounting(c.pageCount)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {c.rateRatio != null
-                                ? formatPercent(c.rateRatio)
-                                : "—"}
-                            </TableCell>
-                            <TableCell className="text-right align-top">
-                              <span>
-                                {formatNumberAccounting(c.contractValue)}
-                              </span>
-                              {c.contractValue != null &&
-                                c.contractValue !== "" && (
-                                  <span className="text-xs text-muted-foreground block mt-0.5">
-                                    {numberToVietnameseWords(c.contractValue)}
-                                  </span>
-                                )}
-                            </TableCell>
-                            <TableCell className="text-right align-top">
-                              {pcPaymentInfoById.get(c.id)?.advance1 ? (
-                                <>
-                                  <span>
-                                    {formatNumberAccounting(
-                                      pcPaymentInfoById.get(c.id)?.advance1
-                                        ?.amount,
-                                    )}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground block mt-0.5">
-                                    {numberToVietnameseWords(
-                                      String(
-                                        pcPaymentInfoById.get(c.id)?.advance1
-                                          ?.amount,
-                                      ),
-                                    )}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground block">
-                                    {formatDateDDMMYYYY(
-                                      pcPaymentInfoById.get(c.id)?.advance1
-                                        ?.paymentDate,
-                                    )}
-                                  </span>
-                                </>
-                              ) : (
-                                "—"
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right align-top">
-                              {pcPaymentInfoById.get(c.id)?.advance2 ? (
-                                <>
-                                  <span>
-                                    {formatNumberAccounting(
-                                      pcPaymentInfoById.get(c.id)?.advance2
-                                        ?.amount,
-                                    )}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground block mt-0.5">
-                                    {numberToVietnameseWords(
-                                      String(
-                                        pcPaymentInfoById.get(c.id)?.advance2
-                                          ?.amount,
-                                      ),
-                                    )}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground block">
-                                    {formatDateDDMMYYYY(
-                                      pcPaymentInfoById.get(c.id)?.advance2
-                                        ?.paymentDate,
-                                    )}
-                                  </span>
-                                </>
-                              ) : (
-                                "—"
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right align-top">
-                              {pcPaymentInfoById.get(c.id)?.settlement ? (
-                                <>
-                                  <span>
-                                    {formatNumberAccounting(
-                                      pcPaymentInfoById.get(c.id)?.settlement
-                                        ?.amount,
-                                    )}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground block mt-0.5">
-                                    {numberToVietnameseWords(
-                                      String(
-                                        pcPaymentInfoById.get(c.id)?.settlement
-                                          ?.amount,
-                                      ),
-                                    )}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground block">
-                                    {formatDateDDMMYYYY(
-                                      pcPaymentInfoById.get(c.id)?.settlement
-                                        ?.paymentDate,
-                                    )}
-                                  </span>
-                                </>
-                              ) : (
-                                "—"
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right align-top">
-                              <span>
-                                {formatNumberAccounting(
-                                  pcOutstandingById.get(c.id) ?? 0,
-                                )}
-                              </span>
-                              <span className="text-xs text-muted-foreground block mt-0.5">
-                                {numberToVietnameseWords(
-                                  String(pcOutstandingById.get(c.id) ?? 0),
-                                )}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              {formatDateDDMMYYYY(c.startDate) || "—"}
-                            </TableCell>
-                            <TableCell>
-                              {formatDateDDMMYYYY(c.endDate) || "—"}
-                            </TableCell>
-                            <TableCell>
-                              {formatDateDDMMYYYY(c.actualCompletionDate) ||
-                                "—"}
-                            </TableCell>
-                            <TableCell
-                              className="max-w-[100px] truncate"
-                              title={c.note ?? undefined}>
-                              {c.note ?? "—"}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() =>
-                                    setPcDialog({
-                                      open: true,
-                                      contract: c,
-                                      mode: "view",
-                                    })
-                                  }>
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() =>
-                                    setPcDialog({
-                                      open: true,
-                                      contract: c,
-                                      mode: "edit",
-                                    })
-                                  }>
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => {
-                                    setPcDeleteTarget(c);
-                                    setDeletePcConfirmOpen(true);
-                                  }}>
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
                 {totalPcPages > 1 && (
                   <div className="p-4 border-t flex justify-center">
                     <Pagination>

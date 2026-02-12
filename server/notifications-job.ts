@@ -46,7 +46,13 @@ async function processUserNotifications(userId: string, today: Date): Promise<vo
     if (!type) continue;
     const existing = await dbStorage.getNotificationByAssignmentType(userId, assignment.id, type);
     if (!existing) {
-      const content = buildNotificationContent(type, task.title ?? "", dueDateStr);
+      const content = buildNotificationContent(type, {
+        taskTitle: task.title ?? "",
+        taskId: assignment.taskId,
+        group: task.group ?? null,
+        dueDate: dueDateStr,
+        daysRemaining: diffDays,
+      });
       const created = await dbStorage.createNotification({
         userId,
         type,
@@ -58,7 +64,13 @@ async function processUserNotifications(userId: string, today: Date): Promise<vo
         createdAt: new Date(),
         readAt: null,
       });
-      await sendNotificationEmail(userId, created, { dueDate: dueDateStr, taskTitle: task.title ?? "" });
+      await sendNotificationEmail(userId, created, {
+        dueDate: dueDateStr,
+        taskTitle: task.title ?? "",
+        taskId: assignment.taskId,
+        group: task.group ?? null,
+        daysRemaining: diffDays,
+      });
     }
   }
 }

@@ -51,6 +51,7 @@ import {
 import type { TaskWithAssignmentDetails, Notification } from "@shared/schema";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -76,7 +77,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const department = user?.department ?? "";
   const { language, setLanguage, t } = useI18n();
   const { data: tasks = [] } = useTasks();
-  const { data: notifications = [] } = useNotifications();
+  const { data: notifications = [] } = useNotifications({
+    refetchInterval: 15000,
+  });
   const { data: unreadCount } = useUnreadNotificationCount();
   const { mutate: markNotificationRead } = useMarkNotificationRead();
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -211,6 +214,65 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return Array.from(groups).sort();
   }, [notificationList]);
 
+  // Push-style toast khi có thông báo mới
+  const lastNotifSeenRef = useRef<number>(0);
+  useEffect(() => {
+    const newestTs =
+      notificationList.length && notificationList[0]?.createdAt
+        ? new Date(notificationList[0].createdAt as any).getTime()
+        : 0;
+    if (lastNotifSeenRef.current === 0) {
+      const stored = Number.parseInt(
+        localStorage.getItem("lastNotifSeenTs") || "0",
+        10,
+      );
+      lastNotifSeenRef.current =
+        stored || (newestTs > 0 ? newestTs : lastNotifSeenRef.current);
+      if (lastNotifSeenRef.current > 0) {
+        localStorage.setItem(
+          "lastNotifSeenTs",
+          String(lastNotifSeenRef.current),
+        );
+      }
+      return;
+    }
+    const newly = notificationList.filter((n) => {
+      const ts = n.createdAt ? new Date(n.createdAt as any).getTime() : 0;
+      return !n.isRead && ts > lastNotifSeenRef.current;
+    });
+    if (newly.length > 0) {
+      const n = newly[0];
+      toast({
+        title: language === "vi" ? "Thông báo mới" : "New notification",
+        description: n.title,
+        action: (
+          <ToastAction
+            altText={language === "vi" ? "Xem" : "View"}
+            onClick={() => {
+              if (!n.isRead) markNotificationRead(n.id);
+              if (n.task) {
+                setSelectedTask(n.task as any);
+              } else {
+                setNotificationDialogOpen(true);
+              }
+            }}>
+            {language === "vi"
+              ? n.task
+                ? "Mở công việc"
+                : "Xem tất cả"
+              : n.task
+                ? "Open Task"
+                : "View All"}
+          </ToastAction>
+        ),
+        duration: 7000,
+      });
+    }
+    if (newestTs > lastNotifSeenRef.current) {
+      lastNotifSeenRef.current = newestTs;
+      localStorage.setItem("lastNotifSeenTs", String(newestTs));
+    }
+  }, [notificationList]);
   const filteredNotifications = useMemo(() => {
     let list = notificationList;
     if (notificationStatusFilter === "unread")
@@ -554,9 +616,43 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               <p className="text-sm font-medium truncate">
                                 {n.title}
                               </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {n.message}
-                              </p>
+                              <div
+                                className="text-xs text-muted-foreground"
+                                dangerouslySetInnerHTML={{ __html: n.message }}
+                              />
+                              {n.task && (
+                                <div className="mt-1 flex gap-3">
+                                  <button
+                                    type="button"
+                                    className="text-[11px] text-primary underline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!n.isRead) markNotificationRead(n.id);
+                                      setSelectedTask(n.task!);
+                                    }}>
+                                    {language === "vi"
+                                      ? "Mở công việc"
+                                      : "Open Task"}
+                                  </button>
+                                  {["task_completed", "task_reviewed"].includes(
+                                    String(n.type || ""),
+                                  ) && (
+                                    <button
+                                      type="button"
+                                      className="text-[11px] text-primary underline"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!n.isRead)
+                                          markNotificationRead(n.id);
+                                        setSelectedTask(n.task!);
+                                      }}>
+                                      {language === "vi"
+                                        ? "Mở đánh giá"
+                                        : "Open Review"}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                               {createdAt && (
                                 <p className="text-[11px] text-muted-foreground mt-0.5">
                                   {formatDistanceToNow(createdAt, {
@@ -724,9 +820,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             {n.group}
                           </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {n.message}
-                        </p>
+                        <div
+                          className="text-xs text-muted-foreground"
+                          dangerouslySetInnerHTML={{ __html: n.message }}
+                        />
+                        {n.task && (
+                          <div className="mt-1 flex gap-3">
+                            <button
+                              type="button"
+                              className="text-[11px] text-primary underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!n.isRead) markNotificationRead(n.id);
+                                setSelectedTask(n.task!);
+                              }}>
+                              {language === "vi" ? "Mở công việc" : "Open Task"}
+                            </button>
+                            {["task_completed", "task_reviewed"].includes(
+                              String(n.type || ""),
+                            ) && (
+                              <button
+                                type="button"
+                                className="text-[11px] text-primary underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!n.isRead) markNotificationRead(n.id);
+                                  setSelectedTask(n.task!);
+                                }}>
+                                {language === "vi"
+                                  ? "Mở đánh giá"
+                                  : "Open Review"}
+                              </button>
+                            )}
+                          </div>
+                        )}
                         {createdAt && (
                           <p className="text-[11px] text-muted-foreground mt-0.5">
                             {formatDistanceToNow(createdAt, {
