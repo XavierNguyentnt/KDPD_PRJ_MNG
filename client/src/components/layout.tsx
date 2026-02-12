@@ -305,53 +305,54 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <aside
         ref={sidebarRef}
         className={`
-          bg-card border-r border-border/50 hidden md:flex flex-col
-          md:sticky md:top-0 md:h-screen overflow-hidden
+          bg-card border-r border-border/50 hidden md:block overflow-hidden
           transition-[opacity,transform] duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"}
         `}
         style={{ willChange: "transform,opacity" }}>
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 font-display font-bold text-2xl text-primary">
-              <img
-                src="/logo-duan.png"
-                alt="Logo"
-                className="h-16 w-auto rounded"
-              />
+        <div className="md:sticky md:top-0 md:h-screen flex flex-col">
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-display font-bold text-2xl text-primary">
+                <img
+                  src="/logo-duan.png"
+                  alt="Logo"
+                  className="h-16 w-auto rounded"
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                onClick={() => setSidebarOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`h-8 w-8 transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-              onClick={() => setSidebarOpen(false)}>
-              <X className="h-4 w-4" />
-            </Button>
           </div>
-        </div>
 
-        <nav
-          className={`flex-1 px-4 space-y-1 transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-          {navItems.map((item) => {
-            const isActive = location === item.href;
-            return (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-colors duration-200
-                    ${
-                      isActive
-                        ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 shadow-sm"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }
-                  `}>
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                </div>
-              </Link>
-            );
-          })}
-        </nav>
+          <nav
+            className={`flex-1 px-4 space-y-1 transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+            {navItems.map((item) => {
+              const isActive = location === item.href;
+              return (
+                <Link key={item.href} href={item.href}>
+                  <div
+                    className={`
+                      flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-colors duration-200
+                      ${
+                        isActive
+                          ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 shadow-sm"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }
+                    `}>
+                    <item.icon className="w-4 h-4" />
+                    {item.label}
+                  </div>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
       </aside>
 
       {/* Mobile Sidebar */}
@@ -638,6 +639,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/20 min-h-0 animate-enter">
           {children}
         </div>
+
+        <footer className="border-t border-border/50 bg-card/50 px-4 sm:px-8 py-4">
+          <div className="text-center text-xs text-muted-foreground">
+            Copyright of Văn phòng Dự án Kinh điển phương Đông
+          </div>
+        </footer>
       </main>
 
       <Dialog
