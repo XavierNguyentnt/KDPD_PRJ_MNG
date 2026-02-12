@@ -398,12 +398,14 @@ function SortableHead<T extends string>({
   sortColumns,
   onSort,
   className,
+  style,
 }: {
   label: React.ReactNode;
   column: T;
   sortColumns?: Array<{ column: T; dir: "asc" | "desc" }>;
   onSort?: (column: T, e?: React.MouseEvent) => void;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   const sortInfo = sortColumns?.find((s) => s.column === column);
   const sortIndex = sortInfo
@@ -418,6 +420,7 @@ function SortableHead<T extends string>({
   return (
     <TableHead
       className={className}
+      style={style}
       onClick={onSort ? (e) => onSort(column, e) : undefined}
       role={onSort ? "button" : undefined}
       tabIndex={onSort ? 0 : undefined}
@@ -3163,11 +3166,11 @@ export default function ThuKyHopPhanPage() {
             ) : (
               <>
                 {tcViewMode === "table" ? (
-                  <div className="overflow-x-auto">
+                  <div className="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
                     <Table>
                       <TableHeader>
-                        <TableRow className="sticky top-0 bg-white z-30">
-                          <TableHead className="w-[44px]">
+                        <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm sticky top-0 z-20">
+                          <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] min-w-[80px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
                             <Checkbox
                               checked={
                                 allSelectedOnPage
@@ -3201,21 +3204,22 @@ export default function ThuKyHopPhanPage() {
                             column="component"
                             sortColumns={worksSortColumns}
                             onSort={handleWorksSort}
-                            className="sticky left-[44px] z-20 bg-white w-[140px] min-w-[140px]"
+                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] min-w-[140px]"
                           />
                           <SortableHead
                             label="Tiêu đề (VI)"
                             column="titleVi"
                             sortColumns={worksSortColumns}
                             onSort={handleWorksSort}
-                            className="sticky left-[184px] z-20 bg-white w-[180px] min-w-[180px]"
+                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[25%] min-w-[200px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                            style={{ left: 80 }}
                           />
                           <SortableHead
                             label="Tiêu đề Hán Nôm"
                             column="titleHannom"
                             sortColumns={worksSortColumns}
                             onSort={handleWorksSort}
-                            className="sticky left-[364px] z-20 bg-white w-[140px] min-w-[140px]"
+                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px] min-w-[140px]"
                           />
                           <SortableHead
                             label="Giai đoạn"
@@ -3282,7 +3286,7 @@ export default function ThuKyHopPhanPage() {
                         ) : (
                           paginatedWorks.map((w) => (
                             <TableRow key={w.id}>
-                              <TableCell className="sticky left-0 z-20 bg-white w-[44px] min-w-[44px]">
+                              <TableCell className="p-4 align-middle sticky left-0 z-10 bg-card border-r border-border/50 min-w-[80px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
                                 <Checkbox
                                   checked={selectedWorkSet.has(w.id)}
                                   onCheckedChange={(checked) => {
@@ -3298,13 +3302,15 @@ export default function ThuKyHopPhanPage() {
                                   }`}
                                 />
                               </TableCell>
-                              <TableCell className="sticky left-[44px] z-10 bg-white max-w-[140px] w-[140px] min-w-[140px]">
+                              <TableCell className="p-4 align-middle">
                                 {getComponentName(w.componentId)}
                               </TableCell>
-                              <TableCell className="sticky left-[184px] z-10 bg-white font-medium max-w-[180px] w-[180px] min-w-[180px]">
+                              <TableCell
+                                className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[200px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                                style={{ left: 80 }}>
                                 {w.titleVi ?? "—"}
                               </TableCell>
-                              <TableCell className="sticky left-[364px] z-10 bg-white max-w-[140px] w-[140px] min-w-[140px]">
+                              <TableCell className="p-4 align-middle">
                                 {w.titleHannom ?? "—"}
                               </TableCell>
                               <TableCell>
@@ -3679,25 +3685,27 @@ export default function ThuKyHopPhanPage() {
             ) : (
               <>
                 {pcViewMode === "table" ? (
-                  <div className="overflow-x-auto">
+                  <div className="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
                     <Table>
                       <TableHeader>
-                        <TableRow className="sticky top-0 bg-white z-30">
+                        <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm sticky top-0 z-20">
                           <SortableHead
                             label="Số HĐ"
                             column="contractNumber"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
-                            className="sticky left-0 z-20 bg-white w-[120px] min-w-[120px]"
+                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px] min-w-[120px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
                           />
                           <SortableHead
                             label="Hợp phần"
                             column="component"
                             sortColumns={tcSortColumns}
                             onSort={handleTcSort}
-                            className="sticky left-[120px] z-20 bg-white w-[140px] min-w-[140px]"
+                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] min-w-[140px]"
                           />
-                          <TableHead className="sticky left-[260px] z-10 bg-white w-[220px] min-w-[220px]">
+                          <TableHead
+                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[220px] min-w-[220px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                            style={{ left: 120 }}>
                             Tác phẩm
                           </TableHead>
                           <SortableHead
@@ -3819,7 +3827,7 @@ export default function ThuKyHopPhanPage() {
                           <TableHead className="max-w-[100px] truncate">
                             Ghi chú
                           </TableHead>
-                          <TableHead className="w-[80px]"></TableHead>
+                          <TableHead className="w-[120px]"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -3834,13 +3842,15 @@ export default function ThuKyHopPhanPage() {
                         ) : (
                           paginatedTc.map((c) => (
                             <TableRow key={c.id}>
-                              <TableCell className="sticky left-0 z-20 bg-white font-medium w-[120px] min-w-[120px]">
+                              <TableCell className="p-4 align-middle sticky left-0 z-10 bg-card border-r border-border/50 font-medium min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
                                 {c.contractNumber ?? "—"}
                               </TableCell>
-                              <TableCell className="sticky left-[120px] z-10 bg-white max-w-[140px] w-[140px] min-w-[140px]">
+                              <TableCell className="p-4 align-middle">
                                 {getComponentName(c.componentId)}
                               </TableCell>
-                              <TableCell className="sticky left-[260px] z-10 bg-white max-w-[220px] w-[220px] min-w-[220px]">
+                              <TableCell
+                                className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[220px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                                style={{ left: 120 }}>
                                 <div
                                   className="font-medium truncate"
                                   title={getWorkTitle(c.workId)}>
@@ -4436,25 +4446,27 @@ export default function ThuKyHopPhanPage() {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
+                <div className="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
                   <Table>
                     <TableHeader>
-                      <TableRow className="sticky top-0 bg-white z-30">
+                      <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm sticky top-0 z-20">
                         <SortableHead
                           label="Số HĐ"
                           column="contractNumber"
                           sortColumns={pcSortColumns}
                           onSort={handlePcSort}
-                          className="sticky left-0 z-20 bg-white w-[120px] min-w-[120px]"
+                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px] min-w-[120px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
                         />
                         <SortableHead
                           label="Hợp phần"
                           column="component"
                           sortColumns={pcSortColumns}
                           onSort={handlePcSort}
-                          className="sticky left-[120px] z-20 bg-white w-[140px] min-w-[140px]"
+                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] min-w-[140px]"
                         />
-                        <TableHead className="sticky left-[260px] z-10 bg-white w-[220px] min-w-[220px]">
+                        <TableHead
+                          className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[220px] min-w-[220px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                          style={{ left: 120 }}>
                           Tác phẩm
                         </TableHead>
                         <TableHead>Người hiệu đính</TableHead>
@@ -4525,13 +4537,15 @@ export default function ThuKyHopPhanPage() {
                       ) : (
                         paginatedPc.map((c) => (
                           <TableRow key={c.id}>
-                            <TableCell className="sticky left-0 z-20 bg-white font-medium w-[120px] min-w-[120px]">
+                            <TableCell className="p-4 align-middle sticky left-0 z-10 bg-card border-r border-border/50 font-medium min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
                               {c.contractNumber ?? "—"}
                             </TableCell>
-                            <TableCell className="sticky left-[120px] z-10 bg-white max-w-[140px] w-[140px] min-w-[140px]">
+                            <TableCell className="p-4 align-middle">
                               {getComponentName(c.componentId)}
                             </TableCell>
-                            <TableCell className="sticky left-[260px] z-10 bg-white max-w-[220px] w-[220px] min-w-[220px]">
+                            <TableCell
+                              className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[220px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                              style={{ left: 120 }}>
                               <div
                                 className="font-medium truncate"
                                 title={getWorkTitle(c.workId)}>

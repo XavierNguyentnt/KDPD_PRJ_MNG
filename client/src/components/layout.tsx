@@ -10,6 +10,8 @@ import {
   ChevronUp,
   Bell,
   Languages,
+  Sun,
+  Moon,
   Shield,
   UserCog,
   FileText,
@@ -77,6 +79,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { data: notifications = [] } = useNotifications();
   const { data: unreadCount } = useUnreadNotificationCount();
   const { mutate: markNotificationRead } = useMarkNotificationRead();
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const saved = localStorage.getItem("theme");
+    return saved === "dark" ? "dark" : "light";
+  });
 
   // Desktop sidebar state - load from localStorage or default to true
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -114,6 +120,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem("sidebarOpen", String(sidebarOpen));
   }, [sidebarOpen]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   // Auto-hide sidebar when clicking on main content (desktop only)
   useEffect(() => {
@@ -464,6 +477,39 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="text-muted-foreground hover:text-primary">
+                  {theme === "dark" ? (
+                    <Moon className="w-5 h-5" />
+                  ) : (
+                    <Sun className="w-5 h-5" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Giao diện</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setTheme("light")}
+                  className={
+                    theme === "light" ? "bg-primary/10 text-primary" : ""
+                  }>
+                  Sáng (Light)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setTheme("dark")}
+                  className={
+                    theme === "dark" ? "bg-primary/10 text-primary" : ""
+                  }>
+                  Tối (Dark)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="relative text-muted-foreground hover:text-primary">
                   <Bell className="w-5 h-5" />
                   {(unreadCount?.count ?? 0) > 0 && (
@@ -572,10 +618,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {language === "vi" ? "Tài khoản của tôi" : "My Account"}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="gap-2">
-                  <Settings className="w-4 h-4" />
-                  {language === "vi" ? "Cài đặt" : "Settings"}
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
                   {language === "vi"
                     ? "Xem thông tin & đổi mật khẩu"
