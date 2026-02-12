@@ -128,12 +128,10 @@ export async function registerRoutes(
   app.post(api.auth.login.path, loginRateLimit, (req, res, next) => {
     const input = api.auth.login.input.safeParse(req.body);
     if (!input.success) {
-      return res
-        .status(400)
-        .json({
-          message: input.error.errors[0].message,
-          field: input.error.errors[0].path.join("."),
-        });
+      return res.status(400).json({
+        message: input.error.errors[0].message,
+        field: input.error.errors[0].path.join("."),
+      });
     }
     passport.authenticate(
       "local",
@@ -143,11 +141,9 @@ export async function registerRoutes(
         info?: { message?: string },
       ) => {
         if (err) {
-          return res
-            .status(500)
-            .json({
-              message: err instanceof Error ? err.message : "Login failed",
-            });
+          return res.status(500).json({
+            message: err instanceof Error ? err.message : "Login failed",
+          });
         }
         if (!user) {
           return res
@@ -186,6 +182,70 @@ export async function registerRoutes(
       return res.status(200).json(null);
     }
     res.json(sanitizeUser(req.user as User));
+  });
+
+  app.post(api.auth.verifyPassword.path, requireAuth, async (req, res) => {
+    try {
+      const body = api.auth.verifyPassword.input.parse(req.body);
+      const userId = (req.user as User).id;
+      const u = await dbStorage.getUserById(userId);
+      if (!u) return res.status(404).json({ message: "User not found" });
+      const ok = await bcrypt.compare(
+        body.currentPassword,
+        u.passwordHash || "",
+      );
+      if (!ok)
+        return res
+          .status(400)
+          .json({ message: "Mật khẩu hiện tại không đúng" });
+      return res.json({ valid: true });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (
+        err instanceof Error &&
+        err.message.includes("Database not configured")
+      ) {
+        return res.status(503).json({ message: err.message });
+      }
+      return res
+        .status(500)
+        .json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+
+  app.post(api.auth.changePassword.path, requireAuth, async (req, res) => {
+    try {
+      const body = api.auth.changePassword.input.parse(req.body);
+      const userId = (req.user as User).id;
+      const u = await dbStorage.getUserById(userId);
+      if (!u) return res.status(404).json({ message: "User not found" });
+      const ok = await bcrypt.compare(
+        body.currentPassword,
+        u.passwordHash || "",
+      );
+      if (!ok)
+        return res
+          .status(400)
+          .json({ message: "Mật khẩu hiện tại không đúng" });
+      const hash = await bcrypt.hash(body.newPassword, 10);
+      await dbStorage.updateUser(userId, { passwordHash: hash });
+      return res.json({ message: "Đổi mật khẩu thành công" });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (
+        err instanceof Error &&
+        err.message.includes("Database not configured")
+      ) {
+        return res.status(503).json({ message: err.message });
+      }
+      return res
+        .status(500)
+        .json({ message: err instanceof Error ? err.message : "Failed" });
+    }
   });
 
   // ---------- Dev only: gán lại hash đúng cho mật khẩu 123456 (seed users) ----------
@@ -659,14 +719,10 @@ export async function registerRoutes(
       res.json({ count });
     } catch (err) {
       console.error("Error fetching unread notifications count:", err);
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error
-              ? err.message
-              : "Failed to fetch notifications",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch notifications",
+      });
     }
   });
 
@@ -683,14 +739,10 @@ export async function registerRoutes(
       res.json(list);
     } catch (err) {
       console.error("Error fetching notifications:", err);
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error
-              ? err.message
-              : "Failed to fetch notifications",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch notifications",
+      });
     }
   });
 
@@ -708,14 +760,10 @@ export async function registerRoutes(
       res.json(updated);
     } catch (err) {
       console.error("Error marking notification as read:", err);
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error
-              ? err.message
-              : "Failed to update notification",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to update notification",
+      });
     }
   });
 
@@ -728,11 +776,9 @@ export async function registerRoutes(
       res.json(list);
     } catch (err) {
       console.error("Error fetching works:", err);
-      res
-        .status(500)
-        .json({
-          message: err instanceof Error ? err.message : "Failed to fetch works",
-        });
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to fetch works",
+      });
     }
   });
 
@@ -836,13 +882,11 @@ export async function registerRoutes(
         buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
       } catch (writeErr) {
         console.error("Error writing Excel buffer:", writeErr);
-        return res
-          .status(500)
-          .json({
-            message:
-              "Failed to generate Excel file: " +
-              (writeErr instanceof Error ? writeErr.message : "Unknown error"),
-          });
+        return res.status(500).json({
+          message:
+            "Failed to generate Excel file: " +
+            (writeErr instanceof Error ? writeErr.message : "Unknown error"),
+        });
       }
 
       res.setHeader(
@@ -874,11 +918,9 @@ export async function registerRoutes(
       if (!row) return res.status(404).json({ message: "Work not found" });
       res.json(row);
     } catch (err) {
-      res
-        .status(500)
-        .json({
-          message: err instanceof Error ? err.message : "Failed to fetch work",
-        });
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to fetch work",
+      });
     }
   });
   /** Chuẩn hóa body works: pg numeric expect string, client có thể gửi number. */
@@ -906,11 +948,9 @@ export async function registerRoutes(
     } catch (err) {
       if (err instanceof z.ZodError)
         return res.status(400).json({ message: err.errors[0].message });
-      res
-        .status(500)
-        .json({
-          message: err instanceof Error ? err.message : "Failed to create work",
-        });
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to create work",
+      });
     }
   });
   app.patch(api.works.update.path, requireAuth, async (req, res) => {
@@ -929,11 +969,9 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       if (err instanceof Error && err.message.includes("not found"))
         return res.status(404).json({ message: err.message });
-      res
-        .status(500)
-        .json({
-          message: err instanceof Error ? err.message : "Failed to update work",
-        });
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to update work",
+      });
     }
   });
   app.delete(
@@ -952,12 +990,9 @@ export async function registerRoutes(
       } catch (err) {
         if (err instanceof Error && err.message.includes("not found"))
           return res.status(404).json({ message: err.message });
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error ? err.message : "Failed to delete work",
-          });
+        res.status(500).json({
+          message: err instanceof Error ? err.message : "Failed to delete work",
+        });
       }
     },
   );
@@ -976,13 +1011,11 @@ export async function registerRoutes(
       upload.single("file")(req, res, (err) => {
         if (err) {
           console.error("Multer error:", err);
-          return res
-            .status(400)
-            .json({
-              message:
-                "File upload error: " +
-                (err instanceof Error ? err.message : "Unknown error"),
-            });
+          return res.status(400).json({
+            message:
+              "File upload error: " +
+              (err instanceof Error ? err.message : "Unknown error"),
+          });
         }
         next();
       });
@@ -1024,12 +1057,10 @@ export async function registerRoutes(
           }) as any[][];
 
           if (data.length < 2) {
-            return res
-              .status(400)
-              .json({
-                message:
-                  "File không có dữ liệu. Cần ít nhất 1 dòng dữ liệu (không tính header).",
-              });
+            return res.status(400).json({
+              message:
+                "File không có dữ liệu. Cần ít nhất 1 dòng dữ liệu (không tính header).",
+            });
           }
 
           // Get components for mapping
@@ -1123,24 +1154,18 @@ export async function registerRoutes(
           res.json({ success: successCount, errors });
         } catch (parseErr) {
           console.error("Error parsing Excel:", parseErr);
-          res
-            .status(400)
-            .json({
-              message:
-                "Lỗi đọc file Excel: " +
-                (parseErr instanceof Error
-                  ? parseErr.message
-                  : "Unknown error"),
-            });
+          res.status(400).json({
+            message:
+              "Lỗi đọc file Excel: " +
+              (parseErr instanceof Error ? parseErr.message : "Unknown error"),
+          });
         }
       } catch (err) {
         console.error("Error importing works:", err);
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error ? err.message : "Failed to import works",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error ? err.message : "Failed to import works",
+        });
       }
     },
   );
@@ -1156,14 +1181,12 @@ export async function registerRoutes(
         res.json(list);
       } catch (err) {
         console.error("Error fetching translation contracts:", err);
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error
-                ? err.message
-                : "Failed to fetch translation contracts",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to fetch translation contracts",
+        });
       }
     },
   );
@@ -1181,14 +1204,12 @@ export async function registerRoutes(
           .json({ message: "Translation contract not found" });
       res.json(row);
     } catch (err) {
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error
-              ? err.message
-              : "Failed to fetch translation contract",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to fetch translation contract",
+      });
     }
   });
   const numericKeysTc = [
@@ -1255,14 +1276,12 @@ export async function registerRoutes(
       } catch (err) {
         if (err instanceof z.ZodError)
           return res.status(400).json({ message: err.errors[0].message });
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error
-                ? err.message
-                : "Failed to create translation contract",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to create translation contract",
+        });
       }
     },
   );
@@ -1323,14 +1342,12 @@ export async function registerRoutes(
           return res.status(400).json({ message: err.errors[0].message });
         if (err instanceof Error && err.message.includes("not found"))
           return res.status(404).json({ message: err.message });
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error
-                ? err.message
-                : "Failed to update translation contract",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to update translation contract",
+        });
       }
     },
   );
@@ -1349,14 +1366,12 @@ export async function registerRoutes(
       } catch (err) {
         if (err instanceof Error && err.message.includes("not found"))
           return res.status(404).json({ message: err.message });
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error
-                ? err.message
-                : "Failed to delete translation contract",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to delete translation contract",
+        });
       }
     },
   );
@@ -1370,12 +1385,10 @@ export async function registerRoutes(
       res.json(list);
     } catch (err) {
       console.error("Error fetching payments:", err);
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to fetch payments",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch payments",
+      });
     }
   });
 
@@ -1392,12 +1405,10 @@ export async function registerRoutes(
         const list = await dbStorage.getPaymentsByTranslationContractId(id);
         res.json(list);
       } catch (err) {
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error ? err.message : "Failed to fetch payments",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error ? err.message : "Failed to fetch payments",
+        });
       }
     },
   );
@@ -1414,12 +1425,10 @@ export async function registerRoutes(
         const list = await dbStorage.getPaymentsByProofreadingContractId(id);
         res.json(list);
       } catch (err) {
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error ? err.message : "Failed to fetch payments",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error ? err.message : "Failed to fetch payments",
+        });
       }
     },
   );
@@ -1440,19 +1449,15 @@ export async function registerRoutes(
       res.json(created);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res
-          .status(400)
-          .json({
-            message: err.errors[0].message,
-            field: err.errors[0].path.join("."),
-          });
-      }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to create payment",
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
         });
+      }
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to create payment",
+      });
     }
   });
 
@@ -1475,22 +1480,18 @@ export async function registerRoutes(
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res
-          .status(400)
-          .json({
-            message: err.errors[0].message,
-            field: err.errors[0].path.join("."),
-          });
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
       }
       if (err instanceof Error && err.message.includes("not found")) {
         return res.status(404).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to update payment",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to update payment",
+      });
     }
   });
 
@@ -1504,12 +1505,10 @@ export async function registerRoutes(
       await dbStorage.deletePayment(id);
       res.json({ message: "Deleted" });
     } catch (err) {
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to delete payment",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to delete payment",
+      });
     }
   });
 
@@ -1527,14 +1526,12 @@ export async function registerRoutes(
           await dbStorage.getTranslationContractFinanceSummary(id);
         res.json(summary);
       } catch (err) {
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error
-                ? err.message
-                : "Failed to fetch finance summary",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to fetch finance summary",
+        });
       }
     },
   );
@@ -1573,14 +1570,12 @@ export async function registerRoutes(
           .json({ message: "Proofreading contract not found" });
       res.json(row);
     } catch (err) {
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error
-              ? err.message
-              : "Failed to fetch proofreading contract",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to fetch proofreading contract",
+      });
     }
   });
   app.get(
@@ -1597,14 +1592,12 @@ export async function registerRoutes(
           await dbStorage.getProofreadingContractFinanceSummary(id);
         res.json(summary);
       } catch (err) {
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error
-                ? err.message
-                : "Failed to fetch finance summary",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to fetch finance summary",
+        });
       }
     },
   );
@@ -1649,14 +1642,12 @@ export async function registerRoutes(
       } catch (err) {
         if (err instanceof z.ZodError)
           return res.status(400).json({ message: err.errors[0].message });
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error
-                ? err.message
-                : "Failed to create proofreading contract",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to create proofreading contract",
+        });
       }
     },
   );
@@ -1692,14 +1683,12 @@ export async function registerRoutes(
           return res.status(400).json({ message: err.errors[0].message });
         if (err instanceof Error && err.message.includes("not found"))
           return res.status(404).json({ message: err.message });
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error
-                ? err.message
-                : "Failed to update proofreading contract",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to update proofreading contract",
+        });
       }
     },
   );
@@ -1718,14 +1707,12 @@ export async function registerRoutes(
       } catch (err) {
         if (err instanceof Error && err.message.includes("not found"))
           return res.status(404).json({ message: err.message });
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error
-                ? err.message
-                : "Failed to delete proofreading contract",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to delete proofreading contract",
+        });
       }
     },
   );
@@ -1739,12 +1726,10 @@ export async function registerRoutes(
       res.json(list);
     } catch (err) {
       console.error("Error fetching components:", err);
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to fetch components",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch components",
+      });
     }
   });
   app.get(api.components.get.path, requireAuth, async (req, res) => {
@@ -1758,12 +1743,10 @@ export async function registerRoutes(
       if (!row) return res.status(404).json({ message: "Component not found" });
       res.json(row);
     } catch (err) {
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to fetch component",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch component",
+      });
     }
   });
   app.post(api.components.create.path, requireAuth, async (req, res) => {
@@ -1776,12 +1759,10 @@ export async function registerRoutes(
     } catch (err) {
       if (err instanceof z.ZodError)
         return res.status(400).json({ message: err.errors[0].message });
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to create component",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to create component",
+      });
     }
   });
   app.patch(api.components.update.path, requireAuth, async (req, res) => {
@@ -1799,12 +1780,10 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       if (err instanceof Error && err.message.includes("not found"))
         return res.status(404).json({ message: err.message });
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to update component",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to update component",
+      });
     }
   });
 
@@ -1834,7 +1813,8 @@ export async function registerRoutes(
           return res.json([]);
         }
         res.status(500).json({
-          message: err instanceof Error ? err.message : "Failed to fetch stages",
+          message:
+            err instanceof Error ? err.message : "Failed to fetch stages",
           stack: err instanceof Error ? err.stack : undefined,
         });
       }
@@ -1854,12 +1834,10 @@ export async function registerRoutes(
           await dbStorage.getContractStagesByProofreadingContractId(contractId);
         res.json(list);
       } catch (err) {
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error ? err.message : "Failed to fetch stages",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error ? err.message : "Failed to fetch stages",
+        });
       }
     },
   );
@@ -1873,14 +1851,12 @@ export async function registerRoutes(
     } catch (err) {
       if (err instanceof z.ZodError)
         return res.status(400).json({ message: err.errors[0].message });
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error
-              ? err.message
-              : "Failed to create contract stage",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to create contract stage",
+      });
     }
   });
   app.patch(api.contractStages.update.path, requireAuth, async (req, res) => {
@@ -1898,14 +1874,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       if (err instanceof Error && err.message.includes("not found"))
         return res.status(404).json({ message: err.message });
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error
-              ? err.message
-              : "Failed to update contract stage",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to update contract stage",
+      });
     }
   });
   app.delete(api.contractStages.delete.path, requireAuth, async (req, res) => {
@@ -1920,14 +1894,12 @@ export async function registerRoutes(
     } catch (err) {
       if (err instanceof Error && err.message.includes("not found"))
         return res.status(404).json({ message: err.message });
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error
-              ? err.message
-              : "Failed to delete contract stage",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to delete contract stage",
+      });
     }
   });
 
@@ -1953,11 +1925,9 @@ export async function registerRoutes(
         return res.status(503).json({ message: err.message });
       }
       console.error("Error fetching users:", err);
-      res
-        .status(500)
-        .json({
-          message: err instanceof Error ? err.message : "Failed to fetch users",
-        });
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to fetch users",
+      });
     }
   });
 
@@ -1977,11 +1947,9 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message: err instanceof Error ? err.message : "Failed to fetch user",
-        });
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to fetch user",
+      });
     }
   });
 
@@ -1997,12 +1965,10 @@ export async function registerRoutes(
         res.json(user);
       } catch (err) {
         if (err instanceof z.ZodError) {
-          return res
-            .status(400)
-            .json({
-              message: err.errors[0].message,
-              field: err.errors[0].path.join("."),
-            });
+          return res.status(400).json({
+            message: err.errors[0].message,
+            field: err.errors[0].path.join("."),
+          });
         }
         if (
           err instanceof Error &&
@@ -2010,12 +1976,9 @@ export async function registerRoutes(
         ) {
           return res.status(503).json({ message: err.message });
         }
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error ? err.message : "Failed to create user",
-          });
+        res.status(500).json({
+          message: err instanceof Error ? err.message : "Failed to create user",
+        });
       }
     },
   );
@@ -2083,12 +2046,10 @@ export async function registerRoutes(
       } catch (err) {
         console.error("PATCH /api/users/:id error:", err);
         if (err instanceof z.ZodError) {
-          return res
-            .status(400)
-            .json({
-              message: err.errors[0].message,
-              field: err.errors[0].path.join("."),
-            });
+          return res.status(400).json({
+            message: err.errors[0].message,
+            field: err.errors[0].path.join("."),
+          });
         }
         if (err instanceof Error && err.message.includes("not found")) {
           return res.status(404).json({ message: err.message });
@@ -2126,12 +2087,10 @@ export async function registerRoutes(
         res.json(sanitizeUser(user));
       } catch (err) {
         if (err instanceof z.ZodError) {
-          return res
-            .status(400)
-            .json({
-              message: err.errors[0].message,
-              field: err.errors[0].path.join("."),
-            });
+          return res.status(400).json({
+            message: err.errors[0].message,
+            field: err.errors[0].path.join("."),
+          });
         }
         if (err instanceof Error && err.message.includes("not found")) {
           return res.status(404).json({ message: err.message });
@@ -2142,12 +2101,10 @@ export async function registerRoutes(
         ) {
           return res.status(503).json({ message: err.message });
         }
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error ? err.message : "Failed to update password",
-          });
+        res.status(500).json({
+          message:
+            err instanceof Error ? err.message : "Failed to update password",
+        });
       }
     },
   );
@@ -2174,12 +2131,9 @@ export async function registerRoutes(
         ) {
           return res.status(503).json({ message: err.message });
         }
-        res
-          .status(500)
-          .json({
-            message:
-              err instanceof Error ? err.message : "Failed to delete user",
-          });
+        res.status(500).json({
+          message: err instanceof Error ? err.message : "Failed to delete user",
+        });
       }
     },
   );
@@ -2197,12 +2151,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to fetch contracts",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch contracts",
+      });
     }
   });
 
@@ -2223,12 +2175,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to fetch contract",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch contract",
+      });
     }
   });
 
@@ -2240,12 +2190,10 @@ export async function registerRoutes(
       res.json(contract);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res
-          .status(400)
-          .json({
-            message: err.errors[0].message,
-            field: err.errors[0].path.join("."),
-          });
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
       }
       if (
         err instanceof Error &&
@@ -2253,12 +2201,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to create contract",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to create contract",
+      });
     }
   });
 
@@ -2284,12 +2230,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to update contract",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to update contract",
+      });
     }
   });
 
@@ -2311,12 +2255,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to delete contract",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to delete contract",
+      });
     }
   });
 
@@ -2333,12 +2275,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to fetch documents",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch documents",
+      });
     }
   });
 
@@ -2358,12 +2298,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to fetch document",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch document",
+      });
     }
   });
 
@@ -2383,12 +2321,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to create document",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to create document",
+      });
     }
   });
 
@@ -2414,12 +2350,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to update document",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to update document",
+      });
     }
   });
 
@@ -2441,12 +2375,10 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message:
-            err instanceof Error ? err.message : "Failed to delete document",
-        });
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to delete document",
+      });
     }
   });
 
@@ -2516,12 +2448,10 @@ export async function registerRoutes(
       res.json(row);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res
-          .status(400)
-          .json({
-            message: err.errors[0].message,
-            field: err.errors[0].path.join("."),
-          });
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
       }
       if (
         err instanceof Error &&

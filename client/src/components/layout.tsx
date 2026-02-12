@@ -39,6 +39,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -46,6 +47,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { TaskWithAssignmentDetails, Notification } from "@shared/schema";
+import { api } from "@shared/routes";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +69,7 @@ import { formatDistanceToNow } from "date-fns";
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { role, user, logout } = useAuth();
+  const { toast } = useToast();
   const displayName = user?.displayName ?? "User";
   const department = user?.department ?? "";
   const { language, setLanguage, t } = useI18n();
@@ -90,6 +94,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [selectedTask, setSelectedTask] =
     useState<TaskWithAssignmentDetails | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [changePasswordMode, setChangePasswordMode] = useState(false);
+  const [verifiedOldPassword, setVerifiedOldPassword] = useState(false);
+  const currentPasswordNameRef = useRef(
+    `cpw-${Math.random().toString(36).slice(2)}`,
+  );
+  const [hasFocusedCurrent, setHasFocusedCurrent] = useState(false);
 
   // Refs for click outside detection
   const sidebarRef = useRef<HTMLElement>(null);
@@ -142,6 +157,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       window.removeEventListener("scroll", onScroll);
     };
   }, []);
+
+  useEffect(() => {
+    if (settingsOpen) {
+      setChangePasswordMode(false);
+      setVerifiedOldPassword(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setHasFocusedCurrent(false);
+    }
+  }, [settingsOpen]);
 
   const normalizeGroupName = (g?: string | null) => {
     const s = (g ?? "").trim();
@@ -550,6 +576,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <Settings className="w-4 h-4" />
                   {language === "vi" ? "Cài đặt" : "Settings"}
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                  {language === "vi"
+                    ? "Xem thông tin & đổi mật khẩu"
+                    : "Profile & Change Password"}
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   className="gap-2 text-destructive"
                   onClick={() => logout()}>
@@ -667,6 +698,240 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 })}
               </ul>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {language === "vi" ? "Cài đặt tài khoản" : "Account Settings"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="font-medium">Email</div>
+              <div className="text-muted-foreground">{user?.email}</div>
+              <div className="font-medium">
+                {language === "vi" ? "Họ tên hiển thị" : "Display name"}
+              </div>
+              <div className="text-muted-foreground">{user?.displayName}</div>
+              <div className="font-medium">
+                {language === "vi" ? "Phòng ban" : "Department"}
+              </div>
+              <div className="text-muted-foreground">
+                {user?.department ?? ""}
+              </div>
+              <div className="font-medium">Roles</div>
+              <div className="text-muted-foreground">
+                {(user?.roles ?? []).map((r) => r.name || r.code).join(", ")}
+              </div>
+              <div className="font-medium">Groups</div>
+              <div className="text-muted-foreground">
+                {(user?.groups ?? []).map((g) => g.name || g.code).join(", ")}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">
+                {language === "vi" ? "Đổi mật khẩu" : "Change Password"}
+              </div>
+              {!changePasswordMode ? (
+                <Button
+                  className="w-full"
+                  onClick={() => setChangePasswordMode(true)}>
+                  {language === "vi" ? "Đổi mật khẩu" : "Change Password"}
+                </Button>
+              ) : !verifiedOldPassword ? (
+                <div className="space-y-2">
+                  <input
+                    type="password"
+                    name="password"
+                    style={{
+                      position: "absolute",
+                      left: "-9999px",
+                      opacity: 0,
+                      width: 0,
+                      height: 0,
+                    }}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    autoComplete="current-password"
+                  />
+                  <Input
+                    type="password"
+                    placeholder={
+                      language === "vi"
+                        ? "Vui lòng nhập mật khẩu hiện tại để xác thực"
+                        : "Please enter your current password to verify"
+                    }
+                    name={currentPasswordNameRef.current}
+                    autoComplete="off"
+                    readOnly={!hasFocusedCurrent}
+                    onFocus={() => setHasFocusedCurrent(true)}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
+                  <Button
+                    className="w-full"
+                    disabled={changingPassword || !currentPassword}
+                    onClick={async () => {
+                      try {
+                        setChangingPassword(true);
+                        const res = await fetch(api.auth.verifyPassword.path, {
+                          method: api.auth.verifyPassword.method,
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({ currentPassword }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          toast({
+                            title:
+                              language === "vi"
+                                ? "Xác thực thất bại"
+                                : "Verification failed",
+                            description: data.message ?? "",
+                            variant: "destructive",
+                            duration: 7000,
+                          });
+                          return;
+                        }
+                        setVerifiedOldPassword(true);
+                        toast({
+                          title: language === "vi" ? "Đã xác thực" : "Verified",
+                          description:
+                            language === "vi"
+                              ? "Nhập mật khẩu mới"
+                              : "Enter new password",
+                        });
+                      } finally {
+                        setChangingPassword(false);
+                      }
+                    }}>
+                    {language === "vi" ? "Xác thực" : "Verify"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Input
+                    type="password"
+                    placeholder={
+                      language === "vi"
+                        ? "Mật khẩu mới (≥6 ký tự)"
+                        : "New password (≥6 chars)"
+                    }
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                  <Input
+                    type="password"
+                    placeholder={
+                      language === "vi"
+                        ? "Xác nhận mật khẩu mới"
+                        : "Confirm new password"
+                    }
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                  <Button
+                    className="w-full"
+                    disabled={changingPassword}
+                    onClick={async () => {
+                      if (!newPassword) {
+                        toast({
+                          title:
+                            language === "vi"
+                              ? "Thiếu thông tin"
+                              : "Missing information",
+                          description:
+                            language === "vi"
+                              ? "Nhập mật khẩu mới"
+                              : "Enter new password",
+                          variant: "destructive",
+                          duration: 5000,
+                        });
+                        return;
+                      }
+                      if (newPassword.length < 6) {
+                        toast({
+                          title:
+                            language === "vi"
+                              ? "Mật khẩu quá ngắn"
+                              : "Password too short",
+                          description:
+                            language === "vi"
+                              ? "Tối thiểu 6 ký tự"
+                              : "Minimum 6 characters",
+                          variant: "destructive",
+                          duration: 5000,
+                        });
+                        return;
+                      }
+                      if (newPassword !== confirmPassword) {
+                        toast({
+                          title:
+                            language === "vi"
+                              ? "Mật khẩu không khớp"
+                              : "Password mismatch",
+                          description:
+                            language === "vi"
+                              ? "Xác nhận lại mật khẩu mới"
+                              : "Confirm new password",
+                          variant: "destructive",
+                          duration: 5000,
+                        });
+                        return;
+                      }
+                      try {
+                        setChangingPassword(true);
+                        const res = await fetch(api.auth.changePassword.path, {
+                          method: api.auth.changePassword.method,
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({
+                            currentPassword,
+                            newPassword,
+                          }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          toast({
+                            title:
+                              language === "vi"
+                                ? "Đổi mật khẩu thất bại"
+                                : "Change password failed",
+                            description: data.message ?? "",
+                            variant: "destructive",
+                            duration: 7000,
+                          });
+                          return;
+                        }
+                        toast({
+                          title:
+                            language === "vi"
+                              ? "Đã đổi mật khẩu"
+                              : "Password changed",
+                          description:
+                            language === "vi"
+                              ? "Đăng nhập lại nếu cần"
+                              : "Re-login if needed",
+                        });
+                        setCurrentPassword("");
+                        setNewPassword("");
+                        setConfirmPassword("");
+                        setSettingsOpen(false);
+                      } finally {
+                        setChangingPassword(false);
+                      }
+                    }}>
+                    {language === "vi" ? "Đổi mật khẩu" : "Change Password"}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

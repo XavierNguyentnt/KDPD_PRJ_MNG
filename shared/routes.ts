@@ -89,6 +89,31 @@ export const api = {
         401: errorSchemas.notFound,
       },
     },
+    verifyPassword: {
+      method: "POST" as const,
+      path: "/api/auth/verify-password",
+      input: z.object({
+        currentPassword: z.string().min(1),
+      }),
+      responses: {
+        200: z.object({ valid: z.boolean() }),
+        400: errorSchemas.validation,
+        401: errorSchemas.internal,
+      },
+    },
+    changePassword: {
+      method: "POST" as const,
+      path: "/api/auth/change-password",
+      input: z.object({
+        currentPassword: z.string().min(1),
+        newPassword: z.string().min(6),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: errorSchemas.validation,
+        401: errorSchemas.internal,
+      },
+    },
   },
 
   tasks: {
