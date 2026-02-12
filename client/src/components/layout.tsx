@@ -283,14 +283,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       ? [{ href: "/thu-ky-hop-phan", label: "Thư ký hợp phần", icon: FileText }]
       : []),
     ...(role === UserRole.ADMIN || role === UserRole.MANAGER
-      ? [
-          {
-            href: "/admin",
-            label: "Admin",
-            icon: Shield as React.ComponentType<any>,
-          },
-          { href: "/admin/users", label: "Quản lý người dùng", icon: UserCog },
-        ]
+      ? [{ href: "/admin/users", label: "Quản lý người dùng", icon: UserCog }]
       : []),
   ];
 

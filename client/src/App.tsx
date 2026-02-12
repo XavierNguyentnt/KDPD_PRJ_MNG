@@ -13,7 +13,6 @@ import BienTapPage from "@/pages/bien-tap";
 import ThietKePage from "@/pages/thiet-ke";
 import CNTTPage from "@/pages/cntt";
 import Team from "@/pages/team";
-import AdminPage from "@/pages/admin";
 import AdminUsersPage from "@/pages/admin-users";
 import ThuKyHopPhanPage from "@/pages/thu-ky-hop-phan";
 import LoginPage from "@/pages/login";
@@ -154,7 +153,6 @@ function Router() {
         <Route path="/cntt" component={GuardedCNTTPage} />
         <Route path="/tasks" component={Dashboard} /> {/* Legacy route */}
         <Route path="/team" component={Team} />
-        <Route path="/admin" component={AdminPage} />
         <Route path="/admin/users" component={AdminUsersPage} />
         <Route path="/thu-ky-hop-phan" component={ThuKyHopPhanPage} />
         <Route path="/thu-ky-hop-phan/:sub" component={ThuKyHopPhanPage} />

@@ -154,7 +154,7 @@ select[class*="dropdown"]:focus {
     @apply border rounded-md bg-background;
   }
   .search-input {
-    @apply pl-9 bg-background;
+    @apply pl-10 bg-background;
   }
   .btn-icon {
     @apply h-8 w-8 p-0;

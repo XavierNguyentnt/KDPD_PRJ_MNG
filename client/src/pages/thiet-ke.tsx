@@ -379,14 +379,13 @@ export default function ThietKePage() {
   }
 
   const isAdminOrManager = role === "Admin" || role === "Manager";
-  const isDesignOrCnttGroup =
-    (user?.groups ?? []).some(
-      (g) =>
-        g.code === "thiet_ke" ||
-        g.code === "cntt" ||
-        g.name === "Thiết kế" ||
-        g.name === "CNTT",
-    );
+  const isDesignOrCnttGroup = (user?.groups ?? []).some(
+    (g) =>
+      g.code === "thiet_ke" ||
+      g.code === "cntt" ||
+      g.name === "Thiết kế" ||
+      g.name === "CNTT",
+  );
   if (!isAdminOrManager && !isDesignOrCnttGroup) {
     return (
       <div className="max-w-2xl mx-auto p-4">
@@ -457,7 +456,7 @@ export default function ThietKePage() {
                   t.dashboard.tasks.toLowerCase() +
                   "..."
                 }
-                className="search-input"
+                className="search-input pl-10"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />

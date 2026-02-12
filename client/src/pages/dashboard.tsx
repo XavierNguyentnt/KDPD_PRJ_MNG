@@ -486,7 +486,7 @@ export default function Dashboard() {
                   t.dashboard.tasks.toLowerCase() +
                   "..."
                 }
-                className="search-input"
+                className="search-input pl-10"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
