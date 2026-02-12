@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -374,6 +375,30 @@ export default function CNTTPage() {
           />
           {t.errors.retryConnection}
         </Button>
+      </div>
+    );
+  }
+
+  const isAdminOrManager = role === "Admin" || role === "Manager";
+  const isDesignOrCnttGroup =
+    (user?.groups ?? []).some(
+      (g) =>
+        g.code === "thiet_ke" ||
+        g.code === "cntt" ||
+        g.name === "Thiết kế" ||
+        g.name === "CNTT",
+    );
+  if (!isAdminOrManager && !isDesignOrCnttGroup) {
+    return (
+      <div className="max-w-2xl mx-auto p-4">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">
+              Bạn cần quyền Admin, Manager hoặc thuộc nhóm Thiết kế/CNTT để truy
+              cập trang này.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

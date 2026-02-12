@@ -103,3 +103,53 @@ export function requireRoleOrGroup(options: {
     });
   };
 }
+
+/** Thiết lập header bảo mật cơ bản cho mọi response. */
+export function securityHeaders(_req: Request, res: Response, next: NextFunction): void {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  next();
+}
+
+/** Rate limit đơn giản theo IP cho một cửa sổ thời gian. */
+export function rateLimit(options: { windowMs: number; max: number }) {
+  const hits = new Map<string, { count: number; resetAt: number }>();
+  const { windowMs, max } = options;
+  return (req: Request, res: Response, next: NextFunction) => {
+    const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    const entry = hits.get(ip);
+    if (!entry || now > entry.resetAt) {
+      hits.set(ip, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    entry.count += 1;
+    if (entry.count > max) {
+      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+      res.setHeader("Retry-After", String(retryAfter));
+      return res.status(429).json({ message: "Too many requests. Please try again later." });
+    }
+    next();
+  };
+}
+
+/** Kiểm tra Origin/Referer cho phương thức ghi để giảm CSRF (tùy chọn). */
+export function csrfOriginCheck(allowedOrigin: string) {
+  const unsafe = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!unsafe.has(req.method)) return next();
+    const origin = (req.headers.origin as string) || "";
+    const referer = (req.headers.referer as string) || "";
+    if (origin && origin !== allowedOrigin) {
+      return res.status(403).json({ message: "Forbidden: invalid origin" });
+    }
+    if (referer && !referer.startsWith(allowedOrigin)) {
+      return res.status(403).json({ message: "Forbidden: invalid referer" });
+    }
+    next();
+  };
+}

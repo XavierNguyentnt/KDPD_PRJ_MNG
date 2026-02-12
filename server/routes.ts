@@ -14,7 +14,7 @@ import { UserRole } from "@shared/schema";
 import { db, pool } from "./db";
 import * as dbStorage from "./db-storage";
 import { passport } from "./auth";
-import { requireAuth, requireRole } from "./middleware";
+import { requireAuth, requireRole, rateLimit } from "./middleware";
 import multer from "multer";
 import { buildNotificationContent } from "./notifications";
 
@@ -124,7 +124,8 @@ export async function registerRoutes(
   app: Express,
 ): Promise<Server> {
   // ---------- Auth (public login; me/logout require auth) ----------
-  app.post(api.auth.login.path, (req, res, next) => {
+  const loginRateLimit = rateLimit({ windowMs: 60_000, max: 10 });
+  app.post(api.auth.login.path, loginRateLimit, (req, res, next) => {
     const input = api.auth.login.input.safeParse(req.body);
     if (!input.success) {
       return res
@@ -153,11 +154,21 @@ export async function registerRoutes(
             .status(401)
             .json({ message: info?.message ?? "Invalid email or password" });
         }
-        req.login(user, (loginErr) => {
-          if (loginErr) {
-            return res.status(500).json({ message: loginErr.message });
+        const regenerate = (cb: () => void) => {
+          const fn = (req as any).session?.regenerate;
+          if (typeof fn === "function") {
+            fn.call((req as any).session, cb);
+          } else {
+            cb();
           }
-          return res.json(sanitizeUser(user as User));
+        };
+        regenerate(() => {
+          req.login(user, (loginErr) => {
+            if (loginErr) {
+              return res.status(500).json({ message: loginErr.message });
+            }
+            return res.json(sanitizeUser(user as User));
+          });
         });
       },
     )(req, res, next);

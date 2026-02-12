@@ -69,6 +69,28 @@ export default function Dashboard() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "board">("table");
   const taskListRef = useRef<HTMLDivElement>(null);
+  const dialogMode = useMemo<"view" | "edit">(() => {
+    if (!selectedTask) return "view";
+    const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
+    if (isAdminManager) return "edit";
+    const groups = user?.groups ?? [];
+    const gname = (selectedTask.group ?? "").toLowerCase().replace(/\s+/g, "");
+    const inSameGroup = groups.some((g) => {
+      const name = (g.name ?? "").toLowerCase().replace(/\s+/g, "");
+      const code = (g.code ?? "").toLowerCase().replace(/\s+/g, "");
+      if (gname === "thiếtkế" || gname === "thietke") {
+        return name.includes("thiếtkế") || code.includes("thietke") || code.includes("thiet-ke");
+      }
+      if (gname === "cntt") {
+        return name.includes("cntt") || code.includes("cntt");
+      }
+      if (gname === "biêntập" || gname === "bientap") {
+        return name.includes("biêntập") || name.includes("bientap") || code.includes("bientap") || code.includes("bien-tap");
+      }
+      return name.includes(gname) || code.includes(gname);
+    });
+    return inSameGroup ? "edit" : "view";
+  }, [selectedTask, role, user]);
 
   // Open create dialog when navigating from header CTA (#create)
   useEffect(() => {
@@ -583,6 +605,7 @@ export default function Dashboard() {
         open={!!selectedTask}
         onOpenChange={(open) => !open && setSelectedTask(null)}
         task={selectedTask}
+        mode={dialogMode}
       />
 
       <TaskDialog

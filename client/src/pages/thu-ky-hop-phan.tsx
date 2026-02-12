@@ -712,7 +712,7 @@ const ROLE_THU_KY_NAME = "Thư ký hợp phần";
 const ROLE_THU_KY_CODE = "prj_secretary";
 
 export default function ThuKyHopPhanPage() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { role, user, loading: authLoading } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
@@ -2792,9 +2792,34 @@ export default function ThuKyHopPhanPage() {
     );
   }
 
+  const pathToTab = (path: string) => {
+    const p = path.toLowerCase();
+    if (p.startsWith("/thu-ky-hop-phan/hop-dong-dich-thuat"))
+      return "translation";
+    if (p.startsWith("/thu-ky-hop-phan/hop-dong-hieu-dinh"))
+      return "proofreading";
+    if (p.startsWith("/thu-ky-hop-phan/danh-muc-tac-pham")) return "works";
+    return "tasks";
+  };
+  const tabToPath = (tab: string) => {
+    if (tab === "translation") return "/thu-ky-hop-phan/hop-dong-dich-thuat";
+    if (tab === "proofreading") return "/thu-ky-hop-phan/hop-dong-hieu-dinh";
+    if (tab === "works") return "/thu-ky-hop-phan/danh-muc-tac-pham";
+    return "/thu-ky-hop-phan";
+  };
+  const [activeTab, setActiveTab] = useState<string>(pathToTab(location));
+  useEffect(() => {
+    setActiveTab(pathToTab(location));
+  }, [location]);
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="tasks" className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          setActiveTab(v);
+          setLocation(tabToPath(v));
+        }}
+        className="w-full">
         <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
           <TabsTrigger value="tasks">Công việc</TabsTrigger>
           <TabsTrigger value="works">Danh mục tác phẩm</TabsTrigger>

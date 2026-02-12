@@ -5,6 +5,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { initSession } from "./auth";
 import { startNotificationsJob } from "./notifications-job";
+import { securityHeaders, csrfOriginCheck } from "./middleware";
 
 const app = express();
 const httpServer = createServer(app);
@@ -28,6 +29,12 @@ app.use(express.urlencoded({ extended: true }));
 const trustProxy = parseInt(process.env.TRUST_PROXY || "0", 10);
 if (trustProxy > 0) {
   app.set("trust proxy", trustProxy);
+}
+
+app.use(securityHeaders);
+
+if (process.env.CSRF_CHECK === "true" && process.env.CSRF_ORIGIN) {
+  app.use(csrfOriginCheck(process.env.CSRF_ORIGIN));
 }
 
 initSession(app);
@@ -102,7 +109,7 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   const isWindows = process.platform === "win32";
-  
+
   httpServer.listen(
     {
       port,

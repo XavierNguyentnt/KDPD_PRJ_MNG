@@ -1,9 +1,10 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { UserRole } from "@/hooks/use-tasks";
 import { I18nProvider } from "@/hooks/use-i18n";
 import Layout from "@/components/layout";
 import Dashboard from "@/pages/dashboard";
@@ -18,20 +19,87 @@ import ThuKyHopPhanPage from "@/pages/thu-ky-hop-phan";
 import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
+function normalize(text: string) {
+  return text.toLowerCase().replace(/\s+/g, "");
+}
+
+function hasGroup(user: ReturnType<typeof useAuth>["user"], group: string) {
+  const target = normalize(group);
+  const list = user?.groups ?? [];
+  return list.some((g) => {
+    const name = normalize(g.name ?? "");
+    const code = normalize(g.code ?? "");
+    if (target === "thiếtkế" || target === "thietke") {
+      return (
+        name.includes("thiếtkế") ||
+        code.includes("thietke") ||
+        code.includes("thiet-k e") ||
+        code.includes("thiet-ke")
+      );
+    }
+    if (target === "cntt") {
+      return name.includes("cntt") || code.includes("cntt");
+    }
+    if (target === "biêntập" || target === "bientap") {
+      return (
+        name.includes("biêntập") ||
+        name.includes("bientap") ||
+        code.includes("bientap") ||
+        code.includes("bien-tap")
+      );
+    }
+    return name.includes(target) || code.includes(target);
+  });
+}
+
+function GuardedGroupPage({
+  group,
+  Component,
+}: {
+  group: string;
+  Component: React.ComponentType<any>;
+}) {
+  const { user, role } = useAuth();
+  const [_, navigate] = useLocation();
+  const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
+  const allowed = isAdminManager || hasGroup(user, group);
+  if (!allowed) {
+    navigate("/");
+    return null;
+  }
+  return <Component />;
+}
+
 function Router() {
   return (
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/cv-chung" component={CVChungPage} />
-        <Route path="/bien-tap" component={BienTapPage} />
-        <Route path="/thiet-ke" component={ThietKePage} />
-        <Route path="/cntt" component={CNTTPage} />
+        <Route
+          path="/bien-tap"
+          component={() => (
+            <GuardedGroupPage group="Biên tập" Component={BienTapPage} />
+          )}
+        />
+        <Route
+          path="/thiet-ke"
+          component={() => (
+            <GuardedGroupPage group="Thiết kế" Component={ThietKePage} />
+          )}
+        />
+        <Route
+          path="/cntt"
+          component={() => (
+            <GuardedGroupPage group="CNTT" Component={CNTTPage} />
+          )}
+        />
         <Route path="/tasks" component={Dashboard} /> {/* Legacy route */}
         <Route path="/team" component={Team} />
         <Route path="/admin" component={AdminPage} />
         <Route path="/admin/users" component={AdminUsersPage} />
         <Route path="/thu-ky-hop-phan" component={ThuKyHopPhanPage} />
+        <Route path="/thu-ky-hop-phan/:sub" component={ThuKyHopPhanPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
