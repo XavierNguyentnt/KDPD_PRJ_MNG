@@ -17,6 +17,7 @@ import { passport } from "./auth";
 import { requireAuth, requireRole, rateLimit } from "./middleware";
 import multer from "multer";
 import { buildNotificationContent } from "./notifications";
+import { sendNotificationEmail } from "./email";
 
 /** Feature flag: Work/Contract taxonomy (theo Docs refactor – tắt được khi rollback). */
 const FEATURE_WORK_ENABLED = process.env.FEATURE_WORK_ENABLED === "true";
@@ -466,6 +467,7 @@ export async function registerRoutes(
         if (dateError) return res.status(400).json({ message: dateError });
       }
 
+      const prevTask = await storage.getTask(id);
       const task = await storage.updateTask(id, input);
 
       if (db && assignmentsInput !== undefined) {
@@ -506,7 +508,7 @@ export async function registerRoutes(
                 "task_assigned",
                 task.title ?? "",
               );
-              await dbStorage.createNotification({
+              const created = await dbStorage.createNotification({
                 userId: a.userId,
                 type: "task_assigned",
                 taskId: id,
@@ -516,6 +518,43 @@ export async function registerRoutes(
                 isRead: false,
                 createdAt: new Date(),
                 readAt: null,
+              });
+              await sendNotificationEmail(a.userId, created, {
+                taskTitle: task.title ?? "",
+              });
+            }
+          }
+        }
+        if ((prevTask?.vote ?? null) !== (task.vote ?? null) && task.vote) {
+          const allAssignments = await dbStorage.getTaskAssignmentsByTaskId(id);
+          for (const a of allAssignments) {
+            if (a.stageType === "kiem_soat") continue;
+            const existing = await dbStorage.getNotificationByTaskType(
+              a.userId,
+              id,
+              "task_reviewed",
+            );
+            if (!existing) {
+              const content = buildNotificationContent(
+                "task_reviewed",
+                task.title ?? "",
+                null,
+                task.vote ?? null,
+              );
+              const created = await dbStorage.createNotification({
+                userId: a.userId,
+                type: "task_reviewed",
+                taskId: id,
+                taskAssignmentId: a.id,
+                title: content.title,
+                message: content.message,
+                isRead: false,
+                createdAt: new Date(),
+                readAt: null,
+              });
+              await sendNotificationEmail(a.userId, created, {
+                taskTitle: task.title ?? "",
+                vote: task.vote ?? null,
               });
             }
           }
@@ -641,7 +680,7 @@ export async function registerRoutes(
               "task_assigned",
               task.title ?? "",
             );
-            await dbStorage.createNotification({
+            const created = await dbStorage.createNotification({
               userId: a.userId,
               type: "task_assigned",
               taskId: task.id,
@@ -651,6 +690,9 @@ export async function registerRoutes(
               isRead: false,
               createdAt: new Date(),
               readAt: null,
+            });
+            await sendNotificationEmail(a.userId, created, {
+              taskTitle: task.title ?? "",
             });
           }
         }

@@ -7,9 +7,10 @@ export function formatDateOnly(input: string | Date | null | undefined): string 
 }
 
 export function buildNotificationContent(
-  type: "task_assigned" | "task_due_soon" | "task_overdue",
+  type: "task_assigned" | "task_due_soon" | "task_overdue" | "task_reviewed",
   taskTitle: string,
-  dueDate?: string | null
+  dueDate?: string | null,
+  vote?: string | null
 ) {
   const safeTitle = taskTitle || "Công việc";
   if (type === "task_assigned") {
@@ -24,8 +25,14 @@ export function buildNotificationContent(
       message: dueDate ? `Sắp đến hạn (${dueDate}): ${safeTitle}` : `Sắp đến hạn: ${safeTitle}`,
     };
   }
+  if (type === "task_overdue") {
+    return {
+      title: "Công việc đã quá hạn",
+      message: dueDate ? `Đã quá hạn (${dueDate}): ${safeTitle}` : `Đã quá hạn: ${safeTitle}`,
+    };
+  }
   return {
-    title: "Công việc đã quá hạn",
-    message: dueDate ? `Đã quá hạn (${dueDate}): ${safeTitle}` : `Đã quá hạn: ${safeTitle}`,
+    title: "Đánh giá công việc đã hoàn thành",
+    message: vote ? `Đánh giá: ${vote} — ${safeTitle}` : `Đã đánh giá: ${safeTitle}`,
   };
 }
