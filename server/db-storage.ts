@@ -66,6 +66,9 @@ import {
   payments,
   type Payment,
   type InsertPayment,
+  pushSubscriptions,
+  type PushSubscriptionRow,
+  type InsertPushSubscriptionRow,
 } from "@shared/schema";
 
 function requireDb() {
@@ -1103,6 +1106,66 @@ export async function getTaskAssignmentsWithTaskByUserId(
     .innerJoin(tasks, eq(taskAssignments.taskId, tasks.id))
     .where(eq(taskAssignments.userId, userId))
     .orderBy(desc(taskAssignments.createdAt));
+}
+
+// -----------------------------------------------------------------------------
+// Push subscriptions CRUD
+// -----------------------------------------------------------------------------
+export async function upsertPushSubscription(
+  userId: string,
+  sub: { endpoint: string; p256dh: string; auth: string },
+): Promise<PushSubscriptionRow> {
+  const existing = await requireDb()
+    .select()
+    .from(pushSubscriptions)
+    .where(
+      and(
+        eq(pushSubscriptions.userId, userId),
+        eq(pushSubscriptions.endpoint, sub.endpoint),
+      ),
+    )
+    .limit(1);
+  if (existing[0]) {
+    const rows = await requireDb()
+      .update(pushSubscriptions)
+      .set({ p256dh: sub.p256dh, auth: sub.auth, updatedAt: new Date() })
+      .where(eq(pushSubscriptions.id, existing[0].id))
+      .returning();
+    return rows[0];
+  }
+  const rows = await requireDb()
+    .insert(pushSubscriptions)
+    .values({
+      userId,
+      endpoint: sub.endpoint,
+      p256dh: sub.p256dh,
+      auth: sub.auth,
+    } satisfies Omit<InsertPushSubscriptionRow, "id">)
+    .returning();
+  return rows[0];
+}
+
+export async function getPushSubscriptionsByUserId(
+  userId: string,
+): Promise<PushSubscriptionRow[]> {
+  return requireDb()
+    .select()
+    .from(pushSubscriptions)
+    .where(eq(pushSubscriptions.userId, userId));
+}
+
+export async function deletePushSubscriptionByEndpoint(
+  userId: string,
+  endpoint: string,
+): Promise<void> {
+  await requireDb()
+    .delete(pushSubscriptions)
+    .where(
+      and(
+        eq(pushSubscriptions.userId, userId),
+        eq(pushSubscriptions.endpoint, endpoint),
+      ),
+    );
 }
 
 // -----------------------------------------------------------------------------

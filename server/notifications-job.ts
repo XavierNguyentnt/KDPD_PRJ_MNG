@@ -2,6 +2,7 @@ import { db } from "./db";
 import * as dbStorage from "./db-storage";
 import { buildNotificationContent, DUE_SOON_DAYS, formatDateOnly } from "./notifications";
 import { sendNotificationEmail } from "./email";
+import { sendWebPushToUser } from "./push";
 
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
 const NOTIFICATIONS_JOB_INTERVAL_MS = Number.parseInt(
@@ -71,6 +72,7 @@ async function processUserNotifications(userId: string, today: Date): Promise<vo
         group: task.group ?? null,
         daysRemaining: diffDays,
       });
+      await sendWebPushToUser(userId, created, { url: "/" });
     }
   }
 }

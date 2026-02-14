@@ -354,6 +354,30 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 // -----------------------------------------------------------------------------
+// Push subscriptions (Web Push)
+// -----------------------------------------------------------------------------
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions);
+export const selectPushSubscriptionSchema = createSelectSchema(pushSubscriptions);
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscriptionRow = z.infer<typeof insertPushSubscriptionSchema>;
+
+// -----------------------------------------------------------------------------
 // Contract members (contracts ↔ users)
 // -----------------------------------------------------------------------------
 export const contractMembers = pgTable("contract_members", {

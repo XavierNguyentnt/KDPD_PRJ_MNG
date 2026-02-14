@@ -18,6 +18,7 @@ import { requireAuth, requireRole, rateLimit } from "./middleware";
 import multer from "multer";
 import { buildNotificationContent } from "./notifications";
 import { sendNotificationEmail } from "./email";
+import { getPublicKey as getPushPublicKey, sendWebPushToUser } from "./push";
 
 /** Feature flag: Work/Contract taxonomy (theo Docs refactor – tắt được khi rollback). */
 const FEATURE_WORK_ENABLED = process.env.FEATURE_WORK_ENABLED === "true";
@@ -569,6 +570,7 @@ export async function registerRoutes(
                 assignmentNotes: a.notes ?? null,
                 controllerNames,
               });
+              await sendWebPushToUser(a.userId, created, { url: "/" });
             }
 
             if (a.completedAt && !prevCompletedKeys.has(key)) {
@@ -644,6 +646,7 @@ export async function registerRoutes(
                         : ((a.completedAt as Date)?.toISOString() ?? null),
                     recipientIsController,
                   });
+                  await sendWebPushToUser(uid, created, { url: "/" });
                 }
               }
             }
@@ -660,40 +663,42 @@ export async function registerRoutes(
               : null;
           const voteChanged = prevVote !== nextVote && nextVote != null;
           if (voteChanged) {
-          const allAssignments = await dbStorage.getTaskAssignmentsByTaskId(id);
-          for (const a of allAssignments) {
-            if (a.stageType === "kiem_soat") continue;
-            const existing = await dbStorage.getNotificationByTaskType(
-              a.userId,
-              id,
-              "task_reviewed",
-            );
-            if (!existing) {
-              const content = buildNotificationContent("task_reviewed", {
-                taskTitle: task.title ?? "",
-                taskId: id,
-                group: task.group ?? null,
-                vote: task.vote ?? null,
-              });
-              const created = await dbStorage.createNotification({
-                userId: a.userId,
-                type: "task_reviewed",
-                taskId: id,
-                taskAssignmentId: a.id,
-                title: content.title,
-                message: content.message,
-                isRead: false,
-                createdAt: new Date(),
-                readAt: null,
-              });
-              await sendNotificationEmail(a.userId, created, {
-                taskTitle: task.title ?? "",
-                taskId: id,
-                group: task.group ?? null,
-                vote: task.vote ?? null,
-              });
+            const allAssignments =
+              await dbStorage.getTaskAssignmentsByTaskId(id);
+            for (const a of allAssignments) {
+              if (a.stageType === "kiem_soat") continue;
+              const existing = await dbStorage.getNotificationByTaskType(
+                a.userId,
+                id,
+                "task_reviewed",
+              );
+              if (!existing) {
+                const content = buildNotificationContent("task_reviewed", {
+                  taskTitle: task.title ?? "",
+                  taskId: id,
+                  group: task.group ?? null,
+                  vote: task.vote ?? null,
+                });
+                const created = await dbStorage.createNotification({
+                  userId: a.userId,
+                  type: "task_reviewed",
+                  taskId: id,
+                  taskAssignmentId: a.id,
+                  title: content.title,
+                  message: content.message,
+                  isRead: false,
+                  createdAt: new Date(),
+                  readAt: null,
+                });
+                await sendNotificationEmail(a.userId, created, {
+                  taskTitle: task.title ?? "",
+                  taskId: id,
+                  group: task.group ?? null,
+                  vote: task.vote ?? null,
+                });
+                await sendWebPushToUser(a.userId, created, { url: "/" });
+              }
             }
-          }
           }
         }
       }
@@ -935,6 +940,55 @@ export async function registerRoutes(
         message:
           err instanceof Error ? err.message : "Failed to fetch notifications",
       });
+    }
+  });
+
+  app.get(api.push.publicKey.path, requireAuth, async (_req, res) => {
+    try {
+      const publicKey = getPushPublicKey();
+      res.json({ publicKey });
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to get key",
+      });
+    }
+  });
+
+  app.post(api.push.subscribe.path, requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      const input = api.push.subscribe.input.parse(req.body);
+      await dbStorage.upsertPushSubscription(userId, {
+        endpoint: input.endpoint,
+        p256dh: input.keys.p256dh,
+        auth: input.keys.auth,
+      });
+      res.json({ message: "Subscribed" });
+    } catch (err) {
+      const message =
+        err instanceof z.ZodError
+          ? err.errors[0].message
+          : err instanceof Error
+            ? err.message
+            : "Failed to subscribe";
+      res.status(400).json({ message });
+    }
+  });
+
+  app.post(api.push.unsubscribe.path, requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      const input = api.push.unsubscribe.input.parse(req.body);
+      await dbStorage.deletePushSubscriptionByEndpoint(userId, input.endpoint);
+      res.json({ message: "Unsubscribed" });
+    } catch (err) {
+      const message =
+        err instanceof z.ZodError
+          ? err.errors[0].message
+          : err instanceof Error
+            ? err.message
+            : "Failed to unsubscribe";
+      res.status(400).json({ message });
     }
   });
 

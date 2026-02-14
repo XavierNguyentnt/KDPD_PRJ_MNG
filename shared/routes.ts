@@ -116,6 +116,40 @@ export const api = {
     },
   },
 
+  push: {
+    publicKey: {
+      method: "GET" as const,
+      path: "/api/push/public-key",
+      responses: {
+        200: z.object({ publicKey: z.string() }),
+      },
+    },
+    subscribe: {
+      method: "POST" as const,
+      path: "/api/push/subscribe",
+      input: z.object({
+        endpoint: z.string(),
+        keys: z.object({
+          p256dh: z.string(),
+          auth: z.string(),
+        }),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: errorSchemas.validation,
+      },
+    },
+    unsubscribe: {
+      method: "POST" as const,
+      path: "/api/push/unsubscribe",
+      input: z.object({ endpoint: z.string() }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: errorSchemas.validation,
+      },
+    },
+  },
+
   tasks: {
     list: {
       method: "GET" as const,
