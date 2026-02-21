@@ -71,7 +71,7 @@ import * as XLSX from "xlsx";
 import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
-const INCLUDED_GROUPS = ["Thiết kế", "Thiết kế_Dàn trang"];
+const INCLUDED_GROUPS = ["Thiết kế"];
 const DEFAULT_GROUP = "Thiết kế";
 
 import type { TaskWithAssignmentDetails as TTask } from "@shared/schema";

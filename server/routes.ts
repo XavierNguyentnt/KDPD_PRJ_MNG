@@ -276,9 +276,16 @@ export async function registerRoutes(
   }
 
   // ---------- Tasks (require auth) ----------
-  app.get(api.tasks.list.path, requireAuth, async (_req, res) => {
+  app.get(api.tasks.list.path, requireAuth, async (req, res) => {
     try {
-      const tasks = await storage.getTasks();
+      const all = await storage.getTasks();
+      const includeArchived =
+        typeof req.query.includeArchived !== "undefined" &&
+        (req.query.includeArchived === "1" ||
+          req.query.includeArchived === "true");
+      const tasks = includeArchived
+        ? all
+        : all.filter((t) => String(t.status) !== "Archived");
       if (db) {
         const taskIds = tasks.map((t) => t.id);
         const assignments =
@@ -373,6 +380,83 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/tasks/:id/redo", requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const oldTask = await storage.getTask(id);
+      if (!oldTask) return res.status(404).json({ message: "Task not found" });
+      const vote = oldTask.vote ?? null;
+      const allowedVotes = new Set(["khong_tot", "khong_hoan_thanh"]);
+      if (!allowedVotes.has(String(vote))) {
+        return res.status(400).json({ message: "Chỉ cho phép làm lại khi đánh giá là 'Không tốt' hoặc 'Không hoàn thành'" });
+      }
+      const assignments = await dbStorage.getTaskAssignmentsByTaskId(id);
+      const reqUser = req.user as UserWithRolesAndGroups;
+      const isController = assignments.some(
+        (a) =>
+          a.userId === reqUser.id &&
+          (a.stageType === "kiem_soat" || a.stageType === "doc_duyet"),
+      );
+      if (!isController) {
+        return res.status(403).json({ message: "Chỉ người kiểm soát có thể yêu cầu làm lại" });
+      }
+      const allTasks = await dbStorage.getTasksFromDb();
+      const stripSuffix = (title: string) =>
+        title.replace(/\s*\(Làm lại lần\s+\d+\)\s*$/i, "").trim();
+      const baseTitle = stripSuffix(oldTask.title);
+      const redoCount =
+        allTasks.filter((t) => stripSuffix(t.title) === baseTitle && /\(Làm lại lần\s+\d+\)$/i.test(t.title)).length +
+        1;
+      const newTitle = `${baseTitle} (Làm lại lần ${redoCount})`;
+      await storage.updateTask(id, { status: "Archived" });
+      const now = new Date();
+      const newTask = await storage.createTask({
+        title: newTitle,
+        description: oldTask.description ?? null,
+        group: oldTask.group ?? null,
+        status: "Not Started",
+        priority: oldTask.priority,
+        progress: 0,
+        notes: oldTask.notes ?? null,
+        workflow: oldTask.workflow ?? null,
+        sourceSheetId: null,
+        sourceSheetName: null,
+        contractId: oldTask.contractId ?? null,
+        taskType: oldTask.taskType ?? null,
+        relatedWorkId: oldTask.relatedWorkId ?? null,
+        relatedContractId: oldTask.relatedContractId ?? null,
+        vote: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      // Sao chép assignments: giữ cả người kiểm soát và người thực hiện; reset ngày & trạng thái
+      for (const a of assignments) {
+        await dbStorage.createTaskAssignment({
+          taskId: newTask.id,
+          userId: a.userId,
+          stageType: a.stageType,
+          roundNumber: 1,
+          receivedAt: null,
+          dueDate: null,
+          completedAt: null,
+          assignedBy: reqUser.id,
+          status: "not_started",
+          progress: 0,
+          notes: null,
+        });
+      }
+      res.json(newTask);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Database not configured")) {
+        return res.status(503).json({ message: err.message });
+      }
+      res
+        .status(500)
+        .json({ message: err instanceof Error ? err.message : "Failed to redo task" });
+    }
+  });
+
   app.get(api.tasks.get.path, requireAuth, async (req, res) => {
     try {
       const id = Array.isArray(req.params.id)
@@ -428,10 +512,28 @@ export async function registerRoutes(
         (input as Record<string, unknown>).notes =
           body.notes === "" ? null : body.notes;
       }
-      // Đảm bảo vote (đánh giá Người kiểm soát) luôn được truyền từ body vào input
+      // Đảm bảo vote (đánh giá) chỉ được phép bởi Người kiểm soát/Doc duyệt
+      const currentUserId = (req.user as UserWithRolesAndGroups).id;
+      let allowSetVote = false;
+      if (db) {
+        try {
+          const assns = await dbStorage.getTaskAssignmentsByTaskId(id);
+          allowSetVote = assns.some(
+            (a) =>
+              a.userId === currentUserId &&
+              (a.stageType === "kiem_soat" || a.stageType === "doc_duyet"),
+          );
+        } catch {
+          allowSetVote = false;
+        }
+      }
       if ("vote" in body) {
-        (input as Record<string, unknown>).vote =
-          body.vote === "" || body.vote === undefined ? null : body.vote;
+        if (allowSetVote) {
+          (input as Record<string, unknown>).vote =
+            body.vote === "" || body.vote === undefined ? null : body.vote;
+        } else {
+          delete (input as Record<string, unknown>).vote;
+        }
       }
       if (
         FEATURE_WORK_ENABLED &&
@@ -472,6 +574,12 @@ export async function registerRoutes(
       const prevAssignmentsList = db
         ? await dbStorage.getTaskAssignmentsByTaskId(id)
         : [];
+      const prevAssignmentMap = new Map(
+        prevAssignmentsList.map((x) => [
+          `${x.userId}|${x.stageType}|${x.roundNumber ?? 1}`,
+          x,
+        ]),
+      );
       const prevAssignmentKeys = new Set(
         prevAssignmentsList.map(
           (x) => `${x.userId}|${x.stageType}|${x.roundNumber ?? 1}`,
@@ -488,6 +596,22 @@ export async function registerRoutes(
         await dbStorage.deleteTaskAssignmentsByTaskId(id);
         if (assignmentsInput.length > 0) {
           for (const a of assignmentsInput) {
+            const isController = a.stageType === "kiem_soat" || a.stageType === "doc_duyet";
+            const key = `${a.userId}|${a.stageType}|${a.roundNumber ?? 1}`;
+            const prev = prevAssignmentMap.get(key);
+            let completedAt: Date | null = null;
+            if (isController) {
+              completedAt = null;
+            } else if (a.userId === currentUserId) {
+              completedAt = a.completedAt
+                ? typeof a.completedAt === "string"
+                  ? new Date(a.completedAt)
+                  : new Date(a.completedAt)
+                : null;
+            } else {
+              completedAt =
+                prev?.completedAt != null ? new Date(prev.completedAt) : null;
+            }
             const assignment = await dbStorage.createTaskAssignment({
               taskId: id,
               userId: a.userId,
@@ -503,17 +627,13 @@ export async function registerRoutes(
                   ? a.dueDate
                   : new Date(a.dueDate).toISOString().slice(0, 10)
                 : null,
-              completedAt: a.completedAt
-                ? typeof a.completedAt === "string"
-                  ? new Date(a.completedAt)
-                  : new Date(a.completedAt)
-                : null,
+              completedAt,
               assignedBy: (req.user as UserWithRolesAndGroups)?.id ?? undefined,
               status: a.status ?? "not_started",
               progress: a.progress ?? 0,
               notes: a.notes ?? null,
             });
-            const key = `${a.userId}|${a.stageType}|${a.roundNumber ?? 1}`;
+            const key2 = `${a.userId}|${a.stageType}|${a.roundNumber ?? 1}`;
             const existing = await dbStorage.getNotificationByTaskType(
               a.userId,
               id,

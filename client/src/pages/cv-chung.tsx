@@ -32,6 +32,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   AlertDialog,
@@ -256,6 +257,8 @@ function handleExportTasks(
 
 export default function CVChungPage() {
   const { data: tasks, isLoading, isError } = useTasks();
+  const { data: tasksAll } = useTasks({ includeArchived: true });
+  const [includeArchivedForList, setIncludeArchivedForList] = useState(false);
   const { mutate: refresh, isPending: isRefreshing } = useRefreshTasks();
   const { mutate: createTask, isPending: isCreating } = useCreateTask();
   const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask();
@@ -295,9 +298,11 @@ export default function CVChungPage() {
 
   // Filter tasks for "Công việc chung" group only (DB có thể lưu "CV chung" hoặc "Công việc chung")
   const CV_CHUNG_GROUP_NAMES = ["Công việc chung", "CV chung"];
+  const datasetForList = includeArchivedForList ? tasksAll : tasks;
+
   const filteredTasks = useMemo(() => {
-    if (!tasks) return [];
-    let list = tasks.filter(
+    if (!datasetForList) return [];
+    let list = datasetForList.filter(
       (t) => t.group && CV_CHUNG_GROUP_NAMES.includes(t.group),
     );
 
@@ -331,7 +336,7 @@ export default function CVChungPage() {
     list = applyTaskFilters(list, filters, worksForFilter);
     return sortTasks(list, sortBy, sortDir);
   }, [
-    tasks,
+    datasetForList,
     role,
     user?.displayName,
     search,
@@ -440,6 +445,15 @@ export default function CVChungPage() {
             <Badge variant="secondary" className="font-normal">
               {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
             </Badge>
+            <div className="flex items-center gap-2 ml-3">
+              <span className="text-xs text-muted-foreground">
+                {language === "vi" ? "Bao gồm lưu trữ" : "Include archived"}
+              </span>
+              <Switch
+                checked={includeArchivedForList}
+                onCheckedChange={(val) => setIncludeArchivedForList(Boolean(val))}
+              />
+            </div>
             {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
               <Button
                 size="sm"

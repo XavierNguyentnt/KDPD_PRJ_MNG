@@ -184,6 +184,15 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    redo: {
+      method: "POST" as const,
+      path: "/api/tasks/:id/redo",
+      input: z.object({}).optional(),
+      responses: {
+        200: z.custom<typeof tasks.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
     delete: {
       method: "DELETE" as const,
       path: "/api/tasks/:id",

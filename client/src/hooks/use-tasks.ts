@@ -5,27 +5,34 @@ import { z } from "zod";
 // Define schema locally if not exported from shared/routes yet
 // In a real app, this would be imported from @shared/schema
 export const UserRole = {
-  ADMIN: 'Admin',
-  MANAGER: 'Manager',
-  EMPLOYEE: 'Employee'
+  ADMIN: "Admin",
+  MANAGER: "Manager",
+  EMPLOYEE: "Employee",
 } as const;
 
-export type UserRoleType = typeof UserRole[keyof typeof UserRole];
+export type UserRoleType = (typeof UserRole)[keyof typeof UserRole];
 
-export function useTasks() {
+export function useTasks(options?: { includeArchived?: boolean }) {
+  const includeArchived = options?.includeArchived ?? false;
   return useQuery({
-    queryKey: [api.tasks.list.path],
+    queryKey: [api.tasks.list.path, { includeArchived }],
     queryFn: async () => {
-      const res = await fetch(api.tasks.list.path, { credentials: "include" });
+      const url = includeArchived
+        ? api.tasks.list.path + "?includeArchived=1"
+        : api.tasks.list.path;
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return api.tasks.list.responses[200].parse(await res.json());
     },
     // Refresh every minute to simulate live updates from Sheet
-    refetchInterval: 60000, 
+    refetchInterval: 60000,
   });
 }
 
-export function useTask(id: string, options?: { includeAssignments?: boolean }) {
+export function useTask(
+  id: string,
+  options?: { includeAssignments?: boolean },
+) {
   const includeAssignments = options?.includeAssignments ?? false;
   return useQuery({
     queryKey: [api.tasks.get.path, id, includeAssignments],
@@ -45,7 +52,10 @@ export function useTask(id: string, options?: { includeAssignments?: boolean }) 
 export function useUpdateTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string } & z.infer<typeof api.tasks.update.input>) => {
+    mutationFn: async ({
+      id,
+      ...updates
+    }: { id: string } & z.infer<typeof api.tasks.update.input>) => {
       const url = buildUrl(api.tasks.update.path, { id });
       const res = await fetch(url, {
         method: api.tasks.update.method,
@@ -60,11 +70,19 @@ export function useUpdateTask() {
       queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
       // Refetch ngay để UI cập nhật tức thì (vote, assignments, task detail)
       if (variables.id) {
-        queryClient.invalidateQueries({ queryKey: [api.tasks.get.path, variables.id] });
-        queryClient.invalidateQueries({ queryKey: ["task-assignments-by-task", variables.id] });
+        queryClient.invalidateQueries({
+          queryKey: [api.tasks.get.path, variables.id],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["task-assignments-by-task", variables.id],
+        });
         await Promise.all([
-          queryClient.refetchQueries({ queryKey: [api.tasks.get.path, variables.id] }),
-          queryClient.refetchQueries({ queryKey: ["task-assignments-by-task", variables.id] }),
+          queryClient.refetchQueries({
+            queryKey: [api.tasks.get.path, variables.id],
+          }),
+          queryClient.refetchQueries({
+            queryKey: ["task-assignments-by-task", variables.id],
+          }),
         ]);
       }
     },
@@ -82,7 +100,9 @@ export function useCreateTask() {
         credentials: "include",
       });
       if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: "Failed to create task" }));
+        const error = await res
+          .json()
+          .catch(() => ({ message: "Failed to create task" }));
         throw new Error(error.message || "Failed to create task");
       }
       return api.tasks.create.responses[200].parse(await res.json());
@@ -103,10 +123,35 @@ export function useDeleteTask() {
         credentials: "include",
       });
       if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: "Failed to delete task" }));
+        const error = await res
+          .json()
+          .catch(() => ({ message: "Failed to delete task" }));
         throw new Error(error.message || "Failed to delete task");
       }
       return api.tasks.delete.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
+    },
+  });
+}
+
+export function useRedoTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const url = buildUrl(api.tasks.redo.path, { id });
+      const res = await fetch(url, {
+        method: api.tasks.redo.method,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const error = await res
+          .json()
+          .catch(() => ({ message: "Failed to redo task" }));
+        throw new Error(error.message || "Failed to redo task");
+      }
+      return api.tasks.redo.responses[200].parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });

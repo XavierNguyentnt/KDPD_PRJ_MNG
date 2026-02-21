@@ -33,6 +33,7 @@ interface AssigneePickerProps {
   label?: string;
   placeholder?: string;
   className?: string;
+  autoFocus?: boolean;
 }
 
 export function AssigneePicker({
@@ -43,6 +44,7 @@ export function AssigneePicker({
   label,
   placeholder = "Tìm theo tên hoặc email...",
   className,
+  autoFocus,
 }: AssigneePickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -101,6 +103,14 @@ export function AssigneePicker({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!autoFocus || disabled) return;
+    const input = containerRef.current?.querySelector('input[type="text"]') as HTMLInputElement | null;
+    if (input) {
+      input.focus();
+    }
+  }, [autoFocus, disabled]);
 
   const handleSelect = (u: UserOption) => {
     onChange(u.displayName, u.id);
@@ -165,6 +175,7 @@ export function AssigneePicker({
             placeholder={placeholder}
             disabled={disabled}
             className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-muted-foreground"
+            autoFocus={!!autoFocus && !disabled}
           />
           {value && !disabled && (
             <button

@@ -42,9 +42,20 @@ import { useToast } from "@/hooks/use-toast";
 import { AssigneePicker } from "@/components/assignee-picker";
 import { WorkPicker } from "@/components/work-picker";
 import { DateInput } from "@/components/ui/date-input";
-import { formatDateDDMMYYYY, formatNumberAccounting, maxDateString } from "@/lib/utils";
+import {
+  formatDateDDMMYYYY,
+  formatNumberAccounting,
+  maxDateString,
+} from "@/lib/utils";
 import React, { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import { useRedoTask } from "@/hooks/use-tasks";
 import { useQuery } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import type {
@@ -58,6 +69,7 @@ interface TaskDialogProps {
   onOpenChange: (open: boolean) => void;
   task: TaskWithAssignmentDetails | null;
   onCreate?: (task: any) => void;
+  onOpenOtherTask?: (task: TaskWithAssignmentDetails) => void;
   isCreating?: boolean;
   mode?: "view" | "edit";
   /** Nhóm mặc định khi tạo mới (theo trang đang mở: Công việc chung, Biên tập, Thiết kế, CNTT) */
@@ -186,13 +198,19 @@ const DueDateBlock: React.FC<DueDateBlockProps> = ({
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <Label>{dueDateLabel}{!isBienTap ? " (Tổng)" : ""}</Label>
+          <Label>
+            {dueDateLabel}
+            {!isBienTap ? " (Tổng)" : ""}
+          </Label>
           <div className="py-2.5 px-3 rounded-md border bg-muted/30 text-sm text-muted-foreground">
             {computedDueDisplay || "—"}
           </div>
         </div>
         <div className="space-y-2">
-          <Label>{actualCompletedAtLabel}{!isBienTap ? " (Tổng)" : ""}</Label>
+          <Label>
+            {actualCompletedAtLabel}
+            {!isBienTap ? " (Tổng)" : ""}
+          </Label>
           <div className="py-2.5 px-3 rounded-md border bg-muted/30 text-sm text-muted-foreground">
             {computedActualDisplay || "—"}
           </div>
@@ -234,11 +252,12 @@ export function TaskDialog({
   onOpenChange,
   task,
   onCreate,
+  onOpenOtherTask,
   isCreating = false,
   mode = "view",
   defaultGroup,
 }: TaskDialogProps) {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { t, language } = useI18n();
   const { toast } = useToast();
   const { data: allTasks } = useTasks();
@@ -254,6 +273,7 @@ export function TaskDialog({
   });
   const updateMutation = useUpdateTask();
   const deleteMutation = useDeleteTask();
+  const redoMutation = useRedoTask();
   const isNewTask = !task;
   const [isEditing, setIsEditing] = useState(false);
   const effectiveTask = (
@@ -263,18 +283,32 @@ export function TaskDialog({
     task?.group === "CNTT" ||
     task?.group === "Quét trùng lặp" ||
     task?.group === "Thư ký hợp phần"
-      ? taskWithAssignments ?? task
+      ? (taskWithAssignments ?? task)
       : task
   ) as TaskWithAssignmentDetails | null;
 
   // Get available groups from all tasks
   const availableGroups = useMemo(() => {
     if (!allTasks)
-      return ["Công việc chung", "Biên tập", "Thiết kế", "CNTT", "Quét trùng lặp", "Thư ký hợp phần"];
+      return [
+        "Công việc chung",
+        "Biên tập",
+        "Thiết kế",
+        "CNTT",
+        "Quét trùng lặp",
+        "Thư ký hợp phần",
+      ];
     const groups = new Set(allTasks.map((t) => t.group).filter(Boolean));
     return Array.from(groups).length > 0
       ? Array.from(groups)
-      : ["Công việc chung", "Biên tập", "Thiết kế", "CNTT", "Quét trùng lặp", "Thư ký hợp phần"];
+      : [
+          "Công việc chung",
+          "Biên tập",
+          "Thiết kế",
+          "CNTT",
+          "Quét trùng lặp",
+          "Thư ký hợp phần",
+        ];
   }, [allTasks]);
 
   const getMaxBienTapRoundForWork = (
@@ -290,7 +324,10 @@ export function TaskDialog({
       let roundNum = 0;
       if (t.workflow) {
         try {
-          const wf = typeof t.workflow === "string" ? JSON.parse(t.workflow) : t.workflow;
+          const wf =
+            typeof t.workflow === "string"
+              ? JSON.parse(t.workflow)
+              : t.workflow;
           const round = wf?.rounds?.[0];
           if (round?.roundNumber) {
             roundNum = Number(round.roundNumber);
@@ -422,12 +459,10 @@ export function TaskDialog({
       const res = await fetch("/api/users", { credentials: "include" });
       if (!res.ok) throw new Error("Không tải được danh sách người dùng");
       const list = await res.json();
-      return list.map(
-        (u: { id: string; displayName: string }) => ({
-          id: u.id,
-          displayName: u.displayName,
-        })
-      ) as Array<{ id: string; displayName: string }>;
+      return list.map((u: { id: string; displayName: string }) => ({
+        id: u.id,
+        displayName: u.displayName,
+      })) as Array<{ id: string; displayName: string }>;
     },
     enabled: open && !!task && needTaskAssignments,
   });
@@ -438,7 +473,8 @@ export function TaskDialog({
     [worksList, selectedWorkId],
   );
   const componentName = selectedWork?.componentId
-    ? componentsList.find((c) => c.id === selectedWork.componentId)?.name ?? "—"
+    ? (componentsList.find((c) => c.id === selectedWork.componentId)?.name ??
+      "—")
     : "—";
   const stageDisplay = formatStageDisplay(selectedWork?.stage ?? null);
   const pageCountBienTap = useMemo(() => {
@@ -480,15 +516,32 @@ export function TaskDialog({
     status: string;
     progress: number;
   };
-  const [multiAssigneesList, setMultiAssigneesList] = useState<MultiAssigneeSlot[]>([
-    { id: "1", label: "Nhân sự 1", displayName: "", userId: null, receivedAt: null, dueDate: null, completedAt: null, status: "not_started", progress: 0 },
+  const [multiAssigneesList, setMultiAssigneesList] = useState<
+    MultiAssigneeSlot[]
+  >([
+    {
+      id: "1",
+      label: "Nhân sự 1",
+      displayName: "",
+      userId: null,
+      receivedAt: null,
+      dueDate: null,
+      completedAt: null,
+      status: "not_started",
+      progress: 0,
+    },
   ]);
 
   // Khi mở task Công việc chung / CNTT / Quét / Thư ký hợp phần: điền multiAssigneesList từ assignments + users
   useEffect(() => {
     if (
       !task?.id ||
-      !(task.group === "Công việc chung" || task.group === "CNTT" || task.group === "Quét trùng lặp" || task.group === "Thư ký hợp phần")
+      !(
+        task.group === "Công việc chung" ||
+        task.group === "CNTT" ||
+        task.group === "Quét trùng lặp" ||
+        task.group === "Thư ký hợp phần"
+      )
     )
       return;
     if (!Array.isArray(taskAssignmentsList)) return;
@@ -513,13 +566,27 @@ export function TaskDialog({
       if (v == null) return null;
       if (typeof v === "string" && v.length === 10) return v;
       try {
-        return formatDateForInput(typeof v === "string" ? v : new Date(v).toISOString().slice(0, 10));
+        return formatDateForInput(
+          typeof v === "string" ? v : new Date(v).toISOString().slice(0, 10),
+        );
       } catch {
         return null;
       }
     };
     const list: MultiAssigneeSlot[] = taskAssignmentsList.map(
-      (a: { id?: string; userId: string; stageType: string; receivedAt?: string | Date | null; dueDate?: string | Date | null; completedAt?: string | Date | null; status?: string; progress?: number }, i: number) => {
+      (
+        a: {
+          id?: string;
+          userId: string;
+          stageType: string;
+          receivedAt?: string | Date | null;
+          dueDate?: string | Date | null;
+          completedAt?: string | Date | null;
+          status?: string;
+          progress?: number;
+        },
+        i: number,
+      ) => {
         const label =
           a.stageType === "kiem_soat"
             ? "Người kiểm soát"
@@ -529,7 +596,8 @@ export function TaskDialog({
                 ? "Nhân sự " + a.stageType.replace("nhan_su_", "")
                 : "Nhân sự 1";
         const displayName =
-          users.find((u: { id: string }) => u.id === a.userId)?.displayName ?? "";
+          users.find((u: { id: string }) => u.id === a.userId)?.displayName ??
+          "";
         const hasCompleted = !!toDateStr(a.completedAt);
         return {
           id: (a.id ?? a.userId + "-" + i).toString(),
@@ -540,9 +608,14 @@ export function TaskDialog({
           dueDate: toDateStr(a.dueDate),
           completedAt: toDateStr(a.completedAt),
           status: a.status ?? (hasCompleted ? "completed" : "not_started"),
-          progress: typeof a.progress === "number" ? a.progress : (hasCompleted ? 100 : 0),
+          progress:
+            typeof a.progress === "number"
+              ? a.progress
+              : hasCompleted
+                ? 100
+                : 0,
         };
-      }
+      },
     );
     setMultiAssigneesList(list);
   }, [task?.id, task?.group, taskAssignmentsList, usersListForAssignments]);
@@ -568,18 +641,29 @@ export function TaskDialog({
       if (v == null) return "";
       if (typeof v === "string" && v.length === 10) return v;
       try {
-        return formatDateForInput(typeof v === "string" ? v : new Date(v).toISOString().slice(0, 10));
+        return formatDateForInput(
+          typeof v === "string" ? v : new Date(v).toISOString().slice(0, 10),
+        );
       } catch {
         return "";
       }
     };
     const ktvChinh = taskAssignmentsList.find(
-      (a: { stageType: string }) => a.stageType === "ktv_chinh"
-    ) as { userId: string; receivedAt?: string | Date | null; dueDate?: string | Date | null; completedAt?: string | Date | null } | undefined;
+      (a: { stageType: string }) => a.stageType === "ktv_chinh",
+    ) as
+      | {
+          userId: string;
+          receivedAt?: string | Date | null;
+          dueDate?: string | Date | null;
+          completedAt?: string | Date | null;
+        }
+      | undefined;
     if (ktvChinh) {
       setThietKeKtvChinh({
         id: "ktv",
-        displayName: users.find((u: { id: string }) => u.id === ktvChinh.userId)?.displayName ?? "",
+        displayName:
+          users.find((u: { id: string }) => u.id === ktvChinh.userId)
+            ?.displayName ?? "",
         userId: ktvChinh.userId,
         receiveDate: toDateStr(ktvChinh.receivedAt) ?? "",
         dueDate: toDateStr(ktvChinh.dueDate) ?? null,
@@ -596,17 +680,36 @@ export function TaskDialog({
       });
     }
     const troLyAssignments = taskAssignmentsList.filter(
-      (a: { stageType: string }) => a.stageType?.startsWith("tro_ly_")
-    ) as Array<{ userId: string; receivedAt?: string | Date | null; dueDate?: string | Date | null; completedAt?: string | Date | null }>;
+      (a: { stageType: string }) => a.stageType?.startsWith("tro_ly_"),
+    ) as Array<{
+      userId: string;
+      receivedAt?: string | Date | null;
+      dueDate?: string | Date | null;
+      completedAt?: string | Date | null;
+    }>;
     const troLyList = troLyAssignments
       .sort((a, b) => {
-        const na = parseInt(String((a as { stageType?: string }).stageType || "0").replace("tro_ly_", ""), 10);
-        const nb = parseInt(String((b as { stageType?: string }).stageType || "0").replace("tro_ly_", ""), 10);
+        const na = parseInt(
+          String((a as { stageType?: string }).stageType || "0").replace(
+            "tro_ly_",
+            "",
+          ),
+          10,
+        );
+        const nb = parseInt(
+          String((b as { stageType?: string }).stageType || "0").replace(
+            "tro_ly_",
+            "",
+          ),
+          10,
+        );
         return na - nb;
       })
       .map((a, i) => ({
         id: "tly-" + (a.userId ?? i),
-        displayName: users.find((u: { id: string }) => u.id === a.userId)?.displayName ?? "",
+        displayName:
+          users.find((u: { id: string }) => u.id === a.userId)?.displayName ??
+          "",
         userId: a.userId,
         receiveDate: toDateStr(a.receivedAt) ?? "",
         dueDate: toDateStr(a.dueDate) ?? null,
@@ -619,19 +722,30 @@ export function TaskDialog({
   useEffect(() => {
     if (form.watch("group") !== "Thiết kế") return;
     const hasComplete =
-      (thietKeKtvChinh.completeDate && thietKeKtvChinh.completeDate.trim() !== "") ||
-      thietKeTroLyList.some((s) => s.completeDate && s.completeDate.trim() !== "");
+      (thietKeKtvChinh.completeDate &&
+        thietKeKtvChinh.completeDate.trim() !== "") ||
+      thietKeTroLyList.some(
+        (s) => s.completeDate && s.completeDate.trim() !== "",
+      );
     if (hasComplete) form.setValue("status", "Completed");
   }, [form, thietKeKtvChinh.completeDate, thietKeTroLyList]);
 
   // Tự động cập nhật status = "Completed" khi tất cả nhân sự đã nhập ngày hoàn thành (Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần)
   useEffect(() => {
     const group = form.watch("group");
-    if (group !== "Công việc chung" && group !== "CNTT" && group !== "Quét trùng lặp" && group !== "Thư ký hợp phần") return;
-    
-    const staffMulti = multiAssigneesList.filter((s) => s.label !== "Người kiểm soát" && s.userId);
+    if (
+      group !== "Công việc chung" &&
+      group !== "CNTT" &&
+      group !== "Quét trùng lặp" &&
+      group !== "Thư ký hợp phần"
+    )
+      return;
+
+    const staffMulti = multiAssigneesList.filter(
+      (s) => s.label !== "Người kiểm soát" && s.userId,
+    );
     if (staffMulti.length === 0) return;
-    
+
     const allCompleted = staffMulti.every((s) => !!s.completedAt);
     if (allCompleted) {
       form.setValue("status", "Completed");
@@ -678,7 +792,11 @@ export function TaskDialog({
             }
           )?.taskType ?? undefined,
         vote:
-          (effectiveTask as TaskWithAssignmentDetails & { vote?: string | null })?.vote ?? null,
+          (
+            effectiveTask as TaskWithAssignmentDetails & {
+              vote?: string | null;
+            }
+          )?.vote ?? null,
       };
       if (effectiveTask.group === "Biên tập" && effectiveTask.workflow) {
         try {
@@ -794,6 +912,23 @@ export function TaskDialog({
 
   const canEditMetaRaw = role === UserRole.ADMIN || role === UserRole.MANAGER;
   const canEditMeta = canEditMetaRaw && (isNewTask || isEditing);
+  const isRedoTask =
+    !!task?.title && /\(Làm lại lần\s+\d+\)\s*$/i.test(task.title);
+  const shouldFocusTitle = isNewTask && canEditMeta && !isRedoTask;
+  const shouldFocusAssignee = !isNewTask && isRedoTask && canEditMeta;
+
+  const currentUserId = user?.id ?? null;
+  const isControllerForThisTask = useMemo(() => {
+    const list = (taskWithAssignments as any)?.assignments as
+      | Array<{ userId: string; stageType: string }>
+      | undefined;
+    if (!Array.isArray(list) || !currentUserId) return false;
+    return list.some(
+      (a) =>
+        a.userId === currentUserId &&
+        (a.stageType === "kiem_soat" || a.stageType === "doc_duyet"),
+    );
+  }, [taskWithAssignments, currentUserId]);
 
   useEffect(() => {
     if (!open) {
@@ -802,6 +937,41 @@ export function TaskDialog({
     }
     setIsEditing(isNewTask || mode === "edit");
   }, [open, isNewTask, task?.id, mode]);
+
+  async function handleVoteChange(next: string | null) {
+    form.setValue("vote", next || null);
+    const triggerRedo =
+      !!next &&
+      (next === "khong_tot" || next === "khong_hoan_thanh") &&
+      !isNewTask &&
+      isControllerForThisTask;
+    if (triggerRedo && task?.id) {
+      const confirmMsg =
+        language === "vi"
+          ? "Tạo ngay công việc “Làm lại lần n” và lưu trữ công việc hiện tại?"
+          : "Create a redo task now and archive the current task?";
+      // Xác nhận nhẹ để tránh tạo nhầm
+      if (typeof window !== "undefined" && window.confirm(confirmMsg)) {
+        try {
+          const created = await redoMutation.mutateAsync(task.id);
+          toast({
+            title:
+              language === "vi"
+                ? "Đã tạo công việc làm lại"
+                : "Redo task created",
+            description: (created?.title as string) || "",
+          });
+          if (created && onOpenOtherTask) onOpenOtherTask(created as any);
+        } catch (e) {
+          toast({
+            title: language === "vi" ? "Không thể tạo làm lại" : "Redo failed",
+            description: e instanceof Error ? e.message : String(e),
+            variant: "destructive",
+          });
+        }
+      }
+    }
+  }
 
   const onSubmit = (data: FormData) => {
     if (isNewTask && onCreate) {
@@ -869,7 +1039,8 @@ export function TaskDialog({
             });
           }
         });
-        if (thietKeAssignments.length > 0) payload.assignments = thietKeAssignments;
+        if (thietKeAssignments.length > 0)
+          payload.assignments = thietKeAssignments;
         const anyCompleted = thietKeAssignments.some((a) => !!a.completedAt);
         if (anyCompleted) payload.status = "Completed";
         const maxDueTc = maxDateString(
@@ -899,28 +1070,46 @@ export function TaskDialog({
           .filter((s) => s.userId)
           .map((slot) => {
             const isSupervisor = slot.label === "Người kiểm soát";
-            const stageType = isSupervisor ? "kiem_soat" : `nhan_su_${++nhanSuIndex}`;
+            const stageType = isSupervisor
+              ? "kiem_soat"
+              : `nhan_su_${++nhanSuIndex}`;
             return {
               userId: slot.userId!,
               stageType,
               roundNumber: 1,
-              receivedAt: isSupervisor ? null : (slot.receivedAt || null),
-              dueDate: isSupervisor ? null : (slot.dueDate || null),
-              completedAt: isSupervisor ? null : (slot.completedAt || null),
-              status: isSupervisor ? "not_started" : (slot.status ?? (slot.completedAt ? "completed" : "not_started")),
-              progress: isSupervisor ? 0 : (slot.progress ?? (slot.completedAt ? 100 : 0)),
+              receivedAt: isSupervisor ? null : slot.receivedAt || null,
+              dueDate: isSupervisor ? null : slot.dueDate || null,
+              completedAt: isSupervisor ? null : slot.completedAt || null,
+              status: isSupervisor
+                ? "not_started"
+                : (slot.status ??
+                  (slot.completedAt ? "completed" : "not_started")),
+              progress: isSupervisor
+                ? 0
+                : (slot.progress ?? (slot.completedAt ? 100 : 0)),
             };
           });
         payload.vote = data.vote ?? null;
-        const staffMulti = multiAssigneesList.filter((s) => s.label !== "Người kiểm soát" && s.userId);
-        payload.dueDate = maxDateString(...staffMulti.map((s) => s.dueDate)) ?? null;
-        payload.actualCompletedAt = maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
+        const staffMulti = multiAssigneesList.filter(
+          (s) => s.label !== "Người kiểm soát" && s.userId,
+        );
+        payload.dueDate =
+          maxDateString(...staffMulti.map((s) => s.dueDate)) ?? null;
+        payload.actualCompletedAt =
+          maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
         const nMulti = staffMulti.length;
-        const mMulti = staffMulti.filter((s) => !!s.completedAt || s.status === "completed").length;
-        const calculatedProgress = nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
+        const mMulti = staffMulti.filter(
+          (s) => !!s.completedAt || s.status === "completed",
+        ).length;
+        const calculatedProgress =
+          nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
         payload.progress = calculatedProgress;
         // Tự động cập nhật status = "Completed" khi progress đạt 100%
-        if (calculatedProgress >= 100 && (selectedGroup === "Công việc chung" || selectedGroup === "Thư ký hợp phần")) {
+        if (
+          calculatedProgress >= 100 &&
+          (selectedGroup === "Công việc chung" ||
+            selectedGroup === "Thư ký hợp phần")
+        ) {
           payload.status = "Completed";
         }
       }
@@ -937,8 +1126,8 @@ export function TaskDialog({
             status: hasActualCompletedAtCreate
               ? "completed"
               : data.status === "In Progress"
-              ? "in_progress"
-              : "not_started",
+                ? "in_progress"
+                : "not_started",
             progress: singleCompleted * 100,
             completedAt:
               hasActualCompletedAtCreate && data.actualCompletedAt
@@ -1014,14 +1203,14 @@ export function TaskDialog({
           : null;
         payload.status = lastStageActual
           ? "Completed"
-          : payload.status ?? "Not Started";
+          : (payload.status ?? "Not Started");
         // Ghi vào task_assignments: mỗi stage có userId thì thêm 1 assignment; round_number lấy từ Loại bông (Bông 1 → 1, Bông 3 → 3)
         const stageStatusToApi = (s: string) =>
           s === StageStatus.COMPLETED
             ? "completed"
             : s === StageStatus.IN_PROGRESS
-            ? "in_progress"
-            : "not_started";
+              ? "in_progress"
+              : "not_started";
         const maxRoundHint = getMaxBienTapRoundForWork(
           data.relatedWorkId ?? null,
           null,
@@ -1109,7 +1298,8 @@ export function TaskDialog({
           ...((task.group === "Công việc chung" ||
             task.group === "CNTT" ||
             task.group === "Quét trùng lặp" ||
-            task.group === "Thư ký hợp phần") && { vote: data.vote ?? null }),
+            task.group === "Thư ký hợp phần") &&
+            (isControllerForThisTask ? { vote: data.vote ?? null } : {})),
         }
       : {
           progress: data.progress,
@@ -1120,7 +1310,8 @@ export function TaskDialog({
           ...((task.group === "Công việc chung" ||
             task.group === "CNTT" ||
             task.group === "Quét trùng lặp" ||
-            task.group === "Thư ký hợp phần") && { vote: data.vote ?? null }),
+            task.group === "Thư ký hợp phần") &&
+            (isControllerForThisTask ? { vote: data.vote ?? null } : {})),
         };
 
     // Thiết kế: gửi assignments từ KTV chính + Trợ lý thiết kế
@@ -1163,7 +1354,8 @@ export function TaskDialog({
       });
       (payload as Record<string, unknown>).assignments = thietKeAssignments;
       const anyCompleted = thietKeAssignments.some((a) => !!a.completedAt);
-      if (anyCompleted) (payload as Record<string, unknown>).status = "Completed";
+      if (anyCompleted)
+        (payload as Record<string, unknown>).status = "Completed";
       const maxDueTc = maxDateString(
         thietKeKtvChinh.dueDate,
         ...thietKeTroLyList.map((s) => s.dueDate),
@@ -1173,10 +1365,12 @@ export function TaskDialog({
         ...thietKeTroLyList.map((s) => s.completeDate),
       );
       (payload as Record<string, unknown>).dueDate = maxDueTc ?? null;
-      (payload as Record<string, unknown>).actualCompletedAt = maxActualTc ?? null;
+      (payload as Record<string, unknown>).actualCompletedAt =
+        maxActualTc ?? null;
       const nTc = thietKeAssignments.length;
       const mTc = thietKeAssignments.filter((a) => !!a.completedAt).length;
-      (payload as Record<string, unknown>).progress = nTc === 0 ? 0 : Math.round((100 / nTc) * mTc);
+      (payload as Record<string, unknown>).progress =
+        nTc === 0 ? 0 : Math.round((100 / nTc) * mTc);
     }
     // Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần: gửi assignments từ danh sách nhiều nhân sự
     else if (
@@ -1191,28 +1385,46 @@ export function TaskDialog({
         .filter((s) => s.userId)
         .map((slot) => {
           const isSupervisor = slot.label === "Người kiểm soát";
-          const stageType = isSupervisor ? "kiem_soat" : `nhan_su_${++nhanSuIndex}`;
+          const stageType = isSupervisor
+            ? "kiem_soat"
+            : `nhan_su_${++nhanSuIndex}`;
           return {
             userId: slot.userId!,
             stageType,
             roundNumber: 1,
-            receivedAt: isSupervisor ? null : (slot.receivedAt || null),
-            dueDate: isSupervisor ? null : (slot.dueDate || null),
-            completedAt: isSupervisor ? null : (slot.completedAt || null),
-            status: isSupervisor ? "not_started" : (slot.status ?? (slot.completedAt ? "completed" : "not_started")),
-            progress: isSupervisor ? 0 : (slot.progress ?? (slot.completedAt ? 100 : 0)),
+            receivedAt: isSupervisor ? null : slot.receivedAt || null,
+            dueDate: isSupervisor ? null : slot.dueDate || null,
+            completedAt: isSupervisor ? null : slot.completedAt || null,
+            status: isSupervisor
+              ? "not_started"
+              : (slot.status ??
+                (slot.completedAt ? "completed" : "not_started")),
+            progress: isSupervisor
+              ? 0
+              : (slot.progress ?? (slot.completedAt ? 100 : 0)),
           };
         });
-      (payload as Record<string, unknown>).vote = data.vote ?? null;
-      const staffMulti = multiAssigneesList.filter((s) => s.label !== "Người kiểm soát" && s.userId);
-      (payload as Record<string, unknown>).dueDate = maxDateString(...staffMulti.map((s) => s.dueDate)) ?? null;
-      (payload as Record<string, unknown>).actualCompletedAt = maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
+      if (isControllerForThisTask)
+        (payload as Record<string, unknown>).vote = data.vote ?? null;
+      const staffMulti = multiAssigneesList.filter(
+        (s) => s.label !== "Người kiểm soát" && s.userId,
+      );
+      (payload as Record<string, unknown>).dueDate =
+        maxDateString(...staffMulti.map((s) => s.dueDate)) ?? null;
+      (payload as Record<string, unknown>).actualCompletedAt =
+        maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
       const nMulti = staffMulti.length;
-      const mMulti = staffMulti.filter((s) => !!s.completedAt || s.status === "completed").length;
-      const calculatedProgress = nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
+      const mMulti = staffMulti.filter(
+        (s) => !!s.completedAt || s.status === "completed",
+      ).length;
+      const calculatedProgress =
+        nMulti === 0 ? 0 : Math.round((100 / nMulti) * mMulti);
       (payload as Record<string, unknown>).progress = calculatedProgress;
       // Tự động cập nhật status = "Completed" khi progress đạt 100%
-      if (calculatedProgress >= 100 && (task.group === "Công việc chung" || task.group === "Thư ký hợp phần")) {
+      if (
+        calculatedProgress >= 100 &&
+        (task.group === "Công việc chung" || task.group === "Thư ký hợp phần")
+      ) {
         (payload as Record<string, unknown>).status = "Completed";
       }
     }
@@ -1226,8 +1438,9 @@ export function TaskDialog({
         task.group !== "Thư ký hợp phần";
       const singleCompleted = hasActualCompletedAt ? 1 : 0;
       if (isOtherGroup) {
-        (payload as Record<string, unknown>).progress =
-          Math.round((100 / 1) * singleCompleted);
+        (payload as Record<string, unknown>).progress = Math.round(
+          (100 / 1) * singleCompleted,
+        );
       }
       (payload as Record<string, unknown>).assignments = data.assigneeId
         ? [
@@ -1239,8 +1452,8 @@ export function TaskDialog({
               status: hasActualCompletedAt
                 ? "completed"
                 : data.status === "In Progress"
-                ? "in_progress"
-                : "not_started",
+                  ? "in_progress"
+                  : "not_started",
               progress: isOtherGroup ? singleCompleted * 100 : progressVal,
               completedAt:
                 hasActualCompletedAt && data.actualCompletedAt
@@ -1258,7 +1471,8 @@ export function TaskDialog({
         data.relatedWorkId || null;
       (payload as Record<string, unknown>).relatedContractId =
         data.relatedContractId || null;
-      (payload as Record<string, unknown>).vote = data.vote ?? null;
+      if (isControllerForThisTask)
+        (payload as Record<string, unknown>).vote = data.vote ?? null;
       const workflow = BienTapWorkflowHelpers.createWorkflow(1);
       if (data.roundType) workflow.rounds[0].roundType = data.roundType;
       const round = workflow.rounds[0];
@@ -1269,7 +1483,7 @@ export function TaskDialog({
       round.stages[0].cancelReason = data.btv2CancelReason || null;
       round.stages[0].status = data.btv2CompleteDate
         ? StageStatus.COMPLETED
-        : (data.btv2Status as StageStatus) ?? StageStatus.NOT_STARTED;
+        : ((data.btv2Status as StageStatus) ?? StageStatus.NOT_STARTED);
       round.stages[0].progress = data.btv2CompleteDate ? 100 : 0;
       round.stages[1].assignee = data.btv1 || null;
       round.stages[1].startDate = data.btv1ReceiveDate || null;
@@ -1278,7 +1492,7 @@ export function TaskDialog({
       round.stages[1].cancelReason = data.btv1CancelReason || null;
       round.stages[1].status = data.btv1CompleteDate
         ? StageStatus.COMPLETED
-        : (data.btv1Status as StageStatus) ?? StageStatus.NOT_STARTED;
+        : ((data.btv1Status as StageStatus) ?? StageStatus.NOT_STARTED);
       round.stages[1].progress = data.btv1CompleteDate ? 100 : 0;
       round.stages[2].assignee = data.docDuyet || null;
       round.stages[2].startDate = data.docDuyetReceiveDate || null;
@@ -1287,7 +1501,7 @@ export function TaskDialog({
       round.stages[2].cancelReason = data.docDuyetCancelReason || null;
       round.stages[2].status = data.docDuyetCompleteDate
         ? StageStatus.COMPLETED
-        : (data.docDuyetStatus as StageStatus) ?? StageStatus.NOT_STARTED;
+        : ((data.docDuyetStatus as StageStatus) ?? StageStatus.NOT_STARTED);
       round.stages[2].progress = data.docDuyetCompleteDate ? 100 : 0;
       payload.workflow = JSON.stringify(workflow);
       payload.progress = BienTapWorkflowHelpers.calculateProgress(workflow);
@@ -1302,11 +1516,14 @@ export function TaskDialog({
           s === StageStatus.COMPLETED
             ? "completed"
             : s === StageStatus.IN_PROGRESS
-            ? "in_progress"
-            : "not_started";
+              ? "in_progress"
+              : "not_started";
         const maxRoundHint = getMaxBienTapRoundForWork(
-          (task as TaskWithAssignmentDetails & { relatedWorkId?: string | null })
-            ?.relatedWorkId ?? null,
+          (
+            task as TaskWithAssignmentDetails & {
+              relatedWorkId?: string | null;
+            }
+          )?.relatedWorkId ?? null,
           task?.id ?? null,
         );
         const roundNum = roundNumberFromRoundType(data.roundType, maxRoundHint);
@@ -1446,6 +1663,7 @@ export function TaskDialog({
                 placeholder={t.task.title + "..."}
                 className="bg-background"
                 disabled={!canEditMeta}
+                autoFocus={shouldFocusTitle}
               />
               {form.formState.errors.title && (
                 <p className="text-sm text-destructive">
@@ -1472,7 +1690,9 @@ export function TaskDialog({
                       {t.status.inProgress}
                     </SelectItem>
                     <SelectItem value="Pending">{t.status.pending}</SelectItem>
-                    <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
+                    <SelectItem value="Cancelled">
+                      {t.status.cancelled}
+                    </SelectItem>
                     <SelectItem value="Completed">
                       {t.status.completed}
                     </SelectItem>
@@ -1521,6 +1741,7 @@ export function TaskDialog({
                         ? "Tìm theo tên hoặc email nhân sự..."
                         : "Search by name or email..."
                     }
+                    autoFocus={shouldFocusAssignee}
                   />
                 )}
 
@@ -1626,7 +1847,9 @@ export function TaskDialog({
                   {multiAssigneesList.map((slot) => {
                     const isSupervisor = slot.label === "Người kiểm soát";
                     return (
-                      <div key={slot.id} className="flex flex-wrap items-end gap-4 p-3 rounded-lg border bg-muted/20">
+                      <div
+                        key={slot.id}
+                        className="flex flex-wrap items-end gap-4 p-3 rounded-lg border bg-muted/20">
                         <div className="flex-1 min-w-[200px]">
                           <AssigneePicker
                             label={slot.label}
@@ -1635,8 +1858,10 @@ export function TaskDialog({
                             onChange={(displayName, userId) => {
                               setMultiAssigneesList((prev) =>
                                 prev.map((s) =>
-                                  s.id === slot.id ? { ...s, displayName, userId } : s
-                                )
+                                  s.id === slot.id
+                                    ? { ...s, displayName, userId }
+                                    : s,
+                                ),
                               );
                             }}
                             disabled={!canEditMeta && !isNewTask}
@@ -1645,43 +1870,142 @@ export function TaskDialog({
                                 ? "Tìm theo tên hoặc email..."
                                 : "Search by name or email..."
                             }
+                            autoFocus={shouldFocusAssignee && slot.id === "1"}
                           />
                         </div>
                         <div className="flex flex-wrap gap-2 items-end">
                           {isSupervisor ? (
                             <div className="space-y-1">
-                              <Label className="text-xs text-muted-foreground">
-                                {language === "vi" ? "Đánh giá công việc" : "Evaluation"}
-                              </Label>
+                              <div className="flex items-center gap-1">
+                                <Label className="text-xs text-muted-foreground">
+                                  {language === "vi"
+                                    ? "Đánh giá công việc"
+                                    : "Evaluation"}
+                                </Label>
+                                {!isControllerForThisTask && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span
+                                          className="inline-flex text-destructive cursor-help"
+                                          aria-label="permission-info">
+                                          <AlertCircle size={14} />
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        {language === "vi"
+                                          ? "Chỉ Người kiểm soát có thể đánh giá công việc."
+                                          : "Only the controller can evaluate this task."}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
                               <Select
                                 value={form.watch("vote") ?? ""}
-                                onValueChange={(v) => form.setValue("vote", v || null)}
-                                disabled={!canEditMeta && !isNewTask}
-                              >
+                                onValueChange={(v) =>
+                                  handleVoteChange(v || null)
+                                }
+                                disabled={!isControllerForThisTask}>
                                 <SelectTrigger className="w-[180px] bg-background">
-                                  <SelectValue placeholder={language === "vi" ? "Chọn đánh giá" : "Select"} />
+                                  <SelectValue
+                                    placeholder={
+                                      language === "vi"
+                                        ? "Chọn đánh giá"
+                                        : "Select"
+                                    }
+                                  />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="tot">{language === "vi" ? "Hoàn thành tốt" : "Good"}</SelectItem>
-                                  <SelectItem value="kha">{language === "vi" ? "Hoàn thành khá" : "Fair"}</SelectItem>
-                                  <SelectItem value="khong_tot">{language === "vi" ? "Không tốt" : "Poor"}</SelectItem>
-                                  <SelectItem value="khong_hoan_thanh">{language === "vi" ? "Không hoàn thành" : "Not completed"}</SelectItem>
+                                  <SelectItem value="tot">
+                                    {language === "vi"
+                                      ? "Hoàn thành tốt"
+                                      : "Good"}
+                                  </SelectItem>
+                                  <SelectItem value="kha">
+                                    {language === "vi"
+                                      ? "Hoàn thành khá"
+                                      : "Fair"}
+                                  </SelectItem>
+                                  <SelectItem value="khong_tot">
+                                    {language === "vi" ? "Không tốt" : "Poor"}
+                                  </SelectItem>
+                                  <SelectItem value="khong_hoan_thanh">
+                                    {language === "vi"
+                                      ? "Không hoàn thành"
+                                      : "Not completed"}
+                                  </SelectItem>
                                 </SelectContent>
                               </Select>
+                              {isControllerForThisTask &&
+                                !isNewTask &&
+                                (form.watch("vote") === "khong_tot" ||
+                                  form.watch("vote") ===
+                                    "khong_hoan_thanh") && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    className="mt-2"
+                                    disabled={redoMutation.isPending}
+                                    onClick={async () => {
+                                      if (!task?.id) return;
+                                      try {
+                                        const created =
+                                          await redoMutation.mutateAsync(
+                                            task.id,
+                                          );
+                                        toast({
+                                          title:
+                                            language === "vi"
+                                              ? "Đã tạo công việc làm lại"
+                                              : "Redo task created",
+                                          description:
+                                            (created?.title as string) || "",
+                                        });
+                                        if (created && onOpenOtherTask) {
+                                          onOpenOtherTask(created as any);
+                                        }
+                                      } catch (e) {
+                                        toast({
+                                          title:
+                                            language === "vi"
+                                              ? "Không thể tạo làm lại"
+                                              : "Redo failed",
+                                          description:
+                                            e instanceof Error
+                                              ? e.message
+                                              : String(e),
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    }}>
+                                    {redoMutation.isPending && (
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    )}
+                                    {language === "vi"
+                                      ? "Yêu cầu làm lại"
+                                      : "Request redo"}
+                                  </Button>
+                                )}
                             </div>
                           ) : (
                             <>
                               <div className="space-y-1">
                                 <Label className="text-xs text-muted-foreground">
-                                  {language === "vi" ? "Ngày nhận công việc" : "Received"}
+                                  {language === "vi"
+                                    ? "Ngày nhận công việc"
+                                    : "Received"}
                                 </Label>
                                 <DateInput
                                   value={slot.receivedAt || null}
                                   onChange={(v) =>
                                     setMultiAssigneesList((prev) =>
                                       prev.map((s) =>
-                                        s.id === slot.id ? { ...s, receivedAt: v || null } : s
-                                      )
+                                        s.id === slot.id
+                                          ? { ...s, receivedAt: v || null }
+                                          : s,
+                                      ),
                                     )
                                   }
                                   placeholder="dd/mm/yyyy"
@@ -1691,15 +2015,19 @@ export function TaskDialog({
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-xs text-muted-foreground">
-                                  {language === "vi" ? "Ngày hoàn thành dự kiến" : "Due"}
+                                  {language === "vi"
+                                    ? "Ngày hoàn thành dự kiến"
+                                    : "Due"}
                                 </Label>
                                 <DateInput
                                   value={slot.dueDate || null}
                                   onChange={(v) =>
                                     setMultiAssigneesList((prev) =>
                                       prev.map((s) =>
-                                        s.id === slot.id ? { ...s, dueDate: v || null } : s
-                                      )
+                                        s.id === slot.id
+                                          ? { ...s, dueDate: v || null }
+                                          : s,
+                                      ),
                                     )
                                   }
                                   placeholder="dd/mm/yyyy"
@@ -1708,30 +2036,84 @@ export function TaskDialog({
                                 />
                               </div>
                               <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">
-                                  {language === "vi" ? "Ngày hoàn thành thực tế" : "Completed"}
-                                </Label>
+                                <div className="flex items-center gap-1">
+                                  <Label className="text-xs text-muted-foreground">
+                                    {language === "vi"
+                                      ? "Ngày hoàn thành thực tế"
+                                      : "Completed"}
+                                  </Label>
+                                  {slot.userId !== currentUserId && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span
+                                            className="inline-flex text-destructive cursor-help"
+                                            aria-label="permission-info">
+                                            <AlertCircle size={14} />
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {language === "vi"
+                                            ? "Chỉ nhân sự này có thể nhập ngày hoàn thành của mình."
+                                            : "Only this assignee can edit their completion date."}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
                                 <DateInput
                                   value={slot.completedAt || null}
                                   onChange={(v) => {
                                     setMultiAssigneesList((prev) =>
                                       prev.map((s) =>
-                                        s.id === slot.id ? { ...s, completedAt: v || null, status: v ? "completed" : s.status } : s
-                                      )
+                                        s.id === slot.id
+                                          ? {
+                                              ...s,
+                                              completedAt: v || null,
+                                              status: v
+                                                ? "completed"
+                                                : s.status,
+                                            }
+                                          : s,
+                                      ),
                                     );
                                     // Tự động cập nhật status của task khi tất cả nhân sự đã hoàn thành
-                                    const updatedList = multiAssigneesList.map((s) =>
-                                      s.id === slot.id ? { ...s, completedAt: v || null, status: v ? "completed" : s.status } : s
+                                    const updatedList = multiAssigneesList.map(
+                                      (s) =>
+                                        s.id === slot.id
+                                          ? {
+                                              ...s,
+                                              completedAt: v || null,
+                                              status: v
+                                                ? "completed"
+                                                : s.status,
+                                            }
+                                          : s,
                                     );
-                                    const staffMulti = updatedList.filter((s) => s.label !== "Người kiểm soát" && s.userId);
-                                    const allCompleted = staffMulti.length > 0 && staffMulti.every((s) => !!s.completedAt);
-                                    if (allCompleted && (form.watch("group") === "Công việc chung" || form.watch("group") === "CNTT" || form.watch("group") === "Quét trùng lặp" || form.watch("group") === "Thư ký hợp phần")) {
+                                    const staffMulti = updatedList.filter(
+                                      (s) =>
+                                        s.label !== "Người kiểm soát" &&
+                                        s.userId,
+                                    );
+                                    const allCompleted =
+                                      staffMulti.length > 0 &&
+                                      staffMulti.every((s) => !!s.completedAt);
+                                    if (
+                                      allCompleted &&
+                                      (form.watch("group") ===
+                                        "Công việc chung" ||
+                                        form.watch("group") === "CNTT" ||
+                                        form.watch("group") ===
+                                          "Quét trùng lặp" ||
+                                        form.watch("group") ===
+                                          "Thư ký hợp phần")
+                                    ) {
                                       form.setValue("status", "Completed");
                                     }
                                   }}
                                   placeholder="dd/mm/yyyy"
                                   className="bg-background w-32"
-                                  disabled={!canEditMeta && !isNewTask}
+                                  disabled={slot.userId !== currentUserId}
                                 />
                               </div>
                             </>
@@ -1742,11 +2124,17 @@ export function TaskDialog({
                             size="icon"
                             className="text-destructive hover:text-destructive"
                             onClick={() =>
-                              setMultiAssigneesList((prev) => prev.filter((s) => s.id !== slot.id))
+                              setMultiAssigneesList((prev) =>
+                                prev.filter((s) => s.id !== slot.id),
+                              )
                             }
-                            disabled={multiAssigneesList.length <= 1 || (!canEditMeta && !isNewTask)}
-                            aria-label={language === "vi" ? "Xóa dòng" : "Remove row"}
-                          >
+                            disabled={
+                              multiAssigneesList.length <= 1 ||
+                              (!canEditMeta && !isNewTask)
+                            }
+                            aria-label={
+                              language === "vi" ? "Xóa dòng" : "Remove row"
+                            }>
                             ×
                           </Button>
                         </div>
@@ -1760,7 +2148,7 @@ export function TaskDialog({
                     onClick={() => {
                       setMultiAssigneesList((prev) => {
                         const nhanSuCount = prev.filter((s) =>
-                          s.label.startsWith("Nhân sự")
+                          s.label.startsWith("Nhân sự"),
                         ).length;
                         return [
                           ...prev,
@@ -1778,11 +2166,12 @@ export function TaskDialog({
                         ];
                       });
                     }}
-                    disabled={!canEditMeta && !isNewTask}
-                  >
+                    disabled={!canEditMeta && !isNewTask}>
                     + {language === "vi" ? "Thêm nhân sự" : "Add staff"}
                   </Button>
-                  {!multiAssigneesList.some((s) => s.label === "Người kiểm soát") && (
+                  {!multiAssigneesList.some(
+                    (s) => s.label === "Người kiểm soát",
+                  ) && (
                     <Button
                       type="button"
                       variant="outline"
@@ -1803,21 +2192,27 @@ export function TaskDialog({
                           },
                         ])
                       }
-                      disabled={!canEditMeta && !isNewTask}
-                    >
-                      + {language === "vi" ? "Thêm Người kiểm soát" : "Add controller"}
+                      disabled={!canEditMeta && !isNewTask}>
+                      +{" "}
+                      {language === "vi"
+                        ? "Thêm Người kiểm soát"
+                        : "Add controller"}
                     </Button>
                   )}
                   {(() => {
                     const performing = multiAssigneesList.filter(
-                      (s) => s.label !== "Người kiểm soát" && s.userId
+                      (s) => s.label !== "Người kiểm soát" && s.userId,
                     );
                     const completed = performing.filter((s) => !!s.completedAt);
                     const total = performing.length;
-                    const pct = total ? Math.round((completed.length / total) * 100) : 0;
+                    const pct = total
+                      ? Math.round((completed.length / total) * 100)
+                      : 0;
                     return (
                       <div className="pt-2 text-sm text-muted-foreground">
-                        {language === "vi" ? "Tiến độ chung: " : "Overall progress: "}
+                        {language === "vi"
+                          ? "Tiến độ chung: "
+                          : "Overall progress: "}
                         <span className="font-medium text-foreground">
                           {completed.length}/{total} ({pct}%)
                         </span>
@@ -1843,11 +2238,19 @@ export function TaskDialog({
                   <div className="flex flex-wrap items-end gap-4 p-3 rounded-lg border bg-muted/20">
                     <div className="flex-1 min-w-[200px]">
                       <AssigneePicker
-                        label={language === "vi" ? "Kỹ thuật viên chính" : "Lead technician"}
+                        label={
+                          language === "vi"
+                            ? "Kỹ thuật viên chính"
+                            : "Lead technician"
+                        }
                         value={thietKeKtvChinh.displayName}
                         assigneeId={thietKeKtvChinh.userId}
                         onChange={(displayName, userId) =>
-                          setThietKeKtvChinh((prev) => ({ ...prev, displayName, userId }))
+                          setThietKeKtvChinh((prev) => ({
+                            ...prev,
+                            displayName,
+                            userId,
+                          }))
                         }
                         disabled={!canEditMeta && !isNewTask}
                         placeholder={
@@ -1855,6 +2258,7 @@ export function TaskDialog({
                             ? "Tìm theo tên hoặc email..."
                             : "Search by name or email..."
                         }
+                        autoFocus={shouldFocusAssignee}
                       />
                     </div>
                     <div className="flex gap-2">
@@ -1865,7 +2269,10 @@ export function TaskDialog({
                         <DateInput
                           value={thietKeKtvChinh.receiveDate || null}
                           onChange={(v) =>
-                            setThietKeKtvChinh((prev) => ({ ...prev, receiveDate: v || "" }))
+                            setThietKeKtvChinh((prev) => ({
+                              ...prev,
+                              receiveDate: v || "",
+                            }))
                           }
                           placeholder="dd/mm/yyyy"
                           className="bg-background w-32"
@@ -1879,7 +2286,10 @@ export function TaskDialog({
                         <DateInput
                           value={thietKeKtvChinh.dueDate || null}
                           onChange={(v) =>
-                            setThietKeKtvChinh((prev) => ({ ...prev, dueDate: v || null }))
+                            setThietKeKtvChinh((prev) => ({
+                              ...prev,
+                              dueDate: v || null,
+                            }))
                           }
                           placeholder="dd/mm/yyyy"
                           className="bg-background w-32"
@@ -1888,12 +2298,17 @@ export function TaskDialog({
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">
-                          {language === "vi" ? "Ngày hoàn thành thực tế" : "Actual completion"}
+                          {language === "vi"
+                            ? "Ngày hoàn thành thực tế"
+                            : "Actual completion"}
                         </Label>
                         <DateInput
                           value={thietKeKtvChinh.completeDate || null}
                           onChange={(v) =>
-                            setThietKeKtvChinh((prev) => ({ ...prev, completeDate: v || "" }))
+                            setThietKeKtvChinh((prev) => ({
+                              ...prev,
+                              completeDate: v || "",
+                            }))
                           }
                           placeholder="dd/mm/yyyy"
                           className="bg-background w-32"
@@ -1903,7 +2318,9 @@ export function TaskDialog({
                     </div>
                   </div>
                   {thietKeTroLyList.map((slot, index) => (
-                    <div key={slot.id} className="flex flex-wrap items-end gap-4 p-3 rounded-lg border bg-muted/20">
+                    <div
+                      key={slot.id}
+                      className="flex flex-wrap items-end gap-4 p-3 rounded-lg border bg-muted/20">
                       <div className="flex-1 min-w-[200px]">
                         <AssigneePicker
                           label={
@@ -1916,8 +2333,10 @@ export function TaskDialog({
                           onChange={(displayName, userId) => {
                             setThietKeTroLyList((prev) =>
                               prev.map((s) =>
-                                s.id === slot.id ? { ...s, displayName, userId } : s
-                              )
+                                s.id === slot.id
+                                  ? { ...s, displayName, userId }
+                                  : s,
+                              ),
                             );
                           }}
                           disabled={!canEditMeta && !isNewTask}
@@ -1938,8 +2357,10 @@ export function TaskDialog({
                             onChange={(v) =>
                               setThietKeTroLyList((prev) =>
                                 prev.map((s) =>
-                                  s.id === slot.id ? { ...s, receiveDate: v || "" } : s
-                                )
+                                  s.id === slot.id
+                                    ? { ...s, receiveDate: v || "" }
+                                    : s,
+                                ),
                               )
                             }
                             placeholder="dd/mm/yyyy"
@@ -1956,8 +2377,10 @@ export function TaskDialog({
                             onChange={(v) =>
                               setThietKeTroLyList((prev) =>
                                 prev.map((s) =>
-                                  s.id === slot.id ? { ...s, dueDate: v || null } : s
-                                )
+                                  s.id === slot.id
+                                    ? { ...s, dueDate: v || null }
+                                    : s,
+                                ),
                               )
                             }
                             placeholder="dd/mm/yyyy"
@@ -1967,15 +2390,19 @@ export function TaskDialog({
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">
-                            {language === "vi" ? "Ngày hoàn thành thực tế" : "Actual completion"}
+                            {language === "vi"
+                              ? "Ngày hoàn thành thực tế"
+                              : "Actual completion"}
                           </Label>
                           <DateInput
                             value={slot.completeDate || null}
                             onChange={(v) =>
                               setThietKeTroLyList((prev) =>
                                 prev.map((s) =>
-                                  s.id === slot.id ? { ...s, completeDate: v || "" } : s
-                                )
+                                  s.id === slot.id
+                                    ? { ...s, completeDate: v || "" }
+                                    : s,
+                                ),
                               )
                             }
                             placeholder="dd/mm/yyyy"
@@ -1989,10 +2416,11 @@ export function TaskDialog({
                           size="icon"
                           className="text-destructive hover:text-destructive"
                           onClick={() =>
-                            setThietKeTroLyList((prev) => prev.filter((s) => s.id !== slot.id))
+                            setThietKeTroLyList((prev) =>
+                              prev.filter((s) => s.id !== slot.id),
+                            )
                           }
-                          disabled={!canEditMeta && !isNewTask}
-                        >
+                          disabled={!canEditMeta && !isNewTask}>
                           ×
                         </Button>
                       </div>
@@ -2015,9 +2443,11 @@ export function TaskDialog({
                         },
                       ])
                     }
-                    disabled={!canEditMeta && !isNewTask}
-                  >
-                    + {language === "vi" ? "Thêm Trợ lý thiết kế" : "Add design assistant"}
+                    disabled={!canEditMeta && !isNewTask}>
+                    +{" "}
+                    {language === "vi"
+                      ? "Thêm Trợ lý thiết kế"
+                      : "Add design assistant"}
                   </Button>
                 </div>
               </div>
@@ -2038,15 +2468,21 @@ export function TaskDialog({
                       <SelectValue placeholder={t.task.selectRoundType} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Tiền biên tập">Tiền biên tập</SelectItem>
+                      <SelectItem value="Tiền biên tập">
+                        Tiền biên tập
+                      </SelectItem>
                       <SelectItem value="Bông thô">Bông thô</SelectItem>
                       {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                         <React.Fragment key={`round-${n}`}>
-                          <SelectItem value={`Bông ${n} (thô)`}>{`Bông ${n} (thô)`}</SelectItem>
-                          <SelectItem value={`Bông ${n} (tinh)`}>{`Bông ${n} (tinh)`}</SelectItem>
+                          <SelectItem
+                            value={`Bông ${n} (thô)`}>{`Bông ${n} (thô)`}</SelectItem>
+                          <SelectItem
+                            value={`Bông ${n} (tinh)`}>{`Bông ${n} (tinh)`}</SelectItem>
                         </React.Fragment>
                       ))}
-                      <SelectItem value="Bông chuyển in">Bông chuyển in</SelectItem>
+                      <SelectItem value="Bông chuyển in">
+                        Bông chuyển in
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2074,6 +2510,7 @@ export function TaskDialog({
                             : "Search by name or email..."
                         }
                         disabled={!isNewTask && !canEditMeta}
+                        autoFocus={shouldFocusAssignee}
                       />
                     </div>
                     <div className="space-y-2">
@@ -2124,8 +2561,8 @@ export function TaskDialog({
                         value={
                           form.watch("btv2CompleteDate")
                             ? StageStatus.COMPLETED
-                            : form.watch("btv2Status") ??
-                              StageStatus.NOT_STARTED
+                            : (form.watch("btv2Status") ??
+                              StageStatus.NOT_STARTED)
                         }
                         onValueChange={(val) =>
                           form.setValue("btv2Status", val)
@@ -2197,6 +2634,7 @@ export function TaskDialog({
                             : "Search by name or email..."
                         }
                         disabled={!isNewTask && !canEditMeta}
+                        autoFocus={false}
                       />
                     </div>
                     <div className="space-y-2">
@@ -2247,8 +2685,8 @@ export function TaskDialog({
                         value={
                           form.watch("btv1CompleteDate")
                             ? StageStatus.COMPLETED
-                            : form.watch("btv1Status") ??
-                              StageStatus.NOT_STARTED
+                            : (form.watch("btv1Status") ??
+                              StageStatus.NOT_STARTED)
                         }
                         onValueChange={(val) =>
                           form.setValue("btv1Status", val)
@@ -2322,6 +2760,7 @@ export function TaskDialog({
                             : "Search by name or email..."
                         }
                         disabled={!isNewTask && !canEditMeta}
+                        autoFocus={false}
                       />
                     </div>
                     <div className="space-y-2">
@@ -2375,8 +2814,8 @@ export function TaskDialog({
                         value={
                           form.watch("docDuyetCompleteDate")
                             ? StageStatus.COMPLETED
-                            : form.watch("docDuyetStatus") ??
-                              StageStatus.NOT_STARTED
+                            : (form.watch("docDuyetStatus") ??
+                              StageStatus.NOT_STARTED)
                         }
                         onValueChange={(val) =>
                           form.setValue("docDuyetStatus", val)
@@ -2405,22 +2844,102 @@ export function TaskDialog({
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs">{language === "vi" ? "Đánh giá công việc" : "Evaluation"}</Label>
+                      <div className="flex items-center gap-1">
+                        <Label className="text-xs">
+                          {language === "vi"
+                            ? "Đánh giá công việc"
+                            : "Evaluation"}
+                        </Label>
+                        {!isControllerForThisTask && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className="inline-flex text-destructive cursor-help"
+                                  aria-label="permission-info">
+                                  <AlertCircle size={14} />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {language === "vi"
+                                  ? "Chỉ Người kiểm soát có thể đánh giá công việc."
+                                  : "Only the controller can evaluate this task."}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                       <Select
                         value={form.watch("vote") ?? ""}
-                        onValueChange={(v) => form.setValue("vote", v || null)}
-                        disabled={!isNewTask && !canEditMeta}
-                      >
+                        onValueChange={(v) => handleVoteChange(v || null)}
+                        disabled={!isControllerForThisTask}>
                         <SelectTrigger className="bg-background">
-                          <SelectValue placeholder={language === "vi" ? "Chọn đánh giá" : "Select"} />
+                          <SelectValue
+                            placeholder={
+                              language === "vi" ? "Chọn đánh giá" : "Select"
+                            }
+                          />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="tot">{language === "vi" ? "Hoàn thành tốt" : "Good"}</SelectItem>
-                          <SelectItem value="kha">{language === "vi" ? "Hoàn thành khá" : "Fair"}</SelectItem>
-                          <SelectItem value="khong_tot">{language === "vi" ? "Không tốt" : "Poor"}</SelectItem>
-                          <SelectItem value="khong_hoan_thanh">{language === "vi" ? "Không hoàn thành" : "Not completed"}</SelectItem>
+                          <SelectItem value="tot">
+                            {language === "vi" ? "Hoàn thành tốt" : "Good"}
+                          </SelectItem>
+                          <SelectItem value="kha">
+                            {language === "vi" ? "Hoàn thành khá" : "Fair"}
+                          </SelectItem>
+                          <SelectItem value="khong_tot">
+                            {language === "vi" ? "Không tốt" : "Poor"}
+                          </SelectItem>
+                          <SelectItem value="khong_hoan_thanh">
+                            {language === "vi"
+                              ? "Không hoàn thành"
+                              : "Not completed"}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
+                      {isControllerForThisTask &&
+                        !isNewTask &&
+                        (form.watch("vote") === "khong_tot" ||
+                          form.watch("vote") === "khong_hoan_thanh") && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className="mt-2"
+                            disabled={redoMutation.isPending}
+                            onClick={async () => {
+                              if (!task?.id) return;
+                              try {
+                                const created = await redoMutation.mutateAsync(
+                                  task.id,
+                                );
+                                toast({
+                                  title:
+                                    language === "vi"
+                                      ? "Đã tạo công việc làm lại"
+                                      : "Redo task created",
+                                  description: (created?.title as string) || "",
+                                });
+                              } catch (e) {
+                                toast({
+                                  title:
+                                    language === "vi"
+                                      ? "Không thể tạo làm lại"
+                                      : "Redo failed",
+                                  description:
+                                    e instanceof Error ? e.message : String(e),
+                                  variant: "destructive",
+                                });
+                              }
+                            }}>
+                            {redoMutation.isPending && (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            {language === "vi"
+                              ? "Yêu cầu làm lại"
+                              : "Request redo"}
+                          </Button>
+                        )}
                     </div>
                     {form.watch("docDuyetStatus") === StageStatus.CANCELLED && (
                       <div className="space-y-2">
@@ -2481,9 +3000,18 @@ export function TaskDialog({
                       ...thietKeTroLyList.map((s) => s.dueDate),
                     ),
                   );
-                if (g === "Công việc chung" || g === "CNTT" || g === "Quét trùng lặp" || g === "Thư ký hợp phần") {
-                  const staff = multiAssigneesList.filter((s) => s.label !== "Người kiểm soát");
-                  return formatDateDDMMYYYY(maxDateString(...staff.map((s) => s.dueDate)));
+                if (
+                  g === "Công việc chung" ||
+                  g === "CNTT" ||
+                  g === "Quét trùng lặp" ||
+                  g === "Thư ký hợp phần"
+                ) {
+                  const staff = multiAssigneesList.filter(
+                    (s) => s.label !== "Người kiểm soát",
+                  );
+                  return formatDateDDMMYYYY(
+                    maxDateString(...staff.map((s) => s.dueDate)),
+                  );
                 }
                 return undefined;
               })()}
@@ -2498,9 +3026,18 @@ export function TaskDialog({
                       ...thietKeTroLyList.map((s) => s.completeDate),
                     ),
                   );
-                if (g === "Công việc chung" || g === "CNTT" || g === "Quét trùng lặp" || g === "Thư ký hợp phần") {
-                  const staff = multiAssigneesList.filter((s) => s.label !== "Người kiểm soát");
-                  return formatDateDDMMYYYY(maxDateString(...staff.map((s) => s.completedAt)));
+                if (
+                  g === "Công việc chung" ||
+                  g === "CNTT" ||
+                  g === "Quét trùng lặp" ||
+                  g === "Thư ký hợp phần"
+                ) {
+                  const staff = multiAssigneesList.filter(
+                    (s) => s.label !== "Người kiểm soát",
+                  );
+                  return formatDateDDMMYYYY(
+                    maxDateString(...staff.map((s) => s.completedAt)),
+                  );
                 }
                 return undefined;
               })()}
@@ -2545,13 +3082,16 @@ export function TaskDialog({
                   const r = w.rounds[0];
                   r.stages[0].status = form.watch("btv2CompleteDate")
                     ? StageStatus.COMPLETED
-                    : (form.watch("btv2Status") as StageStatus) ?? StageStatus.NOT_STARTED;
+                    : ((form.watch("btv2Status") as StageStatus) ??
+                      StageStatus.NOT_STARTED);
                   r.stages[1].status = form.watch("btv1CompleteDate")
                     ? StageStatus.COMPLETED
-                    : (form.watch("btv1Status") as StageStatus) ?? StageStatus.NOT_STARTED;
+                    : ((form.watch("btv1Status") as StageStatus) ??
+                      StageStatus.NOT_STARTED);
                   r.stages[2].status = form.watch("docDuyetCompleteDate")
                     ? StageStatus.COMPLETED
-                    : (form.watch("docDuyetStatus") as StageStatus) ?? StageStatus.NOT_STARTED;
+                    : ((form.watch("docDuyetStatus") as StageStatus) ??
+                      StageStatus.NOT_STARTED);
                   value = BienTapWorkflowHelpers.calculateProgress(w);
                 } else if (group === "Thiết kế") {
                   const slots = [
@@ -2560,16 +3100,23 @@ export function TaskDialog({
                   ].filter(Boolean) as Array<{ completeDate?: string | null }>;
                   const n = slots.length;
                   const m = slots.filter(
-                    (s) => s.completeDate != null && String(s.completeDate).trim() !== ""
+                    (s) =>
+                      s.completeDate != null &&
+                      String(s.completeDate).trim() !== "",
                   ).length;
                   value = n === 0 ? 0 : Math.round((100 / n) * m);
-                } else if (group === "Công việc chung" || group === "CNTT" || group === "Quét trùng lặp" || group === "Thư ký hợp phần") {
+                } else if (
+                  group === "Công việc chung" ||
+                  group === "CNTT" ||
+                  group === "Quét trùng lặp" ||
+                  group === "Thư ký hợp phần"
+                ) {
                   const staff = multiAssigneesList.filter(
-                    (s) => s.label !== "Người kiểm soát" && s.userId
+                    (s) => s.label !== "Người kiểm soát" && s.userId,
                   );
                   const n = staff.length;
                   const m = staff.filter(
-                    (s) => !!s.completedAt || s.status === "completed"
+                    (s) => !!s.completedAt || s.status === "completed",
                   ).length;
                   value = n === 0 ? 0 : Math.round((100 / n) * m);
                 } else {

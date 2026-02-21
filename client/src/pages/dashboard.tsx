@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Loader2,
   RefreshCw,
@@ -51,7 +52,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, Circle, Clock } from "lucide-react";
 
 export default function Dashboard() {
+  const [includeArchivedForList, setIncludeArchivedForList] = useState(false);
   const { data: tasks, isLoading, isError } = useTasks();
+  const { data: tasksAll } = useTasks({ includeArchived: true });
   const { mutate: refresh, isPending: isRefreshing } = useRefreshTasks();
   const { mutate: createTask, isPending: isCreating } = useCreateTask();
   const { role, user } = useAuth();
@@ -64,6 +67,7 @@ export default function Dashboard() {
   const [badgeFilter, setBadgeFilter] = useState<DashboardBadgeFilter>(null);
   const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedTask, setSelectedTask] =
     useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -79,13 +83,22 @@ export default function Dashboard() {
       const name = (g.name ?? "").toLowerCase().replace(/\s+/g, "");
       const code = (g.code ?? "").toLowerCase().replace(/\s+/g, "");
       if (gname === "thiếtkế" || gname === "thietke") {
-        return name.includes("thiếtkế") || code.includes("thietke") || code.includes("thiet-ke");
+        return (
+          name.includes("thiếtkế") ||
+          code.includes("thietke") ||
+          code.includes("thiet-ke")
+        );
       }
       if (gname === "cntt") {
         return name.includes("cntt") || code.includes("cntt");
       }
       if (gname === "biêntập" || gname === "bientap") {
-        return name.includes("biêntập") || name.includes("bientap") || code.includes("bientap") || code.includes("bien-tap");
+        return (
+          name.includes("biêntập") ||
+          name.includes("bientap") ||
+          code.includes("bientap") ||
+          code.includes("bien-tap")
+        );
       }
       return name.includes(gname) || code.includes(gname);
     });
@@ -105,16 +118,18 @@ export default function Dashboard() {
   }, []);
 
   // Get unique groups from tasks
+  const datasetForList = includeArchivedForList ? tasksAll : tasks;
+
   const availableGroups = useMemo(() => {
-    if (!tasks) return [];
-    const groups = new Set(tasks.map((t) => t.group).filter(Boolean));
+    if (!datasetForList) return [];
+    const groups = new Set(datasetForList.map((t) => t.group).filter(Boolean));
     return Array.from(groups).sort();
-  }, [tasks]);
+  }, [datasetForList]);
 
   // Base filtered list (role, search, group, status) — dùng cho thống kê dashboard
   const baseFilteredTasks = useMemo(() => {
-    if (!tasks) return [];
-    let filtered: TaskWithAssignmentDetails[] = tasks;
+    if (!datasetForList) return [];
+    let filtered: TaskWithAssignmentDetails[] = datasetForList;
     if (role === UserRole.EMPLOYEE) {
       const uid = user?.id ?? null;
       if (uid) {
@@ -147,13 +162,63 @@ export default function Dashboard() {
       filtered = filtered.filter((t) => t.status === statusFilter);
     }
     return filtered;
-  }, [tasks, role, search, statusFilter, groupFilter, user?.displayName]);
+  }, [
+    datasetForList,
+    role,
+    search,
+    statusFilter,
+    groupFilter,
+    user?.displayName,
+  ]);
+
+  // Dùng cho thống kê dashboard (bao gồm archived để giữ số liệu chính xác cho vote)
+  const baseFilteredTasksAll = useMemo(() => {
+    if (!tasksAll) return [];
+    let filtered: TaskWithAssignmentDetails[] = tasksAll;
+    if (role === UserRole.EMPLOYEE) {
+      const uid = user?.id ?? null;
+      if (uid) {
+        filtered = filtered.filter(
+          (t) =>
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else {
+        const exact = (user?.displayName ?? "").trim();
+        filtered = filtered.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
+    }
+    if (groupFilter !== "all") {
+      filtered = filtered.filter((t) => t.group === groupFilter);
+    }
+    if (search.trim()) {
+      const lower = normalizeSearch(search.trim());
+      filtered = filtered.filter(
+        (t) =>
+          normalizeSearch(t.title ?? "").includes(lower) ||
+          normalizeSearch(t.description ?? "").includes(lower) ||
+          normalizeSearch(t.assignee ?? "").includes(lower) ||
+          normalizeSearch(t.group ?? "").includes(lower),
+      );
+    }
+    // Không áp dụng statusFilter cho số liệu? Giữ nguyên như danh sách để nhất quán.
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((t) => t.status === statusFilter);
+    }
+    return filtered;
+  }, [tasksAll, role, search, statusFilter, groupFilter, user?.displayName]);
 
   // Danh sách task sau khi áp dụng badge filter + sắp xếp (hiển thị trong bảng)
   const filteredTasks = useMemo(() => {
-    const withBadge = applyDashboardBadgeFilter(baseFilteredTasks, badgeFilter);
-    return sortTasks(withBadge, sortBy, sortDir);
-  }, [baseFilteredTasks, badgeFilter, sortBy, sortDir]);
+    let list = applyDashboardBadgeFilter(baseFilteredTasks, badgeFilter);
+    if (selectedAssignees.length > 0) {
+      const set = new Set(selectedAssignees.map((s) => (s ?? "").trim()));
+      list = list.filter((t) => set.has((t.assignee ?? "").trim()));
+    }
+    return sortTasks(list, sortBy, sortDir);
+  }, [baseFilteredTasks, badgeFilter, selectedAssignees, sortBy, sortDir]);
 
   // Falr-style: Recent Activity timeline (last 5 tasks by updatedAt/createdAt)
   const recentActivityItems = useMemo(() => {
@@ -450,7 +515,7 @@ export default function Dashboard() {
       {/* Dashboard thống kê: badges + biểu đồ xu hướng */}
       <section>
         <TaskDashboard
-          tasks={baseFilteredTasks}
+          tasks={baseFilteredTasksAll}
           onBadgeFilter={handleBadgeFilter}
           activeBadgeFilter={badgeFilter}
         />
@@ -464,6 +529,17 @@ export default function Dashboard() {
             <Badge variant="secondary" className="font-normal">
               {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
             </Badge>
+            <div className="flex items-center gap-2 ml-3">
+              <span className="text-xs text-muted-foreground">
+                {language === "vi" ? "Bao gồm lưu trữ" : "Include archived"}
+              </span>
+              <Switch
+                checked={includeArchivedForList}
+                onCheckedChange={(val) =>
+                  setIncludeArchivedForList(Boolean(val))
+                }
+              />
+            </div>
             {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
               <Button
                 size="sm"
@@ -553,28 +629,23 @@ export default function Dashboard() {
             {t.dashboard.filterByStaff}:
           </span>
           <Badge
-            variant={badgeFilter?.type !== "assignee" ? "default" : "outline"}
+            variant={selectedAssignees.length === 0 ? "default" : "outline"}
             className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
-            onClick={() => handleBadgeFilter(null)}>
+            onClick={() => setSelectedAssignees([])}>
             {t.filter.allStaff}
           </Badge>
           {byAssignee.map(({ name, count, display }) => (
             <Badge
               key={name || "_unassigned"}
-              variant={
-                badgeFilter?.type === "assignee" && badgeFilter?.value === name
-                  ? "default"
-                  : "outline"
-              }
+              variant={selectedAssignees.includes(name) ? "default" : "outline"}
               className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
-              onClick={() =>
-                handleBadgeFilter(
-                  badgeFilter?.type === "assignee" &&
-                    badgeFilter?.value === name
-                    ? null
-                    : { type: "assignee", value: name },
-                )
-              }>
+              onClick={() => {
+                setSelectedAssignees((prev) => {
+                  const exists = prev.includes(name);
+                  if (exists) return prev.filter((n) => n !== name);
+                  return [...prev, name];
+                });
+              }}>
               {display} ({count})
             </Badge>
           ))}
@@ -605,6 +676,9 @@ export default function Dashboard() {
         open={!!selectedTask}
         onOpenChange={(open) => !open && setSelectedTask(null)}
         task={selectedTask}
+        onOpenOtherTask={(t) => {
+          setSelectedTask(t as any);
+        }}
         mode={dialogMode}
       />
 

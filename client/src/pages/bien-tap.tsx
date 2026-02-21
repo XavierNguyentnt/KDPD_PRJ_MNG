@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -315,6 +316,8 @@ function handleExportTasks(
 
 export default function BienTapPage() {
   const { data: tasks, isLoading, isError } = useTasks();
+  const { data: tasksAll } = useTasks({ includeArchived: true });
+  const [includeArchivedForList, setIncludeArchivedForList] = useState(false);
   const { mutate: refresh, isPending: isRefreshing } = useRefreshTasks();
   const { mutate: createTask, isPending: isCreating } = useCreateTask();
   const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask();
@@ -352,9 +355,11 @@ export default function BienTapPage() {
     [components],
   );
 
+  const datasetForList = includeArchivedForList ? tasksAll : tasks;
+
   const bienTapTasksScoped = useMemo(() => {
-    if (!tasks) return [];
-    let list = tasks.filter((t) => t.group === "Biên tập");
+    if (!datasetForList) return [];
+    let list = datasetForList.filter((t) => t.group === "Biên tập");
     if (role === UserRole.EMPLOYEE) {
       const uid = user?.id ?? null;
       if (uid) {
@@ -371,7 +376,7 @@ export default function BienTapPage() {
       }
     }
     return list;
-  }, [tasks, role, user?.displayName]);
+  }, [datasetForList, role, user?.displayName]);
 
   const filteredTasks = useMemo(() => {
     let list = bienTapTasksScoped;
@@ -501,6 +506,17 @@ export default function BienTapPage() {
                 <Badge variant="secondary" className="font-normal">
                   {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
                 </Badge>
+                <div className="flex items-center gap-2 ml-3">
+                  <span className="text-xs text-muted-foreground">
+                    {language === "vi" ? "Bao gồm lưu trữ" : "Include archived"}
+                  </span>
+                  <Switch
+                    checked={includeArchivedForList}
+                    onCheckedChange={(val) =>
+                      setIncludeArchivedForList(Boolean(val))
+                    }
+                  />
+                </div>
                 {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
                   <Button
                     size="sm"
