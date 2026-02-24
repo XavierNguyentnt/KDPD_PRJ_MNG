@@ -71,12 +71,9 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            sudo mkdir -p /etc/kdpd
-            sudo cp /apps/KDPD_PRJ_MNG/.env /etc/kdpd/.env
-            sudo chown root:root /etc/kdpd/.env
-            sudo chmod 600 /etc/kdpd/.env
+            sudo /usr/bin/systemctl daemon-reload || true
+            sudo /usr/local/bin/kdpd-env-update
             cd /apps/KDPD_PRJ_MNG
             npm ci --omit=dev
-            sudo systemctl daemon-reload || true
-            sudo systemctl restart kdpd
-            sudo systemctl status kdpd --no-pager || true
+            sudo /usr/bin/systemctl restart kdpd
+            sudo /usr/bin/systemctl status kdpd --no-pager || true
