@@ -350,6 +350,25 @@ export default function BienTapPage() {
       ) as string[],
     [works],
   );
+  const roundTypes = useMemo(() => {
+    const set = new Set<string>();
+    (datasetForList || [])
+      .filter((t) => t.group === "Biên tập")
+      .forEach((t) => {
+        try {
+          const wf =
+            typeof (t as any).workflow === "string"
+              ? JSON.parse((t as any).workflow)
+              : (t as any).workflow;
+          const current =
+            wf?.rounds?.find((r: any) => r?.roundNumber === wf?.currentRound) ||
+            wf?.rounds?.[0];
+          const rt = (current?.roundType ?? "").trim();
+          if (rt) set.add(rt);
+        } catch {}
+      });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [datasetForList]);
   const componentOptions = useMemo(
     () => components.map((c) => ({ id: c.id, name: c.name })),
     [components],
@@ -590,6 +609,7 @@ export default function BienTapPage() {
                 }
                 stages={stages}
                 showVoteFilter={true}
+                roundTypes={roundTypes}
               />
             </div>
 

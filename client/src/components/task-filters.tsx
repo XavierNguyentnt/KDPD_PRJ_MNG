@@ -11,6 +11,7 @@ export interface TaskFilterState {
   staffId: string;
   componentId: string;
   stage: string;
+  roundType: string;
   status: string;
   vote: string;
   dateFrom: string;
@@ -21,6 +22,7 @@ const DEFAULT_FILTERS: TaskFilterState = {
   staffId: "all",
   componentId: "all",
   stage: "all",
+  roundType: "all",
   status: "all",
   vote: "all",
   dateFrom: "",
@@ -58,6 +60,20 @@ export function applyTaskFilters<T extends { id: string; status: string; vote?: 
     list = list.filter((t) => t.relatedWorkId && workIds.has(t.relatedWorkId));
   }
 
+  if (filters.roundType && filters.roundType !== "all") {
+    list = list.filter((t: any) => {
+      if (t.group !== "Biên tập" || !t.workflow) return false;
+      try {
+        const wf = typeof t.workflow === "string" ? JSON.parse(t.workflow) : t.workflow;
+        const current = wf?.rounds?.find((r: any) => r?.roundNumber === wf?.currentRound) || wf?.rounds?.[0];
+        const rt = (current?.roundType ?? "").trim();
+        return rt === filters.roundType;
+      } catch {
+        return false;
+      }
+    });
+  }
+
   if (filters.status && filters.status !== "all") {
     list = list.filter((t) => t.status === filters.status);
   }
@@ -93,6 +109,8 @@ interface TaskFiltersProps {
   /** Unique stages from works (e.g. stage display values) */
   stages: string[];
   showVoteFilter?: boolean;
+  /** Unique round types for Biên tập (from workflows) */
+  roundTypes?: string[];
 }
 
 export function TaskFilters({
@@ -102,6 +120,7 @@ export function TaskFilters({
   onFiltersChange,
   stages,
   showVoteFilter = true,
+  roundTypes = [],
 }: TaskFiltersProps) {
   const { t, language } = useI18n();
 
@@ -111,6 +130,34 @@ export function TaskFilters({
         <Filter className="w-3.5 h-3.5" />
         <span className="text-xs font-medium">{t.common.filter}</span>
       </div>
+
+      {roundTypes.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">
+            {t.task.roundTypeLabel}
+          </Label>
+          <Select
+            value={filters.roundType}
+            onValueChange={(v) => onFiltersChange({ roundType: v })}
+          >
+            <SelectTrigger className="w-[160px] h-9 bg-background">
+              <SelectValue
+                placeholder={language === "vi" ? "Tất cả loại bông" : "All round types"}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                {language === "vi" ? "Tất cả loại bông" : "All round types"}
+              </SelectItem>
+              {roundTypes.map((rt) => (
+                <SelectItem key={rt} value={rt}>
+                  {rt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1">
         <Label className="text-xs text-muted-foreground">{t.filter.staff}</Label>
