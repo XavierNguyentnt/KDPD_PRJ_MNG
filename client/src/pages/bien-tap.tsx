@@ -684,13 +684,22 @@ export default function BienTapPage() {
         onOpenChange={(open) => !open && setSelectedTask(null)}
         task={selectedTask}
         mode={taskDialogMode}
+        onRequestDuplicate={(draft) => {
+          setSelectedTask(null);
+          setIsCreateDialogOpen(true);
+          (window as any).__bien_tap_duplicate_draft = draft;
+        }}
       />
 
       <TaskDialog
         open={isCreateDialogOpen}
-        onOpenChange={(open) => setIsCreateDialogOpen(open)}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) (window as any).__bien_tap_duplicate_draft = undefined;
+        }}
         task={null}
         defaultGroup="Biên tập"
+        initialValues={(window as any).__bien_tap_duplicate_draft}
         onCreate={(taskData) => {
           createTask(
             { ...taskData, group: taskData.group || "Biên tập" },

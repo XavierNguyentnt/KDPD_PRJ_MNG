@@ -74,6 +74,10 @@ interface TaskDialogProps {
   mode?: "view" | "edit";
   /** Nhóm mặc định khi tạo mới (theo trang đang mở: Công việc chung, Biên tập, Thiết kế, CNTT) */
   defaultGroup?: string;
+  /** Mở form tạo mới với dữ liệu dựng sẵn (khi sao chép) */
+  initialValues?: Partial<FormData>;
+  /** Yêu cầu sao chép từ công việc đang mở */
+  onRequestDuplicate?: (draft: Partial<FormData>) => void;
 }
 
 // Partial schema since we only update specific fields
@@ -351,34 +355,43 @@ export function TaskDialog({
   const form = useForm<FormData>({
     resolver: zodResolver(updateSchema),
     defaultValues: {
-      title: task?.title || "",
-      status: task?.status || "Not Started",
-      priority: task?.priority || "Medium",
-      assignee: task?.assignee ?? "",
-      assigneeId: task?.assigneeId ?? null,
-      group: task?.group || "Công việc chung",
-      progress: task?.progress || 0,
-      notes: task?.notes || "",
-      dueDate: task?.dueDate
-        ? task.dueDate.length === 10
-          ? task.dueDate
-          : formatDateForInput(task.dueDate)
-        : null,
-      actualCompletedAt: task?.actualCompletedAt
-        ? formatDateForInput(task.actualCompletedAt)
-        : null,
+      title: task?.title || (initialValues?.title as any) || "",
+      status: task?.status || (initialValues?.status as any) || "Not Started",
+      priority: task?.priority || (initialValues?.priority as any) || "Medium",
+      assignee: task?.assignee ?? (initialValues?.assignee as any) ?? "",
+      assigneeId:
+        task?.assigneeId ?? (initialValues?.assigneeId as any) ?? null,
+      group: task?.group || (initialValues?.group as any) || "Công việc chung",
+      progress: task?.progress || (initialValues?.progress as any) || 0,
+      notes: task?.notes || (initialValues?.notes as any) || "",
+      dueDate:
+        task?.dueDate != null
+          ? task.dueDate.length === 10
+            ? task.dueDate
+            : formatDateForInput(task.dueDate)
+          : ((initialValues?.dueDate as any) ?? null),
+      actualCompletedAt:
+        task?.actualCompletedAt != null
+          ? formatDateForInput(task.actualCompletedAt)
+          : ((initialValues?.actualCompletedAt as any) ?? null),
       relatedWorkId:
         (task as TaskWithAssignmentDetails & { relatedWorkId?: string | null })
-          ?.relatedWorkId ?? null,
+          ?.relatedWorkId ??
+        (initialValues?.relatedWorkId as any) ??
+        null,
       relatedContractId:
         (
           task as TaskWithAssignmentDetails & {
             relatedContractId?: string | null;
           }
-        )?.relatedContractId ?? null,
+        )?.relatedContractId ??
+        (initialValues?.relatedContractId as any) ??
+        null,
       taskType:
         (task as TaskWithAssignmentDetails & { taskType?: string | null })
-          ?.taskType ?? undefined,
+          ?.taskType ??
+        (initialValues?.taskType as any) ??
+        undefined,
     },
   });
 
@@ -3151,7 +3164,64 @@ export function TaskDialog({
           </div>
 
           <DialogFooter className="flex justify-between shrink-0 px-6 py-4 border-t bg-muted/30">
-            <div>
+            <div className="flex items-center gap-2">
+              {!isNewTask &&
+                (role === UserRole.ADMIN || role === UserRole.MANAGER) &&
+                effectiveTask?.group === "Biên tập" &&
+                onRequestDuplicate && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const v = form.getValues();
+                      const prefix =
+                        language === "vi" ? "[Bản sao của] " : "[Copy of] ";
+                      const draft: Partial<FormData> = {
+                        title: prefix + (v.title || ""),
+                        description: v.description || "",
+                        priority: v.priority || "Medium",
+                        group: "Biên tập",
+                        notes: v.notes || "",
+                        relatedWorkId: v.relatedWorkId ?? null,
+                        relatedContractId: v.relatedContractId ?? null,
+                        taskType: "PROOFREADING",
+                        vote: null,
+                        roundType: (v as any).roundType || "",
+                        btv2: (v as any).btv2 || "",
+                        btv2Id: (v as any).btv2Id ?? null,
+                        btv2ReceiveDate: "",
+                        btv2DueDate: null,
+                        btv2CompleteDate: "",
+                        btv2Status: StageStatus.NOT_STARTED,
+                        btv2CancelReason: "",
+                        btv1: (v as any).btv1 || "",
+                        btv1Id: (v as any).btv1Id ?? null,
+                        btv1ReceiveDate: "",
+                        btv1DueDate: null,
+                        btv1CompleteDate: "",
+                        btv1Status: StageStatus.NOT_STARTED,
+                        btv1CancelReason: "",
+                        docDuyet: (v as any).docDuyet || "",
+                        docDuyetId: (v as any).docDuyetId ?? null,
+                        docDuyetReceiveDate: "",
+                        docDuyetDueDate: null,
+                        docDuyetCompleteDate: "",
+                        docDuyetStatus: StageStatus.NOT_STARTED,
+                        docDuyetCancelReason: "",
+                        dueDate: null,
+                        actualCompletedAt: null,
+                        progress: 0,
+                        status: "Not Started",
+                        assignee: "",
+                        assigneeId: null,
+                      };
+                      onRequestDuplicate(draft);
+                    }}>
+                    {language === "vi"
+                      ? "Tạo bản sao công việc"
+                      : "Duplicate task"}
+                  </Button>
+                )}
               {!isNewTask &&
                 (role === UserRole.ADMIN || role === UserRole.MANAGER) && (
                   <Button
