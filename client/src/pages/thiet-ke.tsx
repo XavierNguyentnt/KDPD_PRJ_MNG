@@ -306,6 +306,7 @@ export default function ThietKePage() {
     useState<TaskWithAssignmentDetails | null>(null);
   const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [duplicateDraft, setDuplicateDraft] = useState<any | null>(null);
   const deleteConfirm = useConfirmDialog<TaskWithAssignmentDetails>();
 
   const { data: components = [] } = useComponents();
@@ -570,13 +571,22 @@ export default function ThietKePage() {
         onOpenChange={(open) => !open && setSelectedTask(null)}
         task={selectedTask}
         mode={taskDialogMode}
+        onRequestDuplicate={(draft) => {
+          setSelectedTask(null);
+          setIsCreateDialogOpen(true);
+          setDuplicateDraft(draft);
+        }}
       />
 
       <TaskDialog
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) setDuplicateDraft(null);
+        }}
         task={null}
         defaultGroup={DEFAULT_GROUP}
+        initialValues={duplicateDraft ?? undefined}
         onCreate={(taskData) => {
           createTask(
             { ...taskData, group: taskData.group || DEFAULT_GROUP },
