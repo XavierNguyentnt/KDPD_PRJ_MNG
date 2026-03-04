@@ -357,6 +357,31 @@ export default function BienTapPage() {
 
   const datasetForList = includeArchivedForList ? tasksAll : tasks;
 
+  const roundTypeOptions = useMemo(() => {
+    const set = new Set<string>();
+    const source = datasetForList || [];
+    source
+      .filter((t) => t.group === "Biên tập")
+      .forEach((t) => {
+        try {
+          const wf =
+            t.workflow && typeof t.workflow === "string"
+              ? JSON.parse(t.workflow)
+              : (t as any).workflow;
+          if (!wf || !Array.isArray(wf.rounds) || wf.rounds.length === 0)
+            return;
+          const current =
+            wf.rounds.find((r: any) => r?.roundNumber === wf.currentRound) ||
+            wf.rounds[0];
+          const rt = (current?.roundType ?? "").trim();
+          if (rt) set.add(rt);
+        } catch {
+          // ignore invalid workflow
+        }
+      });
+    return Array.from(set);
+  }, [datasetForList]);
+
   const bienTapTasksScoped = useMemo(() => {
     if (!datasetForList) return [];
     let list = datasetForList.filter((t) => t.group === "Biên tập");
@@ -590,6 +615,8 @@ export default function BienTapPage() {
                 }
                 stages={stages}
                 showVoteFilter={true}
+                showRoundTypeFilter={true}
+                roundTypeOptions={roundTypeOptions}
               />
             </div>
 

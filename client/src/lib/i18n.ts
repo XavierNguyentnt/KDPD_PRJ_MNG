@@ -72,6 +72,8 @@ export interface Translations {
     allComponents: string;
     allStages: string;
     allVotes: string;
+    roundType?: string;
+    allRoundTypes?: string;
   };
 
   // Task
@@ -220,6 +222,8 @@ const translations: Record<Language, Translations> = {
       allComponents: "Tất cả hợp phần",
       allStages: "Tất cả giai đoạn",
       allVotes: "Tất cả đánh giá",
+      roundType: "Loại bông",
+      allRoundTypes: "Tất cả loại bông",
     },
     task: {
       title: "Tiêu đề công việc",
@@ -356,6 +360,8 @@ const translations: Record<Language, Translations> = {
       allComponents: "All components",
       allStages: "All stages",
       allVotes: "All evaluations",
+      roundType: "Round Type",
+      allRoundTypes: "All round types",
     },
     task: {
       title: "Task Title",
