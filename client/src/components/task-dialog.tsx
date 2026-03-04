@@ -74,6 +74,10 @@ interface TaskDialogProps {
   mode?: "view" | "edit";
   /** Nhóm mặc định khi tạo mới (theo trang đang mở: Công việc chung, Biên tập, Thiết kế, CNTT) */
   defaultGroup?: string;
+  /** Giá trị khởi tạo khi tạo mới (dùng cho sao chép) */
+  initialValues?: Partial<FormData>;
+  /** Chế độ sao chép: bật validation bắt buộc theo yêu cầu */
+  duplicateMode?: boolean;
 }
 
 // Partial schema since we only update specific fields
@@ -256,6 +260,8 @@ export function TaskDialog({
   isCreating = false,
   mode = "view",
   defaultGroup,
+  initialValues,
+  duplicateMode = false,
 }: TaskDialogProps) {
   const { role, user } = useAuth();
   const { t, language } = useI18n();
@@ -847,7 +853,7 @@ export function TaskDialog({
       }
       form.reset(base);
     } else if (!task) {
-      form.reset({
+      const baseDefaults: FormData = {
         title: "",
         status: "Not Started",
         priority: "Medium",
@@ -884,7 +890,50 @@ export function TaskDialog({
         relatedContractId: null,
         taskType: undefined,
         vote: null,
-      });
+      };
+      const merged: FormData = { ...baseDefaults, ...(initialValues as any) };
+      if (duplicateMode && initialValues?.title) {
+        merged.title = `[Bản sao của] ${initialValues.title}`;
+      }
+      form.reset(merged);
+      if ((initialValues as any)?.__thietKeKtvChinh) {
+        const v = (initialValues as any).__thietKeKtvChinh as {
+          displayName?: string;
+          userId?: string | null;
+          receiveDate?: string;
+          dueDate?: string | null;
+          completeDate?: string;
+        };
+        setThietKeKtvChinh({
+          id: "ktv",
+          displayName: v?.displayName ?? "",
+          userId: v?.userId ?? null,
+          receiveDate: v?.receiveDate ?? "",
+          dueDate: v?.dueDate ?? null,
+          completeDate: v?.completeDate ?? "",
+        });
+      }
+      if ((initialValues as any)?.__thietKeTroLyList) {
+        const list = (initialValues as any).__thietKeTroLyList as Array<{
+          displayName?: string;
+          userId?: string | null;
+          receiveDate?: string;
+          dueDate?: string | null;
+          completeDate?: string;
+        }>;
+        if (Array.isArray(list)) {
+          setThietKeTroLyList(
+            list.map((s, idx) => ({
+              id: "tly-" + (s.userId ?? idx),
+              displayName: s.displayName ?? "",
+              userId: s.userId ?? null,
+              receiveDate: s.receiveDate ?? "",
+              dueDate: s.dueDate ?? null,
+              completeDate: s.completeDate ?? "",
+            })),
+          );
+        }
+      }
       setThietKeKtvChinh({
         id: "ktv",
         displayName: "",
@@ -908,7 +957,7 @@ export function TaskDialog({
         },
       ]);
     }
-  }, [open, effectiveTask, task, form, defaultGroup]);
+  }, [open, effectiveTask, task, form, defaultGroup, initialValues, duplicateMode]);
 
   const canEditMetaRaw = role === UserRole.ADMIN || role === UserRole.MANAGER;
   const canEditMeta = canEditMetaRaw && (isNewTask || isEditing);
@@ -974,6 +1023,42 @@ export function TaskDialog({
   }
 
   const onSubmit = (data: FormData) => {
+    if (isNewTask && duplicateMode && (data.group || defaultGroup) === "Biên tập") {
+      const hasReceive =
+        !!(data.btv2ReceiveDate && data.btv2ReceiveDate.trim()) ||
+        !!(data.btv1ReceiveDate && data.btv1ReceiveDate.trim()) ||
+        !!(data.docDuyetReceiveDate && data.docDuyetReceiveDate.trim());
+      const hasDue =
+        !!data.btv2DueDate || !!data.btv1DueDate || !!data.docDuyetDueDate;
+      const hasCompleted =
+        !!(data.btv2CompleteDate && data.btv2CompleteDate.trim()) ||
+        !!(data.btv1CompleteDate && data.btv1CompleteDate.trim()) ||
+        !!(data.docDuyetCompleteDate && data.docDuyetCompleteDate.trim());
+      if (!data.status) {
+        form.setError("status", { message: language === "vi" ? "Bắt buộc nhập Trạng thái" : "Status is required" });
+        return;
+      }
+      if (!data.priority) {
+        form.setError("priority", { message: language === "vi" ? "Bắt buộc nhập Độ ưu tiên" : "Priority is required" });
+        return;
+      }
+      if (!data.roundType || !data.roundType.trim()) {
+        form.setError("roundType", { message: language === "vi" ? "Bắt buộc nhập Loại bông" : "Round type is required" });
+        return;
+      }
+      if (!hasReceive) {
+        form.setError("btv2ReceiveDate", { message: language === "vi" ? "Bắt buộc nhập Ngày nhận công việc (ít nhất 1 stage)" : "Receive date required (at least one stage)" });
+        return;
+      }
+      if (!hasDue) {
+        form.setError("btv2DueDate", { message: language === "vi" ? "Bắt buộc nhập Ngày hoàn thành dự kiến (ít nhất 1 stage)" : "Due date required (at least one stage)" });
+        return;
+      }
+      if (!hasCompleted) {
+        form.setError("btv2CompleteDate", { message: language === "vi" ? "Bắt buộc nhập Ngày hoàn thành thực tế (ít nhất 1 stage)" : "Actual completed date required (at least one stage)" });
+        return;
+      }
+    }
     if (isNewTask && onCreate) {
       // Create new task
       if (!data.title || data.title.trim() === "") {

@@ -338,6 +338,8 @@ export default function BienTapPage() {
   const [deleteTaskTarget, setDeleteTaskTarget] =
     useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createInitialValues, setCreateInitialValues] = useState<any | null>(null);
+  const [createDuplicateMode, setCreateDuplicateMode] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
   const { data: works = [] } = useWorks();
@@ -641,6 +643,50 @@ export default function BienTapPage() {
                     setSelectedTask(task);
                     setTaskDialogMode("edit");
                   },
+                  onDuplicate: (task) => {
+                    if (task.group !== "Biên tập") return;
+                    const initial: any = {
+                      title: task.title || task.id,
+                      group: "Biên tập",
+                      relatedWorkId: (task as any).relatedWorkId ?? null,
+                    };
+                    try {
+                      const wf =
+                        task.workflow && typeof task.workflow === "string"
+                          ? JSON.parse(task.workflow as any)
+                          : (task as any).workflow;
+                      if (wf && Array.isArray(wf.rounds) && wf.rounds.length > 0) {
+                        const current =
+                          wf.rounds.find((r: any) => r?.roundNumber === wf.currentRound) ||
+                          wf.rounds[0];
+                        const stages = Array.isArray(current?.stages) ? current.stages : [];
+                        const btv2 = stages.find((s: any) => s?.type === "btv2");
+                        const btv1 = stages.find((s: any) => s?.type === "btv1");
+                        const doc = stages.find((s: any) => s?.type === "doc_duyet");
+                        if (btv2) {
+                          initial.btv2 = btv2.assignee || "";
+                          initial.btv2ReceiveDate = "";
+                          initial.btv2DueDate = null;
+                          initial.btv2CompleteDate = "";
+                        }
+                        if (btv1) {
+                          initial.btv1 = btv1.assignee || "";
+                          initial.btv1ReceiveDate = "";
+                          initial.btv1DueDate = null;
+                          initial.btv1CompleteDate = "";
+                        }
+                        if (doc) {
+                          initial.docDuyet = doc.assignee || "";
+                          initial.docDuyetReceiveDate = "";
+                          initial.docDuyetDueDate = null;
+                          initial.docDuyetCompleteDate = "";
+                        }
+                      }
+                    } catch {}
+                    setCreateInitialValues(initial);
+                    setCreateDuplicateMode(true);
+                    setIsCreateDialogOpen(true);
+                  },
                   onDelete: (task) => {
                     setDeleteTaskTarget(task);
                     setDeleteTaskConfirmOpen(true);
@@ -698,6 +744,8 @@ export default function BienTapPage() {
         onOpenChange={(open) => setIsCreateDialogOpen(open)}
         task={null}
         defaultGroup="Biên tập"
+        initialValues={createInitialValues || undefined}
+        duplicateMode={createDuplicateMode}
         onCreate={(taskData) => {
           createTask(
             { ...taskData, group: taskData.group || "Biên tập" },
@@ -711,6 +759,8 @@ export default function BienTapPage() {
                     (language === "vi" ? "thành công" : "successfully"),
                 });
                 setIsCreateDialogOpen(false);
+                setCreateInitialValues(null);
+                setCreateDuplicateMode(false);
               },
               onError: (error) => {
                 toast({
