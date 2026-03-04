@@ -101,6 +101,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Loader2,
   Plus,
   Pencil,
@@ -1487,6 +1493,225 @@ export default function ThuKyHopPhanPage() {
       });
     return map;
   }, [tasks]);
+
+  const tcByWorkId = useMemo(() => {
+    const map = new Map<string, TranslationContract[]>();
+    tcScoped.forEach((c) => {
+      if (!c.workId) return;
+      const list = map.get(c.workId) ?? [];
+      list.push(c);
+      map.set(c.workId, list);
+    });
+    return map;
+  }, [tcScoped]);
+
+  const pcByWorkId = useMemo(() => {
+    const map = new Map<string, ProofreadingContract[]>();
+    pcScoped.forEach((c) => {
+      if (!c.workId) return;
+      const list = map.get(c.workId) ?? [];
+      list.push(c);
+      map.set(c.workId, list);
+    });
+    return map;
+  }, [pcScoped]);
+
+  const bienTapTasksByWorkId = useMemo(() => {
+    const map = new Map<string, TaskWithAssignmentDetails[]>();
+    (tasks || [])
+      .filter((t) => t.group === "Biên tập" && t.relatedWorkId)
+      .forEach((t) => {
+        const key = t.relatedWorkId as string;
+        const list = map.get(key) ?? [];
+        list.push(t);
+        map.set(key, list);
+      });
+    return map;
+  }, [tasks]);
+
+  const thietKeTasksByWorkId = useMemo(() => {
+    const map = new Map<string, TaskWithAssignmentDetails[]>();
+    (tasks || [])
+      .filter((t) => t.group === "Thiết kế" && t.relatedWorkId)
+      .forEach((t) => {
+        const key = t.relatedWorkId as string;
+        const list = map.get(key) ?? [];
+        list.push(t);
+        map.set(key, list);
+      });
+    return map;
+  }, [tasks]);
+
+  type ProgressBadge = {
+    label: string;
+    tone: "muted" | "info" | "success" | "warning" | "danger";
+    tooltip?: string;
+  };
+
+  const progressBadgeClass: Record<ProgressBadge["tone"], string> = {
+    muted: "bg-slate-100 text-slate-700 border-slate-300",
+    info: "bg-blue-100 text-blue-700 border-blue-300",
+    success: "bg-green-100 text-green-700 border-green-300",
+    warning: "bg-amber-100 text-amber-700 border-amber-300",
+    danger: "bg-red-100 text-red-700 border-red-300",
+  };
+
+  const getEditingInfo = (
+    workId: string,
+  ): {
+    inProgress: boolean;
+    roundType?: string;
+    dueDate?: string;
+    completedDate?: string;
+  } => {
+    const completedDate = editingCompletionByWorkId.get(workId);
+    if (completedDate) return { inProgress: false, completedDate };
+    const list = bienTapTasksByWorkId.get(workId) ?? [];
+    if (list.length === 0) return { inProgress: false };
+    const ongoing = list.find((t) => t.status !== "Completed") ?? list[0];
+    let roundType = "";
+    try {
+      const wf = (
+        ongoing.workflow && typeof ongoing.workflow === "string"
+          ? JSON.parse(ongoing.workflow)
+          : ongoing.workflow
+      ) as {
+        rounds?: Array<{ roundType?: string | null }>;
+      } | null;
+      roundType = (wf?.rounds?.[0]?.roundType ?? "").toString();
+    } catch {
+      roundType = "";
+    }
+    const dueDate = (ongoing.dueDate as string | null) ?? undefined;
+    return { inProgress: true, roundType, dueDate };
+  };
+
+  const buildWorkProgressBadges = (work: Work): ProgressBadge[] => {
+    const badges: ProgressBadge[] = [];
+    const tcList = tcByWorkId.get(work.id) ?? [];
+    const pcList = pcByWorkId.get(work.id) ?? [];
+
+    if (tcList.length > 0) {
+      const anyStart = tcList.find((c) => !!(c.startDate || c.contractNumber));
+      badges.push({
+        label: "Ký hợp đồng",
+        tone: "success",
+        tooltip: anyStart?.startDate
+          ? `Ngày bắt đầu: ${formatDateDDMMYYYY(anyStart.startDate)}`
+          : undefined,
+      });
+      if (tcList.some((c) => !!c.progressCheckDate)) {
+        const d = tcList.find((c) => !!c.progressCheckDate)?.progressCheckDate;
+        badges.push({
+          label: "Kiểm tra tiến độ",
+          tone: "info",
+          tooltip: d ? `Ngày: ${formatDateDDMMYYYY(d)}` : undefined,
+        });
+      }
+      if (tcList.some((c) => !!c.expertReviewDate)) {
+        const d = tcList.find((c) => !!c.expertReviewDate)?.expertReviewDate;
+        badges.push({
+          label: "Thẩm định cấp chuyên gia",
+          tone: "info",
+          tooltip: d ? `Ngày: ${formatDateDDMMYYYY(d)}` : undefined,
+        });
+      }
+      if (tcList.some((c) => !!c.projectAcceptanceDate)) {
+        const d = tcList.find(
+          (c) => !!c.projectAcceptanceDate,
+        )?.projectAcceptanceDate;
+        badges.push({
+          label: "Nghiệm thu cấp Dự án",
+          tone: "success",
+          tooltip: d ? `Ngày: ${formatDateDDMMYYYY(d)}` : undefined,
+        });
+      }
+      if (tcList.some((c) => c.settlementValue != null)) {
+        badges.push({
+          label: "Quyết toán",
+          tone: "success",
+        });
+      }
+    }
+
+    if (pcList.length > 0) {
+      const total = pcList.length;
+      const completed = pcList.filter((p) => !!p.actualCompletionDate).length;
+      // Lấy ngày hoàn thành gần nhất trong các HĐ hiệu đính của tác phẩm (nếu có)
+      let latestPcCompleted: string | null = null;
+      pcList.forEach((p) => {
+        if (!p.actualCompletionDate) return;
+        const d =
+          typeof p.actualCompletionDate === "string"
+            ? p.actualCompletionDate.slice(0, 10)
+            : new Date(p.actualCompletionDate as any)
+                .toISOString()
+                .slice(0, 10);
+        if (!latestPcCompleted || d > latestPcCompleted) latestPcCompleted = d;
+      });
+      badges.push({
+        label: "Hiệu đính",
+        tone: completed === total && total > 0 ? "success" : "info",
+        tooltip:
+          completed > 0
+            ? `Hoàn thành ${completed}/${total} | Ngày hoàn thành gần nhất: ${formatDateDDMMYYYY(latestPcCompleted)}`
+            : `Hoàn thành ${completed}/${total}`,
+      });
+    }
+
+    const editing = getEditingInfo(work.id);
+    if (editing.completedDate) {
+      badges.push({
+        label: "Biên tập",
+        tone: "success",
+        tooltip: `Hoàn thành Bông chuyển in: ${formatDateDDMMYYYY(editing.completedDate)}`,
+      });
+    } else if (editing.inProgress) {
+      const tipParts: string[] = [];
+      if (editing.roundType) tipParts.push(`Loại bông: ${editing.roundType}`);
+      if (editing.dueDate)
+        tipParts.push(`Hạn: ${formatDateDDMMYYYY(editing.dueDate)}`);
+      badges.push({
+        label: "Đang biên tập",
+        tone: "info",
+        tooltip: tipParts.join(" | ") || undefined,
+      });
+    }
+
+    const tkList = thietKeTasksByWorkId.get(work.id) ?? [];
+    if (tkList.length > 0) {
+      const allCompleted =
+        tkList.length > 0 && tkList.every((t) => t.status === "Completed");
+      // Nếu hoàn thành, hiển thị ngày hoàn thành gần nhất trong các task thiết kế
+      let latestTkCompleted: string | null = null;
+      if (allCompleted) {
+        tkList.forEach((t) => {
+          const v = t.actualCompletedAt;
+          if (!v) return;
+          let d: string | null = null;
+          if (v instanceof Date) {
+            d = v.toISOString().slice(0, 10);
+          } else {
+            const dt = new Date(v as any);
+            if (!Number.isNaN(dt.getTime())) d = dt.toISOString().slice(0, 10);
+          }
+          if (!d) return;
+          if (!latestTkCompleted || d > latestTkCompleted)
+            latestTkCompleted = d;
+        });
+      }
+      badges.push({
+        label: "Thiết kế",
+        tone: allCompleted ? "success" : "info",
+        tooltip:
+          allCompleted && latestTkCompleted
+            ? `Ngày hoàn thành: ${formatDateDDMMYYYY(latestTkCompleted)}`
+            : undefined,
+      });
+    }
+
+    return badges;
+  };
 
   const paginatedTasks = useMemo(() => {
     const start = (tasksPage - 1) * PAGE_SIZE;
@@ -3391,6 +3616,9 @@ export default function ThuKyHopPhanPage() {
                           sortColumns={worksSortColumns}
                           onSort={handleWorksSort}
                         />
+                        <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                          Tiến độ
+                        </TableHead>
                         <SortableHead
                           label="Mã tài liệu"
                           column="documentCode"
@@ -3442,7 +3670,7 @@ export default function ThuKyHopPhanPage() {
                       {paginatedWorks.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={13}
+                            colSpan={14}
                             className="text-center text-muted-foreground py-8">
                             Chưa có tác phẩm nào.
                           </TableCell>
@@ -3478,6 +3706,39 @@ export default function ThuKyHopPhanPage() {
                               {w.titleHannom ?? "—"}
                             </TableCell>
                             <TableCell>{formatStageDisplay(w.stage)}</TableCell>
+                            <TableCell className="p-4 align-middle">
+                              <div className="flex flex-wrap gap-1.5">
+                                <TooltipProvider
+                                  delayDuration={100}
+                                  skipDelayDuration={100}>
+                                  {buildWorkProgressBadges(w).map((b, idx) => {
+                                    const badge = (
+                                      <Badge
+                                        key={`${w.id}-progress-${idx}`}
+                                        variant="outline"
+                                        className={progressBadgeClass[b.tone]}
+                                        title={b.tooltip || undefined}>
+                                        {b.label}
+                                      </Badge>
+                                    );
+                                    return b.tooltip ? (
+                                      <Tooltip key={`${w.id}-tip-${idx}`}>
+                                        <TooltipTrigger asChild>
+                                          {badge}
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {b.tooltip}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ) : (
+                                      <Fragment key={`${w.id}-tip-${idx}`}>
+                                        {badge}
+                                      </Fragment>
+                                    );
+                                  })}
+                                </TooltipProvider>
+                              </div>
+                            </TableCell>
                             <TableCell>{w.documentCode ?? "—"}</TableCell>
                             <TableCell className="text-right">
                               {formatNumberAccounting(w.baseWordCount)}

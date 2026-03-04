@@ -6,7 +6,7 @@ import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { useI18n } from "@/hooks/use-i18n";
 import { formatDateDDMMYYYY } from "@/lib/utils";
 import { Workflow, BienTapWorkflowHelpers, BienTapStageType, StageStatus } from "@shared/workflow";
-import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Pencil, Trash2, Copy as CopyIcon } from "lucide-react";
 
 export type TaskSortColumn = "id" | "title" | "group" | "assignee" | "priority" | "status" | "dueDate" | "progress" | "receivedDate" | "actualCompletedAt" | "vote";
 
@@ -73,6 +73,7 @@ interface TaskTableProps {
     onView?: (task: TaskWithAssignmentDetails) => void;
     onEdit?: (task: TaskWithAssignmentDetails) => void;
     onDelete?: (task: TaskWithAssignmentDetails) => void;
+    onDuplicate?: (task: TaskWithAssignmentDetails) => void;
   };
   getPriorityColor?: (priority: string) => string;
   getStatusColor?: (status: string) => string;
@@ -628,6 +629,19 @@ export function TaskTable({
                           }}
                         >
                           <Eye className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {actions?.onDuplicate && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            actions.onDuplicate?.(task);
+                          }}
+                          title={language === "vi" ? "Tạo bản sao công việc" : "Duplicate task"}
+                        >
+                          <CopyIcon className="w-4 h-4" />
                         </Button>
                       )}
                       {actions?.onEdit && (

@@ -2,7 +2,13 @@
 
 import { useI18n } from "@/hooks/use-i18n";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
 import { Filter } from "lucide-react";
 import type { User } from "@shared/schema";
@@ -15,6 +21,7 @@ export interface TaskFilterState {
   vote: string;
   dateFrom: string;
   dateTo: string;
+  roundType: string;
 }
 
 const DEFAULT_FILTERS: TaskFilterState = {
@@ -25,6 +32,7 @@ const DEFAULT_FILTERS: TaskFilterState = {
   vote: "all",
   dateFrom: "",
   dateTo: "",
+  roundType: "all",
 };
 
 export function getDefaultTaskFilters(): TaskFilterState {
@@ -32,10 +40,21 @@ export function getDefaultTaskFilters(): TaskFilterState {
 }
 
 /** Apply filters to task list. Pass works to resolve relatedWorkId -> componentId/stage. */
-export function applyTaskFilters<T extends { id: string; status: string; vote?: string | null; relatedWorkId?: string | null; dueDate?: string | Date | null; assigneeId?: string | null; assignments?: { userId: string }[] }>(
+export function applyTaskFilters<
+  T extends {
+    id: string;
+    status: string;
+    vote?: string | null;
+    relatedWorkId?: string | null;
+    dueDate?: string | Date | null;
+    assigneeId?: string | null;
+    assignments?: { userId: string }[];
+    workflow?: any;
+  },
+>(
   tasks: T[],
   filters: TaskFilterState,
-  works: { id: string; componentId: string | null; stage: string | null }[]
+  works: { id: string; componentId: string | null; stage: string | null }[],
 ): T[] {
   let list = tasks.slice();
 
@@ -44,17 +63,23 @@ export function applyTaskFilters<T extends { id: string; status: string; vote?: 
     list = list.filter(
       (t) =>
         t.assigneeId === uid ||
-        (t.assignments && t.assignments.some((a) => a.userId === uid))
+        (t.assignments && t.assignments.some((a) => a.userId === uid)),
     );
   }
 
   if (filters.componentId && filters.componentId !== "all") {
-    const workIds = new Set(works.filter((w) => w.componentId === filters.componentId).map((w) => w.id));
+    const workIds = new Set(
+      works
+        .filter((w) => w.componentId === filters.componentId)
+        .map((w) => w.id),
+    );
     list = list.filter((t) => t.relatedWorkId && workIds.has(t.relatedWorkId));
   }
 
   if (filters.stage && filters.stage !== "all") {
-    const workIds = new Set(works.filter((w) => w.stage === filters.stage).map((w) => w.id));
+    const workIds = new Set(
+      works.filter((w) => w.stage === filters.stage).map((w) => w.id),
+    );
     list = list.filter((t) => t.relatedWorkId && workIds.has(t.relatedWorkId));
   }
 
@@ -63,13 +88,39 @@ export function applyTaskFilters<T extends { id: string; status: string; vote?: 
   }
 
   if (filters.vote && filters.vote !== "all") {
-    list = list.filter((t) => (t.vote ?? "").toLowerCase() === filters.vote.toLowerCase());
+    list = list.filter(
+      (t) => (t.vote ?? "").toLowerCase() === filters.vote.toLowerCase(),
+    );
+  }
+
+  if (filters.roundType && filters.roundType !== "all") {
+    list = list.filter((t) => {
+      try {
+        const wf = (t as any).workflow
+          ? typeof (t as any).workflow === "string"
+            ? JSON.parse((t as any).workflow)
+            : (t as any).workflow
+          : null;
+        if (!wf || !Array.isArray(wf.rounds)) return false;
+        const current =
+          wf.rounds.find((r: any) => r?.roundNumber === wf.currentRound) ||
+          wf.rounds[0];
+        const rt = current?.roundType ?? "";
+        return rt === filters.roundType;
+      } catch {
+        return false;
+      }
+    });
   }
 
   if (filters.dateFrom) {
     const from = filters.dateFrom.slice(0, 10);
     list = list.filter((t) => {
-      const d = t.dueDate ? (typeof t.dueDate === "string" ? t.dueDate.slice(0, 10) : (t.dueDate as Date).toISOString().slice(0, 10)) : "";
+      const d = t.dueDate
+        ? typeof t.dueDate === "string"
+          ? t.dueDate.slice(0, 10)
+          : (t.dueDate as Date).toISOString().slice(0, 10)
+        : "";
       return d >= from;
     });
   }
@@ -77,7 +128,11 @@ export function applyTaskFilters<T extends { id: string; status: string; vote?: 
   if (filters.dateTo) {
     const to = filters.dateTo.slice(0, 10);
     list = list.filter((t) => {
-      const d = t.dueDate ? (typeof t.dueDate === "string" ? t.dueDate.slice(0, 10) : (t.dueDate as Date).toISOString().slice(0, 10)) : "";
+      const d = t.dueDate
+        ? typeof t.dueDate === "string"
+          ? t.dueDate.slice(0, 10)
+          : (t.dueDate as Date).toISOString().slice(0, 10)
+        : "";
       return d <= to;
     });
   }
@@ -93,6 +148,8 @@ interface TaskFiltersProps {
   /** Unique stages from works (e.g. stage display values) */
   stages: string[];
   showVoteFilter?: boolean;
+  showRoundTypeFilter?: boolean;
+  roundTypeOptions?: string[];
 }
 
 export function TaskFilters({
@@ -102,6 +159,8 @@ export function TaskFilters({
   onFiltersChange,
   stages,
   showVoteFilter = true,
+  showRoundTypeFilter = false,
+  roundTypeOptions = [],
 }: TaskFiltersProps) {
   const { t, language } = useI18n();
 
@@ -113,11 +172,12 @@ export function TaskFilters({
       </div>
 
       <div className="flex flex-col gap-1">
-        <Label className="text-xs text-muted-foreground">{t.filter.staff}</Label>
+        <Label className="text-xs text-muted-foreground">
+          {t.filter.staff}
+        </Label>
         <Select
           value={filters.staffId}
-          onValueChange={(v) => onFiltersChange({ staffId: v })}
-        >
+          onValueChange={(v) => onFiltersChange({ staffId: v })}>
           <SelectTrigger className="w-[160px] h-9 bg-background">
             <SelectValue placeholder={t.filter.allStaff} />
           </SelectTrigger>
@@ -135,11 +195,12 @@ export function TaskFilters({
       </div>
 
       <div className="flex flex-col gap-1">
-        <Label className="text-xs text-muted-foreground">{t.filter.component}</Label>
+        <Label className="text-xs text-muted-foreground">
+          {t.filter.component}
+        </Label>
         <Select
           value={filters.componentId}
-          onValueChange={(v) => onFiltersChange({ componentId: v })}
-        >
+          onValueChange={(v) => onFiltersChange({ componentId: v })}>
           <SelectTrigger className="w-[180px] h-9 bg-background">
             <SelectValue placeholder={t.filter.allComponents} />
           </SelectTrigger>
@@ -155,11 +216,12 @@ export function TaskFilters({
       </div>
 
       <div className="flex flex-col gap-1">
-        <Label className="text-xs text-muted-foreground">{t.filter.stage}</Label>
+        <Label className="text-xs text-muted-foreground">
+          {t.filter.stage}
+        </Label>
         <Select
           value={filters.stage}
-          onValueChange={(v) => onFiltersChange({ stage: v })}
-        >
+          onValueChange={(v) => onFiltersChange({ stage: v })}>
           <SelectTrigger className="w-[140px] h-9 bg-background">
             <SelectValue placeholder={t.filter.allStages} />
           </SelectTrigger>
@@ -175,11 +237,12 @@ export function TaskFilters({
       </div>
 
       <div className="flex flex-col gap-1">
-        <Label className="text-xs text-muted-foreground">{t.filter.status}</Label>
+        <Label className="text-xs text-muted-foreground">
+          {t.filter.status}
+        </Label>
         <Select
           value={filters.status}
-          onValueChange={(v) => onFiltersChange({ status: v })}
-        >
+          onValueChange={(v) => onFiltersChange({ status: v })}>
           <SelectTrigger className="w-[150px] h-9 bg-background">
             <SelectValue placeholder={t.filter.status} />
           </SelectTrigger>
@@ -196,11 +259,12 @@ export function TaskFilters({
 
       {showVoteFilter && (
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">{t.filter.vote}</Label>
+          <Label className="text-xs text-muted-foreground">
+            {t.filter.vote}
+          </Label>
           <Select
             value={filters.vote}
-            onValueChange={(v) => onFiltersChange({ vote: v })}
-          >
+            onValueChange={(v) => onFiltersChange({ vote: v })}>
             <SelectTrigger className="w-[160px] h-9 bg-background">
               <SelectValue placeholder={t.filter.allVotes} />
             </SelectTrigger>
@@ -222,9 +286,38 @@ export function TaskFilters({
           </Select>
         </div>
       )}
+      {showRoundTypeFilter && (
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">
+            {t.filter.roundType ?? t.task.roundTypeLabel}
+          </Label>
+          <Select
+            value={filters.roundType}
+            onValueChange={(v) => onFiltersChange({ roundType: v })}>
+            <SelectTrigger className="w-[180px] h-9 bg-background">
+              <SelectValue
+                placeholder={t.filter.allRoundTypes ?? t.task.selectRoundType}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                {t.filter.allRoundTypes ??
+                  (language === "vi" ? "Tất cả loại bông" : "All round types")}
+              </SelectItem>
+              {(roundTypeOptions || []).map((rt) => (
+                <SelectItem key={rt} value={rt}>
+                  {rt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1">
-        <Label className="text-xs text-muted-foreground">{t.filter.dateFrom}</Label>
+        <Label className="text-xs text-muted-foreground">
+          {t.filter.dateFrom}
+        </Label>
         <DateInput
           value={filters.dateFrom || null}
           onChange={(v) => onFiltersChange({ dateFrom: v ?? "" })}
@@ -234,7 +327,9 @@ export function TaskFilters({
       </div>
 
       <div className="flex flex-col gap-1">
-        <Label className="text-xs text-muted-foreground">{t.filter.dateTo}</Label>
+        <Label className="text-xs text-muted-foreground">
+          {t.filter.dateTo}
+        </Label>
         <DateInput
           value={filters.dateTo || null}
           onChange={(v) => onFiltersChange({ dateTo: v ?? "" })}

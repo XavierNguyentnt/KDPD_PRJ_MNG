@@ -306,6 +306,8 @@ export default function ThietKePage() {
     useState<TaskWithAssignmentDetails | null>(null);
   const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createInitialValues, setCreateInitialValues] = useState<any | null>(null);
+  const [createDuplicateMode, setCreateDuplicateMode] = useState(false);
   const deleteConfirm = useConfirmDialog<TaskWithAssignmentDetails>();
 
   const { data: components = [] } = useComponents();
@@ -533,6 +535,38 @@ export default function ThietKePage() {
                 setSelectedTask(task);
                 setTaskDialogMode("edit");
               },
+              onDuplicate: (task) => {
+                if (task.group !== "Thiết kế") return;
+                const initial: any = {
+                  title: task.title || task.id,
+                  group: "Thiết kế",
+                  relatedWorkId: (task as any).relatedWorkId ?? null,
+                };
+                const assignments = Array.isArray((task as any).assignments) ? (task as any).assignments : [];
+                const ktv = assignments.find((a: any) => a?.stageType === "ktv_chinh");
+                if (ktv) {
+                  initial.__thietKeKtvChinh = {
+                    displayName: ktv.displayName ?? "",
+                    userId: ktv.userId ?? null,
+                    receiveDate: "",
+                    dueDate: null,
+                    completeDate: "",
+                  };
+                }
+                const troLy = assignments.filter((a: any) => String(a?.stageType || "").startsWith("tro_ly_"));
+                if (troLy.length > 0) {
+                  initial.__thietKeTroLyList = troLy.map((a: any) => ({
+                    displayName: a.displayName ?? "",
+                    userId: a.userId ?? null,
+                    receiveDate: "",
+                    dueDate: null,
+                    completeDate: "",
+                  }));
+                }
+                setCreateInitialValues(initial);
+                setCreateDuplicateMode(true);
+                setIsCreateDialogOpen(true);
+              },
               onDelete: (task) => {
                 deleteConfirm.ask(task);
               },
@@ -577,6 +611,8 @@ export default function ThietKePage() {
         onOpenChange={setIsCreateDialogOpen}
         task={null}
         defaultGroup={DEFAULT_GROUP}
+        initialValues={createInitialValues || undefined}
+        duplicateMode={createDuplicateMode}
         onCreate={(taskData) => {
           createTask(
             { ...taskData, group: taskData.group || DEFAULT_GROUP },
@@ -590,6 +626,8 @@ export default function ThietKePage() {
                     (language === "vi" ? "thành công" : "successfully"),
                 });
                 setIsCreateDialogOpen(false);
+                setCreateInitialValues(null);
+                setCreateDuplicateMode(false);
               },
               onError: (error) => {
                 toast({
