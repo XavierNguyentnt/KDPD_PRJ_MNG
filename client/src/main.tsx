@@ -8,10 +8,7 @@ async function setupPush() {
   if (!("serviceWorker" in navigator)) return;
   try {
     const reg = await navigator.serviceWorker.register("/sw.js");
-    let permission = Notification.permission;
-    if (permission === "default") {
-      permission = await Notification.requestPermission();
-    }
+    const permission = Notification.permission;
     if (permission !== "granted") return;
     const res = await fetch("/api/push/public-key", { credentials: "include" });
     if (!res.ok) return;
