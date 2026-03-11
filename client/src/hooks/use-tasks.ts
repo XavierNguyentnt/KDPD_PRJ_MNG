@@ -67,7 +67,10 @@ export function useUpdateTask() {
       return api.tasks.update.responses[200].parse(await res.json());
     },
     onSuccess: async (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === api.tasks.list.path,
+      });
       // Refetch ngay để UI cập nhật tức thì (vote, assignments, task detail)
       if (variables.id) {
         queryClient.invalidateQueries({
@@ -108,7 +111,10 @@ export function useCreateTask() {
       return api.tasks.create.responses[200].parse(await res.json());
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === api.tasks.list.path,
+      });
     },
   });
 }
@@ -131,7 +137,10 @@ export function useDeleteTask() {
       return api.tasks.delete.responses[200].parse(await res.json());
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === api.tasks.list.path,
+      });
     },
   });
 }
@@ -154,7 +163,10 @@ export function useRedoTask() {
       return api.tasks.redo.responses[200].parse(await res.json());
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === api.tasks.list.path,
+      });
     },
   });
 }
@@ -171,7 +183,10 @@ export function useRefreshTasks() {
       return api.tasks.refresh.responses[200].parse(await res.json());
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === api.tasks.list.path,
+      });
     },
   });
 }

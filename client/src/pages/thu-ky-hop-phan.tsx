@@ -1019,6 +1019,7 @@ export default function ThuKyHopPhanPage() {
       const allowedPcIds = new Set(pcScoped.map((c) => c.id));
       list = list.filter(
         (t) =>
+          (!t.relatedWorkId && !t.relatedContractId) ||
           (t.relatedWorkId && allowedWorkIds.has(t.relatedWorkId)) ||
           (t.relatedContractId &&
             (allowedTcIds.has(t.relatedContractId) ||
