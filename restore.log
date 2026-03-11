@@ -1,0 +1,279 @@
+SET
+SET
+SET
+SET
+SET
+SET
+ set_config 
+------------
+ 
+(1 row)
+
+SET
+SET
+SET
+SET
+psql:attached_assets/2026.03.11. neon_backup.sql:29: ERROR:  extension "pg_session_jwt" is not available
+DETAIL:  Could not open extension control file "/usr/share/postgresql/17/extension/pg_session_jwt.control": No such file or directory.
+HINT:  The extension must first be installed on the system where PostgreSQL is running.
+psql:attached_assets/2026.03.11. neon_backup.sql:38: ERROR:  extension "pg_session_jwt" does not exist
+CREATE SCHEMA
+psql:attached_assets/2026.03.11. neon_backup.sql:49: ERROR:  role "neon_auth" does not exist
+CREATE SCHEMA
+psql:attached_assets/2026.03.11. neon_backup.sql:59: ERROR:  role "neon_service" does not exist
+CREATE EXTENSION
+COMMENT
+CREATE FUNCTION
+psql:attached_assets/2026.03.11. neon_backup.sql:94: ERROR:  role "neon_service" does not exist
+CREATE FUNCTION
+psql:attached_assets/2026.03.11. neon_backup.sql:111: ERROR:  role "neondb_owner" does not exist
+SET
+SET
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:139: ERROR:  role "neon_auth" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:158: ERROR:  role "neon_auth" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:174: ERROR:  role "neon_auth" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:190: ERROR:  role "neon_auth" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:207: ERROR:  role "neon_auth" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:228: ERROR:  role "neon_auth" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:249: ERROR:  role "neon_auth" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:271: ERROR:  role "neon_auth" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:288: ERROR:  role "neon_auth" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:305: ERROR:  role "neondb_owner" does not exist
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:331: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:370: ERROR:  role "neondb_owner" does not exist
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:399: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:433: ERROR:  role "neondb_owner" does not exist
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:465: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:501: ERROR:  role "neondb_owner" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:518: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:550: ERROR:  role "neondb_owner" does not exist
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:576: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:650: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:720: ERROR:  role "neondb_owner" does not exist
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:773: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:861: ERROR:  role "neondb_owner" does not exist
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:887: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:926: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+CREATE TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:968: ERROR:  role "neondb_owner" does not exist
+COMMENT
+COMMENT
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 0
+COPY 1
+COPY 0
+COPY 0
+COPY 0
+COPY 5
+COPY 6
+COPY 59
+COPY 3
+COPY 3
+COPY 3
+COPY 0
+COPY 10
+COPY 5
+COPY 64
+COPY 26
+COPY 41
+COPY 40
+COPY 62
+COPY 91
+COPY 47
+COPY 220
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+psql:attached_assets/2026.03.11. neon_backup.sql:3030: ERROR:  role "authenticator" does not exist
+psql:attached_assets/2026.03.11. neon_backup.sql:3039: ERROR:  role "authenticator" does not exist
+psql:attached_assets/2026.03.11. neon_backup.sql:3047: ERROR:  role "neon_superuser" does not exist
+psql:attached_assets/2026.03.11. neon_backup.sql:3055: ERROR:  role "neon_superuser" does not exist
