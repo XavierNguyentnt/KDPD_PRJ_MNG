@@ -2426,6 +2426,9 @@ export async function registerRoutes(
         } else if (input.roleIds !== undefined) {
           await dbStorage.setUserRoles(id, input.roleIds);
         }
+        if (input.groupIds !== undefined) {
+          await dbStorage.setUserGroups(id, input.groupIds);
+        }
         const user = await dbStorage.getUserByIdWithRolesAndGroups(id);
         if (!user) return res.status(404).json({ message: "User not found" });
         res.json(sanitizeUser(user));

@@ -51,6 +51,7 @@ async function main() {
   const { initSession } = await import("./auth");
   const { registerRoutes } = await import("./routes");
   const { startNotificationsJob } = await import("./notifications-job");
+  const { ensureDbExtensions } = await import("./db");
 
   app.use(
     express.json({
@@ -73,6 +74,7 @@ async function main() {
     app.use(csrfOriginCheck(process.env.CSRF_ORIGIN));
   }
 
+  await ensureDbExtensions();
   initSession(app);
 
   app.use((req, res, next) => {

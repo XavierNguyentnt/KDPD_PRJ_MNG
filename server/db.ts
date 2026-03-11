@@ -40,3 +40,12 @@ if (process.env.DATABASE_URL) {
 }
 
 export { pool, db };
+
+export async function ensureDbExtensions(): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
+  } catch (error) {
+    console.warn("Failed to ensure pgcrypto extension (optional):", error);
+  }
+}

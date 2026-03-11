@@ -252,12 +252,16 @@ export async function setUserRoles(
   userId: string,
   roleIds: string[],
 ): Promise<void> {
-  await requireDb().delete(userRoles).where(eq(userRoles.userId, userId));
-  if (roleIds.length) {
-    await requireDb()
-      .insert(userRoles)
-      .values(roleIds.map((roleId) => ({ userId, roleId, componentId: null })));
-  }
+  await requireDb().transaction(async (tx) => {
+    await tx.delete(userRoles).where(eq(userRoles.userId, userId));
+    if (roleIds.length) {
+      await tx
+        .insert(userRoles)
+        .values(
+          roleIds.map((roleId) => ({ userId, roleId, componentId: null })),
+        );
+    }
+  });
 }
 
 /** Ghi đè toàn bộ role assignments của user (roleId + componentId). Dùng cho thư ký nhiều hợp phần. */
@@ -265,18 +269,18 @@ export async function setUserRoleAssignments(
   userId: string,
   assignments: Array<{ roleId: string; componentId?: string | null }>,
 ): Promise<void> {
-  await requireDb().delete(userRoles).where(eq(userRoles.userId, userId));
-  if (assignments.length) {
-    await requireDb()
-      .insert(userRoles)
-      .values(
+  await requireDb().transaction(async (tx) => {
+    await tx.delete(userRoles).where(eq(userRoles.userId, userId));
+    if (assignments.length) {
+      await tx.insert(userRoles).values(
         assignments.map((a) => ({
           userId,
           roleId: a.roleId,
           componentId: a.componentId ?? null,
         })),
       );
-  }
+    }
+  });
 }
 
 /** Ghi đè toàn bộ groups của user (nguồn duy nhất: user_groups). */
@@ -284,12 +288,14 @@ export async function setUserGroups(
   userId: string,
   groupIds: string[],
 ): Promise<void> {
-  await requireDb().delete(userGroups).where(eq(userGroups.userId, userId));
-  if (groupIds.length) {
-    await requireDb()
-      .insert(userGroups)
-      .values(groupIds.map((groupId) => ({ userId, groupId })));
-  }
+  await requireDb().transaction(async (tx) => {
+    await tx.delete(userGroups).where(eq(userGroups.userId, userId));
+    if (groupIds.length) {
+      await tx
+        .insert(userGroups)
+        .values(groupIds.map((groupId) => ({ userId, groupId })));
+    }
+  });
 }
 
 // -----------------------------------------------------------------------------
