@@ -5584,10 +5584,26 @@ export default function ThuKyHopPhanPage() {
             <AlertDialogAction
               onClick={() => {
                 if (!deleteTaskTarget?.id) return;
+                if ((deleteTaskTarget as any).createdBy !== user?.id) {
+                  toast({
+                    title: "Lỗi",
+                    description:
+                      "Chỉ người tạo công việc mới có quyền xóa công việc này.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 deleteTask(deleteTaskTarget.id, {
                   onSuccess: () => {
                     setDeleteTaskConfirmOpen(false);
                     setDeleteTaskTarget(null);
+                  },
+                  onError: (e) => {
+                    toast({
+                      title: "Lỗi",
+                      description: e.message,
+                      variant: "destructive",
+                    });
                   },
                 });
               }}

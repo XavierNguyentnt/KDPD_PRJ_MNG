@@ -403,6 +403,78 @@ Ghi chú:
 - Cấu hình cron trên sẽ giữ lại backup 14 ngày gần nhất.
 - Nếu không muốn hardcode mật khẩu trong URL, có thể dùng biến môi trường `DATABASE_URL` từ `.env` (cần đảm bảo cron load được env), hoặc dùng `.pgpass`.
 
+## 8.4 Đồng bộ schema DB theo code (Drizzle)
+
+Khi cập nhật code có thay đổi schema (ví dụ thêm cột mới), cần đồng bộ vào PostgreSQL.
+
+Ví dụ chạy `drizzle-kit push` bằng `DATABASE_URL`:
+
+```bash
+cd ~/Task-Project/KDPD_PRJ_MNG
+export DATABASE_URL='postgresql://kdpd_user:CHANGE_ME_STRONG_PASSWORD@localhost:5432/kdpd_db'
+npm run db:push
+```
+
+Ghi chú:
+
+- Lệnh này sẽ áp schema ở `shared/schema.ts` vào DB hiện tại.
+- Nếu user DB không đủ quyền, cần dùng user có quyền DDL (ALTER TABLE, CREATE EXTENSION, ...).
+
+## 8.5 Thêm cột created_by cho tasks (phân quyền xóa công việc)
+
+Mục tiêu: chỉ người tạo task mới được phép xóa task.
+
+### 8.5.1 Thêm cột + khóa ngoại bằng psql (Ubuntu)
+
+```bash
+export DATABASE_URL='postgresql://kdpd_user:CHANGE_ME_STRONG_PASSWORD@localhost:5432/kdpd_db'
+psql "$DATABASE_URL"
+```
+
+Trong prompt `psql`:
+
+```sql
+ALTER TABLE tasks
+  ADD COLUMN IF NOT EXISTS created_by uuid;
+
+ALTER TABLE tasks
+  ADD CONSTRAINT tasks_created_by_fkey
+  FOREIGN KEY (created_by) REFERENCES users(id)
+  ON DELETE SET NULL;
+```
+
+Nếu báo `already exists` ở phần constraint thì nghĩa là khóa ngoại đã được tạo trước đó.
+
+### 8.5.2 Cách chạy an toàn (chỉ thêm constraint nếu chưa tồn tại)
+
+PostgreSQL không hỗ trợ cú pháp `ADD CONSTRAINT IF NOT EXISTS`. Nếu cần idempotent, dùng `DO $$`:
+
+```sql
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'tasks_created_by_fkey'
+  ) THEN
+    ALTER TABLE tasks
+      ADD CONSTRAINT tasks_created_by_fkey
+      FOREIGN KEY (created_by) REFERENCES users(id)
+      ON DELETE SET NULL;
+  END IF;
+END $$;
+```
+
+### 8.5.3 Kiểm tra
+
+```bash
+psql "$DATABASE_URL" -c "\d tasks"
+```
+
+Ghi chú:
+
+- Các task đã có trước khi thêm cột sẽ có `created_by = NULL` nên theo rule “chỉ người tạo mới xóa” thì sẽ không ai xóa được các task cũ này, trừ khi bạn backfill dữ liệu hoặc thêm ngoại lệ.
+
 ## 9) Xử lý lỗi thường gặp
 
 ### 9.1 403 Forbidden: invalid origin

@@ -612,10 +612,28 @@ export default function CVChungPage() {
             <AlertDialogAction
               onClick={() => {
                 if (!deleteTaskTarget?.id) return;
+                if ((deleteTaskTarget as any).createdBy !== user?.id) {
+                  toast({
+                    title: t.common.error,
+                    description:
+                      language === "vi"
+                        ? "Chỉ người tạo công việc mới có quyền xóa công việc này."
+                        : "Only the task creator can delete this task.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 deleteTask(deleteTaskTarget.id, {
                   onSuccess: () => {
                     setDeleteTaskConfirmOpen(false);
                     setDeleteTaskTarget(null);
+                  },
+                  onError: (error) => {
+                    toast({
+                      title: t.common.error,
+                      description: error.message || t.errors.failedToDelete,
+                      variant: "destructive",
+                    });
                   },
                 });
               }}

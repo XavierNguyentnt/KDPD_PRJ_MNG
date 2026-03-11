@@ -659,9 +659,27 @@ export default function ThietKePage() {
             <AlertDialogAction
               onClick={() => {
                 if (!deleteConfirm.target?.id) return;
+                if ((deleteConfirm.target as any).createdBy !== user?.id) {
+                  toast({
+                    title: t.common.error,
+                    description:
+                      language === "vi"
+                        ? "Chỉ người tạo công việc mới có quyền xóa công việc này."
+                        : "Only the task creator can delete this task.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 deleteTask(deleteConfirm.target.id, {
                   onSuccess: () => {
                     deleteConfirm.cancel();
+                  },
+                  onError: (error) => {
+                    toast({
+                      title: t.common.error,
+                      description: error.message || t.errors.failedToDelete,
+                      variant: "destructive",
+                    });
                   },
                 });
               }}

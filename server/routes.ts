@@ -383,13 +383,20 @@ export async function registerRoutes(
   app.post("/api/tasks/:id/redo", requireAuth, async (req, res) => {
     try {
       requireDb();
-      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const id = Array.isArray(req.params.id)
+        ? req.params.id[0]
+        : req.params.id;
       const oldTask = await storage.getTask(id);
       if (!oldTask) return res.status(404).json({ message: "Task not found" });
       const vote = oldTask.vote ?? null;
       const allowedVotes = new Set(["khong_tot", "khong_hoan_thanh"]);
       if (!allowedVotes.has(String(vote))) {
-        return res.status(400).json({ message: "Chỉ cho phép làm lại khi đánh giá là 'Không tốt' hoặc 'Không hoàn thành'" });
+        return res
+          .status(400)
+          .json({
+            message:
+              "Chỉ cho phép làm lại khi đánh giá là 'Không tốt' hoặc 'Không hoàn thành'",
+          });
       }
       const assignments = await dbStorage.getTaskAssignmentsByTaskId(id);
       const reqUser = req.user as UserWithRolesAndGroups;
@@ -399,15 +406,20 @@ export async function registerRoutes(
           (a.stageType === "kiem_soat" || a.stageType === "doc_duyet"),
       );
       if (!isController) {
-        return res.status(403).json({ message: "Chỉ người kiểm soát có thể yêu cầu làm lại" });
+        return res
+          .status(403)
+          .json({ message: "Chỉ người kiểm soát có thể yêu cầu làm lại" });
       }
       const allTasks = await dbStorage.getTasksFromDb();
       const stripSuffix = (title: string) =>
         title.replace(/\s*\(Làm lại lần\s+\d+\)\s*$/i, "").trim();
       const baseTitle = stripSuffix(oldTask.title);
       const redoCount =
-        allTasks.filter((t) => stripSuffix(t.title) === baseTitle && /\(Làm lại lần\s+\d+\)$/i.test(t.title)).length +
-        1;
+        allTasks.filter(
+          (t) =>
+            stripSuffix(t.title) === baseTitle &&
+            /\(Làm lại lần\s+\d+\)$/i.test(t.title),
+        ).length + 1;
       const newTitle = `${baseTitle} (Làm lại lần ${redoCount})`;
       await storage.updateTask(id, { status: "Archived" });
       const now = new Date();
@@ -415,6 +427,7 @@ export async function registerRoutes(
         title: newTitle,
         description: oldTask.description ?? null,
         group: oldTask.group ?? null,
+        createdBy: reqUser.id,
         status: "Not Started",
         priority: oldTask.priority,
         progress: 0,
@@ -448,12 +461,17 @@ export async function registerRoutes(
       }
       res.json(newTask);
     } catch (err) {
-      if (err instanceof Error && err.message.includes("Database not configured")) {
+      if (
+        err instanceof Error &&
+        err.message.includes("Database not configured")
+      ) {
         return res.status(503).json({ message: err.message });
       }
       res
         .status(500)
-        .json({ message: err instanceof Error ? err.message : "Failed to redo task" });
+        .json({
+          message: err instanceof Error ? err.message : "Failed to redo task",
+        });
     }
   });
 
@@ -596,7 +614,8 @@ export async function registerRoutes(
         await dbStorage.deleteTaskAssignmentsByTaskId(id);
         if (assignmentsInput.length > 0) {
           for (const a of assignmentsInput) {
-            const isController = a.stageType === "kiem_soat" || a.stageType === "doc_duyet";
+            const isController =
+              a.stageType === "kiem_soat" || a.stageType === "doc_duyet";
             const key = `${a.userId}|${a.stageType}|${a.roundNumber ?? 1}`;
             const prev = prevAssignmentMap.get(key);
             let completedAt: Date | null = null;
@@ -895,6 +914,7 @@ export async function registerRoutes(
         workflow: input.workflow ?? null,
         sourceSheetId: input.sourceSheetId ?? null,
         sourceSheetName: input.sourceSheetName ?? null,
+        createdBy: (req.user as UserWithRolesAndGroups)?.id ?? null,
         contractId: input.contractId ?? null,
         taskType: input.taskType ?? null,
         relatedWorkId: input.relatedWorkId ?? null,
@@ -1021,6 +1041,15 @@ export async function registerRoutes(
       const id = Array.isArray(req.params.id)
         ? req.params.id[0]
         : req.params.id;
+      const existing = await storage.getTask(id);
+      if (!existing) return res.status(404).json({ message: "Task not found" });
+      const reqUserId = (req.user as UserWithRolesAndGroups)?.id;
+      const createdBy = (existing as { createdBy?: string | null }).createdBy;
+      if (!createdBy || !reqUserId || createdBy !== reqUserId) {
+        return res.status(403).json({
+          message: "Chỉ người tạo công việc mới có quyền xóa công việc này.",
+        });
+      }
       await storage.deleteTask(id);
       res.json({ message: "Task deleted successfully" });
     } catch (err) {

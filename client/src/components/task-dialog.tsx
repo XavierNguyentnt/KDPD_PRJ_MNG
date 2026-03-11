@@ -282,6 +282,71 @@ export function TaskDialog({
   const redoMutation = useRedoTask();
   const isNewTask = !task;
   const [isEditing, setIsEditing] = useState(false);
+  const canDeleteTask = !!task && (task as any).createdBy === user?.id;
+
+  const parseYyyyMmDdLocal = (
+    value: string | null | undefined,
+  ): Date | null => {
+    if (!value) return null;
+    const parts = value
+      .slice(0, 10)
+      .split("-")
+      .map((x) => Number(x));
+    const [y, m, d] = parts;
+    if (!y || !m || !d) return null;
+    const dt = new Date(y, m - 1, d);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  };
+
+  const isCompletedDateValid = (
+    completedYyyyMmDd: string,
+    receivedYyyyMmDd?: string | null,
+  ): boolean => {
+    const completed = parseYyyyMmDdLocal(completedYyyyMmDd);
+    if (!completed) return true;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    completed.setHours(0, 0, 0, 0);
+    if (completed.getTime() > today.getTime()) return false;
+    const received = parseYyyyMmDdLocal(receivedYyyyMmDd ?? null);
+    if (received) {
+      received.setHours(0, 0, 0, 0);
+      if (completed.getTime() < received.getTime()) return false;
+    }
+    return true;
+  };
+
+  const guardCompletedDateOrToast = (
+    completedYyyyMmDd: string,
+    receivedYyyyMmDd?: string | null,
+  ): boolean => {
+    if (isCompletedDateValid(completedYyyyMmDd, receivedYyyyMmDd)) return true;
+    const todayMsg =
+      language === "vi"
+        ? "Ngày hoàn thành thực tế không được lớn hơn ngày hiện tại."
+        : "Actual completion date cannot be in the future.";
+    const beforeMsg =
+      language === "vi"
+        ? "Ngày hoàn thành thực tế không được nhỏ hơn ngày nhận công việc."
+        : "Actual completion date cannot be earlier than received date.";
+    const completed = parseYyyyMmDdLocal(completedYyyyMmDd);
+    const received = parseYyyyMmDdLocal(receivedYyyyMmDd ?? null);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isFuture =
+      completed != null &&
+      !Number.isNaN(completed.getTime()) &&
+      (() => {
+        completed.setHours(0, 0, 0, 0);
+        return completed.getTime() > today.getTime();
+      })();
+    toast({
+      title: t.common.error,
+      description: isFuture ? todayMsg : beforeMsg,
+      variant: "destructive",
+    });
+    return false;
+  };
   const effectiveTask = (
     task?.group === "Biên tập" ||
     task?.group === "Thiết kế" ||
@@ -957,7 +1022,15 @@ export function TaskDialog({
         },
       ]);
     }
-  }, [open, effectiveTask, task, form, defaultGroup, initialValues, duplicateMode]);
+  }, [
+    open,
+    effectiveTask,
+    task,
+    form,
+    defaultGroup,
+    initialValues,
+    duplicateMode,
+  ]);
 
   const canEditMetaRaw = role === UserRole.ADMIN || role === UserRole.MANAGER;
   const canEditMeta = canEditMetaRaw && (isNewTask || isEditing);
@@ -1023,7 +1096,11 @@ export function TaskDialog({
   }
 
   const onSubmit = (data: FormData) => {
-    if (isNewTask && duplicateMode && (data.group || defaultGroup) === "Biên tập") {
+    if (
+      isNewTask &&
+      duplicateMode &&
+      (data.group || defaultGroup) === "Biên tập"
+    ) {
       const hasReceive =
         !!(data.btv2ReceiveDate && data.btv2ReceiveDate.trim()) ||
         !!(data.btv1ReceiveDate && data.btv1ReceiveDate.trim()) ||
@@ -1035,27 +1112,57 @@ export function TaskDialog({
         !!(data.btv1CompleteDate && data.btv1CompleteDate.trim()) ||
         !!(data.docDuyetCompleteDate && data.docDuyetCompleteDate.trim());
       if (!data.status) {
-        form.setError("status", { message: language === "vi" ? "Bắt buộc nhập Trạng thái" : "Status is required" });
+        form.setError("status", {
+          message:
+            language === "vi"
+              ? "Bắt buộc nhập Trạng thái"
+              : "Status is required",
+        });
         return;
       }
       if (!data.priority) {
-        form.setError("priority", { message: language === "vi" ? "Bắt buộc nhập Độ ưu tiên" : "Priority is required" });
+        form.setError("priority", {
+          message:
+            language === "vi"
+              ? "Bắt buộc nhập Độ ưu tiên"
+              : "Priority is required",
+        });
         return;
       }
       if (!data.roundType || !data.roundType.trim()) {
-        form.setError("roundType", { message: language === "vi" ? "Bắt buộc nhập Loại bông" : "Round type is required" });
+        form.setError("roundType", {
+          message:
+            language === "vi"
+              ? "Bắt buộc nhập Loại bông"
+              : "Round type is required",
+        });
         return;
       }
       if (!hasReceive) {
-        form.setError("btv2ReceiveDate", { message: language === "vi" ? "Bắt buộc nhập Ngày nhận công việc (ít nhất 1 stage)" : "Receive date required (at least one stage)" });
+        form.setError("btv2ReceiveDate", {
+          message:
+            language === "vi"
+              ? "Bắt buộc nhập Ngày nhận công việc (ít nhất 1 stage)"
+              : "Receive date required (at least one stage)",
+        });
         return;
       }
       if (!hasDue) {
-        form.setError("btv2DueDate", { message: language === "vi" ? "Bắt buộc nhập Ngày hoàn thành dự kiến (ít nhất 1 stage)" : "Due date required (at least one stage)" });
+        form.setError("btv2DueDate", {
+          message:
+            language === "vi"
+              ? "Bắt buộc nhập Ngày hoàn thành dự kiến (ít nhất 1 stage)"
+              : "Due date required (at least one stage)",
+        });
         return;
       }
       if (!hasCompleted) {
-        form.setError("btv2CompleteDate", { message: language === "vi" ? "Bắt buộc nhập Ngày hoàn thành thực tế (ít nhất 1 stage)" : "Actual completed date required (at least one stage)" });
+        form.setError("btv2CompleteDate", {
+          message:
+            language === "vi"
+              ? "Bắt buộc nhập Ngày hoàn thành thực tế (ít nhất 1 stage)"
+              : "Actual completed date required (at least one stage)",
+        });
         return;
       }
     }
@@ -2149,6 +2256,14 @@ export function TaskDialog({
                                 <DateInput
                                   value={slot.completedAt || null}
                                   onChange={(v) => {
+                                    if (
+                                      v &&
+                                      !guardCompletedDateOrToast(
+                                        v,
+                                        slot.receivedAt ?? null,
+                                      )
+                                    )
+                                      return;
                                     setMultiAssigneesList((prev) =>
                                       prev.map((s) =>
                                         s.id === slot.id
@@ -2389,12 +2504,20 @@ export function TaskDialog({
                         </Label>
                         <DateInput
                           value={thietKeKtvChinh.completeDate || null}
-                          onChange={(v) =>
+                          onChange={(v) => {
+                            if (
+                              v &&
+                              !guardCompletedDateOrToast(
+                                v,
+                                thietKeKtvChinh.receiveDate || null,
+                              )
+                            )
+                              return;
                             setThietKeKtvChinh((prev) => ({
                               ...prev,
                               completeDate: v || "",
-                            }))
-                          }
+                            }));
+                          }}
                           placeholder="dd/mm/yyyy"
                           className="bg-background w-32"
                           disabled={!canEditMeta && !isNewTask}
@@ -2481,15 +2604,23 @@ export function TaskDialog({
                           </Label>
                           <DateInput
                             value={slot.completeDate || null}
-                            onChange={(v) =>
+                            onChange={(v) => {
+                              if (
+                                v &&
+                                !guardCompletedDateOrToast(
+                                  v,
+                                  slot.receiveDate || null,
+                                )
+                              )
+                                return;
                               setThietKeTroLyList((prev) =>
                                 prev.map((s) =>
                                   s.id === slot.id
                                     ? { ...s, completeDate: v || "" }
                                     : s,
                                 ),
-                              )
-                            }
+                              );
+                            }}
                             placeholder="dd/mm/yyyy"
                             className="bg-background w-32"
                             disabled={!canEditMeta && !isNewTask}
@@ -2629,6 +2760,14 @@ export function TaskDialog({
                       <DateInput
                         value={form.watch("btv2CompleteDate") || null}
                         onChange={(v) => {
+                          if (
+                            v &&
+                            !guardCompletedDateOrToast(
+                              v,
+                              form.watch("btv2ReceiveDate") || null,
+                            )
+                          )
+                            return;
                           form.setValue("btv2CompleteDate", v ?? "");
                           if (v)
                             form.setValue("btv2Status", StageStatus.COMPLETED);
@@ -2753,6 +2892,14 @@ export function TaskDialog({
                       <DateInput
                         value={form.watch("btv1CompleteDate") || null}
                         onChange={(v) => {
+                          if (
+                            v &&
+                            !guardCompletedDateOrToast(
+                              v,
+                              form.watch("btv1ReceiveDate") || null,
+                            )
+                          )
+                            return;
                           form.setValue("btv1CompleteDate", v ?? "");
                           if (v)
                             form.setValue("btv1Status", StageStatus.COMPLETED);
@@ -2879,6 +3026,14 @@ export function TaskDialog({
                       <DateInput
                         value={form.watch("docDuyetCompleteDate") || null}
                         onChange={(v) => {
+                          if (
+                            v &&
+                            !guardCompletedDateOrToast(
+                              v,
+                              form.watch("docDuyetReceiveDate") || null,
+                            )
+                          )
+                            return;
                           form.setValue("docDuyetCompleteDate", v ?? "");
                           if (v)
                             form.setValue(
@@ -3237,44 +3392,43 @@ export function TaskDialog({
 
           <DialogFooter className="flex justify-between shrink-0 px-6 py-4 border-t bg-muted/30">
             <div>
-              {!isNewTask &&
-                (role === UserRole.ADMIN || role === UserRole.MANAGER) && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => {
-                      if (task && confirm(t.common.confirmDelete)) {
-                        deleteMutation.mutate(task.id, {
-                          onSuccess: () => {
-                            toast({
-                              title: t.common.success,
-                              description:
-                                t.common.delete +
-                                " " +
-                                (language === "vi"
-                                  ? "thành công"
-                                  : "successfully"),
-                            });
-                            onOpenChange(false);
-                          },
-                          onError: (error) => {
-                            toast({
-                              title: t.common.error,
-                              description:
-                                error.message || t.errors.failedToDelete,
-                              variant: "destructive",
-                            });
-                          },
-                        });
-                      }
-                    }}
-                    disabled={deleteMutation.isPending}>
-                    {deleteMutation.isPending && (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    )}
-                    {t.common.delete}
-                  </Button>
-                )}
+              {!isNewTask && canDeleteTask && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    if (task && confirm(t.common.confirmDelete)) {
+                      deleteMutation.mutate(task.id, {
+                        onSuccess: () => {
+                          toast({
+                            title: t.common.success,
+                            description:
+                              t.common.delete +
+                              " " +
+                              (language === "vi"
+                                ? "thành công"
+                                : "successfully"),
+                          });
+                          onOpenChange(false);
+                        },
+                        onError: (error) => {
+                          toast({
+                            title: t.common.error,
+                            description:
+                              error.message || t.errors.failedToDelete,
+                            variant: "destructive",
+                          });
+                        },
+                      });
+                    }
+                  }}
+                  disabled={deleteMutation.isPending}>
+                  {deleteMutation.isPending && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
+                  {t.common.delete}
+                </Button>
+              )}
             </div>
             <div className="flex gap-2">
               <Button

@@ -232,6 +232,9 @@ export const tasks = pgTable("tasks", {
   workflow: jsonb("workflow"),
   sourceSheetId: text("source_sheet_id"),
   sourceSheetName: text("source_sheet_name"),
+  createdBy: uuid("created_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
   contractId: uuid("contract_id"),
   taskType: text("task_type"),
   relatedWorkId: uuid("related_work_id").references(() => works.id),
@@ -372,10 +375,14 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
     .defaultNow(),
 });
 
-export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions);
-export const selectPushSubscriptionSchema = createSelectSchema(pushSubscriptions);
+export const insertPushSubscriptionSchema =
+  createInsertSchema(pushSubscriptions);
+export const selectPushSubscriptionSchema =
+  createSelectSchema(pushSubscriptions);
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
-export type InsertPushSubscriptionRow = z.infer<typeof insertPushSubscriptionSchema>;
+export type InsertPushSubscriptionRow = z.infer<
+  typeof insertPushSubscriptionSchema
+>;
 
 // -----------------------------------------------------------------------------
 // Contract members (contracts ↔ users)
