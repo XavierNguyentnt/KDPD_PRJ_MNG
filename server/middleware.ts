@@ -183,32 +183,30 @@ export function rateLimit(options: { windowMs: number; max: number }) {
 }
 
 /** Kiểm tra Origin/Referer cho phương thức ghi để giảm CSRF (tùy chọn). */
-export function csrfOriginCheck(allowedOrigin: string | string[]) {
+export function csrfOriginCheck(allowedOrigins: string | string[]) {
   const unsafe = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-  const normalize = (value: string) => {
-    let s = String(value ?? "").trim();
-    while (
-      (s.startsWith('"') && s.endsWith('"')) ||
-      (s.startsWith("'") && s.endsWith("'")) ||
-      (s.startsWith("`") && s.endsWith("`"))
-    ) {
-      s = s.slice(1, -1).trim();
-    }
-    if (s.endsWith("/")) s = s.slice(0, -1);
-    return s;
-  };
-  const list = Array.isArray(allowedOrigin) ? allowedOrigin : [allowedOrigin];
-  const allowedOrigins = list
-    .map((s) => normalize(String(s ?? "")))
-    .filter(Boolean);
+  const list = Array.isArray(allowedOrigins)
+    ? allowedOrigins
+    : [allowedOrigins];
+  const normalized = list
+    .map((s) => String(s || "").trim())
+    .filter(Boolean)
+    .map((s) => s.replace(/\/+$/, ""));
+  const originSet = new Set(normalized);
   return (req: Request, res: Response, next: NextFunction) => {
     if (!unsafe.has(req.method)) return next();
     const origin = (req.headers.origin as string) || "";
     const referer = (req.headers.referer as string) || "";
-    if (origin && !allowedOrigins.includes(origin)) {
+    const originNorm = origin ? origin.replace(/\/+$/, "") : "";
+    if (originNorm && !originSet.has(originNorm)) {
       return res.status(403).json({ message: "Forbidden: invalid origin" });
     }
-    if (referer && !allowedOrigins.some((o) => referer.startsWith(o))) {
+    const refererOk =
+      !referer ||
+      normalized.some(
+        (base) => referer.startsWith(base + "/") || referer === base,
+      );
+    if (!refererOk) {
       return res.status(403).json({ message: "Forbidden: invalid referer" });
     }
     next();

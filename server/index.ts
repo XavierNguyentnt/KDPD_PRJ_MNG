@@ -71,24 +71,13 @@ async function main() {
   app.use(securityHeaders);
 
   if (process.env.CSRF_CHECK === "true" && process.env.CSRF_ORIGIN) {
-    const raw = String(process.env.CSRF_ORIGIN ?? "");
-    const normalize = (value: string) => {
-      let s = String(value ?? "").trim();
-      while (
-        (s.startsWith('"') && s.endsWith('"')) ||
-        (s.startsWith("'") && s.endsWith("'")) ||
-        (s.startsWith("`") && s.endsWith("`"))
-      ) {
-        s = s.slice(1, -1).trim();
-      }
-      if (s.endsWith("/")) s = s.slice(0, -1);
-      return s;
-    };
-    const allowedOrigins = raw
-      .split(/[,\s]+/g)
-      .map((s) => normalize(s))
+    const origins = String(process.env.CSRF_ORIGIN)
+      .split(",")
+      .map((s) => s.trim())
       .filter(Boolean);
-    app.use(csrfOriginCheck(allowedOrigins));
+    app.use(
+      csrfOriginCheck(origins.length > 0 ? origins : process.env.CSRF_ORIGIN),
+    );
   }
 
   await ensureDbExtensions();
