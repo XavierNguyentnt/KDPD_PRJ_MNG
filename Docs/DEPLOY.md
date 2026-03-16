@@ -33,6 +33,7 @@ Nếu đã có repo và muốn cập nhật code:
 cd ~/Task-Project/KDPD_PRJ_MNG
 git fetch --all --prune
 git pull --rebase
+sudo systemctl restart kdpd
 ```
 
 ## 3) Thiết lập PostgreSQL local

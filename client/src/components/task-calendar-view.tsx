@@ -1236,8 +1236,8 @@ export function TaskCalendarView({
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {language === "vi"
-                      ? "Hệ thống sẽ tạo/cập nhật sự kiện cho các công việc được giao cho bạn."
-                      : "The app will create/update events for tasks assigned to you."}
+                      ? "Hệ thống sẽ tự tạo/cập nhật sự kiện hạn (deadline), thời gian thực hiện và cảnh báo sắp đến hạn."
+                      : "The app will create/update deadline, work-span, and due-soon warning events."}
                   </div>
                 </div>
 
@@ -1323,8 +1323,8 @@ export function TaskCalendarView({
                 <div className="space-y-2">
                   <div className="text-xs text-muted-foreground">
                     {language === "vi"
-                      ? "Đồng bộ theo trường ngày"
-                      : "Sync date field"}
+                      ? "Sự kiện bổ sung"
+                      : "Extra event"}
                   </div>
                   <ToggleGroup
                     type="single"
@@ -1336,10 +1336,10 @@ export function TaskCalendarView({
                     }}
                     className="border rounded-md bg-background">
                     <ToggleGroupItem value="dueDate" aria-label="dueDate">
-                      {language === "vi" ? "Hạn" : "Due"}
+                      {language === "vi" ? "Chỉ hạn" : "Deadline only"}
                     </ToggleGroupItem>
                     <ToggleGroupItem value="receivedAt" aria-label="receivedAt">
-                      {language === "vi" ? "Ngày nhận" : "Received"}
+                      {language === "vi" ? "Thêm ngày nhận" : "Add received day"}
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
