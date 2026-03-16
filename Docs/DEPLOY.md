@@ -147,6 +147,8 @@ Lưu ý quan trọng khi viết `.env`:
 - Không dùng backtick (`...`) hoặc thêm khoảng trắng thừa quanh dấu `=`.
 - `CSRF_ORIGIN` phải khớp chính xác URL bạn mở trên trình duyệt (scheme + host + port).
 - Nếu bạn truy cập bằng IP LAN (ví dụ `http://192.168.19.4:5000`) thì đặt `CSRF_ORIGIN=http://192.168.19.4:5000`.
+- `CSRF_ORIGIN` hỗ trợ nhiều origin (phân tách bằng dấu phẩy). Ví dụ:
+  - `CSRF_ORIGIN=http://task.kdpd.local,https://<TEN_NGROK>.ngrok-free.dev`
 
 ## 5) Build và chạy production
 
@@ -486,6 +488,8 @@ Cách xử lý:
 
 - Nếu mở `http://localhost:5000` thì `CSRF_ORIGIN=http://localhost:5000`
 - Nếu mở `http://192.168.19.4:5000` thì `CSRF_ORIGIN=http://192.168.19.4:5000`
+- Nếu cần mở đồng thời nhiều domain (ví dụ domain nội bộ + ngrok) thì tách bằng dấu phẩy:
+  - `CSRF_ORIGIN=http://task.kdpd.local,https://<TEN_NGROK>.ngrok-free.dev`
 - Restart server sau khi sửa `.env`
 
 ### 9.2 401 Unauthorized liên tục sau khi login
@@ -524,3 +528,82 @@ Hoặc hỏi DB trực tiếp:
 ```bash
 psql "$(grep -E '^DATABASE_URL=' .env | cut -d= -f2-)" -c "select inet_server_addr(), inet_server_port(), current_database(), current_user;"
 ```
+
+## 10) Tích hợp Google Calendar (OAuth + đồng bộ)
+
+Mục tiêu: cho phép người dùng kết nối Google Calendar và đồng bộ các công việc trong hệ thống thành sự kiện trên Google Calendar.
+
+### 10.1 Chuẩn bị phía Google Cloud Console
+
+1. Chọn đúng Project đang dùng (cùng project chứa `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`).
+2. Bật API:
+   - APIs & Services → Library → **Google Calendar API** → Enable
+3. Cấu hình OAuth Consent Screen (Google Auth Platform):
+   - Audience/Publishing status: **Testing** (không cần verify cho môi trường nội bộ)
+   - Data Access → Scopes: thêm các scope:
+     - `https://www.googleapis.com/auth/calendar.events`
+     - `https://www.googleapis.com/auth/calendar.readonly`
+   - Audience → Test users: thêm các tài khoản Google sẽ dùng thử
+4. Credentials → OAuth 2.0 Client IDs:
+   - Tạo hoặc sửa client loại **Web application**
+   - Authorized redirect URIs: thêm đúng callback URL của hệ thống (xem 10.2)
+
+### 10.2 Chọn callback URL (tránh dùng `.local`)
+
+Google không chấp nhận redirect URI dạng domain nội bộ `.local` (ví dụ `task.kdpd.local`). Bạn có 3 lựa chọn:
+
+- **Localhost (chỉ phù hợp khi thao tác trên chính máy chạy app hoặc dùng SSH tunnel):**
+  - `http://localhost:5000/api/google-calendar/oauth2/callback`
+- **Tunnel public (ngrok/Cloudflare Tunnel) – phù hợp khi ISP chặn port 80/443 hoặc không muốn mở port:**
+  - `https://<TEN_NGROK>.ngrok-free.dev/api/google-calendar/oauth2/callback`
+  - Lưu ý: ngrok free có thể đổi domain khi restart tunnel → cần cập nhật lại redirect URI và `.env`.
+- **Domain public ổn định (khuyến nghị production):**
+  - `https://oauth.<DOMAIN_THAT>/api/google-calendar/oauth2/callback`
+
+### 10.3 Cấu hình `.env` cho Google Calendar
+
+Thêm vào `.env` (không dùng backtick, không thêm khoảng trắng thừa quanh dấu `=`):
+
+```env
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_CALENDAR_REDIRECT_URI=https://<CALLBACK_DOMAIN>/api/google-calendar/oauth2/callback
+```
+
+Ghi chú:
+
+- `GOOGLE_REDIRECT_URI` và `GOOGLE_REFRESH_TOKEN` (nếu có) là cho luồng Gmail mailer, không dùng cho Calendar sync.
+- Nếu chạy HTTP (không có TLS), giữ `SESSION_SECURE=false` để cookie session không bị trình duyệt chặn.
+
+### 10.4 Đồng bộ schema DB cho các bảng Google Calendar
+
+Nếu code có thay đổi schema (thêm `google_calendar_accounts`, `google_calendar_event_links`), chạy:
+
+```bash
+cd ~/Task-Project/KDPD_PRJ_MNG
+export DATABASE_URL='postgresql://kdpd_user:CHANGE_ME_STRONG_PASSWORD@localhost:5432/kdpd_db'
+npm run db:push
+```
+
+### 10.5 Cách kết nối và đồng bộ trong UI
+
+1. Mở màn **Lịch** → tab **Đồng bộ**
+2. Bấm **Kết nối Google Calendar**
+3. Sau khi kết nối:
+   - Bật/tắt **Tự động đồng bộ**
+   - Nhập `calendarId` (mặc định `primary`, hoặc dán “ID lịch” của lịch KDPD dạng `...@group.calendar.google.com`)
+   - Bấm **Đồng bộ ngay** để đẩy các task hiện có (được giao cho user) lên Google Calendar
+
+### 10.6 Lưu ý & lỗi thường gặp
+
+- `401 Unauthorized. Please log in.` tại callback:
+  - Bạn đang gọi callback trên domain (ngrok/tunnel) nhưng chưa đăng nhập trên chính domain đó.
+  - Cách đúng: mở app bằng chính domain callback (ngrok/tunnel), đăng nhập, rồi bấm “Kết nối Google Calendar”.
+- `403 Forbidden: invalid origin` khi login qua ngrok:
+  - Do `CSRF_CHECK=true` và origin không nằm trong `CSRF_ORIGIN`.
+  - Giờ `CSRF_ORIGIN` hỗ trợ nhiều origin bằng dấu phẩy, ví dụ:
+    - `CSRF_ORIGIN=http://task.kdpd.local,https://<TEN_NGROK>.ngrok-free.dev`
+- `redirect_uri_mismatch`:
+  - Redirect URI trong Google Cloud Console phải khớp 100% với `GOOGLE_CALENDAR_REDIRECT_URI` (scheme/host/path).
+- `ERR_NGROK_6024` (ngrok browser warning):
+  - Ngrok có thể chèn trang cảnh báo lần đầu. Nếu chặn callback OAuth, hãy “Continue” một lần, hoặc dùng domain ổn định/paid/tunnel khác.

@@ -233,6 +233,16 @@ export async function updateGoogleCalendarSyncSettings(params: {
 
 export async function disconnectGoogleCalendar(userId: string): Promise<void> {
   try {
+    const client = await getAuthorizedCalendarClient(userId);
+    if (client) {
+      const { calendar } = client;
+      const links = await dbStorage.getGoogleCalendarEventLinksByUserId(userId);
+      for (const link of links) {
+        await calendar.events
+          .delete({ calendarId: link.calendarId, eventId: link.eventId })
+          .catch(() => {});
+      }
+    }
     await dbStorage.deleteGoogleCalendarEventLinksByUserId(userId);
     await dbStorage.deleteGoogleCalendarAccountByUserId(userId);
   } catch (err) {
@@ -323,6 +333,50 @@ async function syncAssignmentToCalendar(params: {
     });
     return "updated";
   } else {
+    const now = new Date();
+    const timeMin = new Date(now.getTime() - 3650 * 24 * 60 * 60 * 1000);
+    const timeMax = new Date(now.getTime() + 3650 * 24 * 60 * 60 * 1000);
+    const existing = await calendar.events
+      .list({
+        calendarId,
+        maxResults: 10,
+        singleEvents: true,
+        showDeleted: false,
+        timeMin: timeMin.toISOString(),
+        timeMax: timeMax.toISOString(),
+        privateExtendedProperty: [
+          `kdpdTaskId=${params.task.id}`,
+          `kdpdAssignmentId=${params.assignment.id}`,
+          `kdpdDateField=${params.eventKey}`,
+        ],
+      })
+      .catch(() => null);
+
+    const items = existing?.data?.items ?? [];
+    const firstId = items[0]?.id ?? null;
+    if (firstId) {
+      await calendar.events.patch({
+        calendarId,
+        eventId: firstId,
+        requestBody: event,
+      });
+      await dbStorage.createGoogleCalendarEventLink({
+        userId: params.userId,
+        taskId: params.task.id,
+        taskAssignmentId: params.assignment.id,
+        dateField: params.eventKey,
+        calendarId,
+        eventId: firstId,
+      });
+      for (const dup of items.slice(1)) {
+        if (!dup.id) continue;
+        await calendar.events
+          .delete({ calendarId, eventId: dup.id })
+          .catch(() => {});
+      }
+      return "updated";
+    }
+
     const created = await calendar.events.insert({
       calendarId,
       requestBody: event,
@@ -365,7 +419,7 @@ export async function syncGoogleCalendarForUser(
       base.skippedNoClient = 1;
       return base;
     }
-    const { account } = client;
+    const { calendar, account } = client;
     base.connected = true;
     base.syncEnabled = !!account.syncEnabled;
     base.calendarId = account.calendarId ?? "primary";
@@ -377,6 +431,7 @@ export async function syncGoogleCalendarForUser(
     }
 
     const pairs = await dbStorage.getTaskAssignmentsWithTaskByUserId(userId);
+    const desired = new Set<string>();
     base.totalAssignments = pairs.length;
     for (const { assignment, task } of pairs) {
       try {
@@ -390,6 +445,15 @@ export async function syncGoogleCalendarForUser(
         const receivedKey = formatDateOnly(assignment.receivedAt ?? null);
 
         const actions: SyncAction[] = [];
+
+        const dueKeyKey = `${base.calendarId}|${assignment.id}|dueDate`;
+        const periodKeyKey = `${base.calendarId}|${assignment.id}|period`;
+        const dueSoonKeyKey = `${base.calendarId}|${assignment.id}|dueSoon`;
+        const receivedKeyKey = `${base.calendarId}|${assignment.id}|receivedAt`;
+        desired.add(dueKeyKey);
+        desired.add(periodKeyKey);
+        desired.add(dueSoonKeyKey);
+        if (base.syncDateField === "receivedAt") desired.add(receivedKeyKey);
 
         actions.push(
           await syncAssignmentToCalendar({
@@ -590,6 +654,19 @@ export async function syncGoogleCalendarForUser(
         base.errors += 1;
       }
     }
+
+    const links = await dbStorage.getGoogleCalendarEventLinksByUserId(userId);
+    for (const link of links) {
+      const key = `${link.calendarId}|${link.taskAssignmentId ?? ""}|${link.dateField}`;
+      const shouldKeep =
+        link.calendarId === base.calendarId && desired.has(key);
+      if (shouldKeep) continue;
+      await calendar.events
+        .delete({ calendarId: link.calendarId, eventId: link.eventId })
+        .catch(() => {});
+      await dbStorage.deleteGoogleCalendarEventLinkById(link.id);
+    }
+
     return base;
   } catch (err) {
     if (isMissingTableError(err)) return base;
@@ -613,13 +690,9 @@ export async function syncGoogleCalendarForTaskChange(params: {
     for (const userId of uniqueUserIds) {
       const client = await getAuthorizedCalendarClient(userId);
       if (!client) continue;
-      const { account } = client;
+      const { calendar, account } = client;
       if (!account.syncEnabled) continue;
 
-      await dbStorage.deleteGoogleCalendarEventLinksByUserAndTask(
-        userId,
-        params.taskId,
-      );
       const calendarId = account.calendarId ?? "primary";
       const syncDateField =
         (account.syncDateField as SyncDateField) ?? "dueDate";
@@ -627,6 +700,7 @@ export async function syncGoogleCalendarForTaskChange(params: {
       const mine = assignments.filter(
         (a) => String(a.userId) === String(userId),
       );
+      const desired = new Set<string>();
       for (const a of mine) {
         const detailsParts: string[] = [];
         if (task.group) detailsParts.push(`Nhóm: ${task.group}`);
@@ -635,6 +709,11 @@ export async function syncGoogleCalendarForTaskChange(params: {
         const description = detailsParts.join("\n");
         const dueKey = formatDateOnly(a.dueDate ?? null);
         const receivedKey = formatDateOnly(a.receivedAt ?? null);
+        desired.add(`${calendarId}|${a.id}|dueDate`);
+        desired.add(`${calendarId}|${a.id}|period`);
+        desired.add(`${calendarId}|${a.id}|dueSoon`);
+        if (syncDateField === "receivedAt")
+          desired.add(`${calendarId}|${a.id}|receivedAt`);
 
         await syncAssignmentToCalendar({
           userId,
@@ -806,6 +885,21 @@ export async function syncGoogleCalendarForTaskChange(params: {
             description,
           });
         }
+      }
+
+      const existingLinks =
+        await dbStorage.getGoogleCalendarEventLinksByUserAndTask(
+          userId,
+          params.taskId,
+        );
+      for (const link of existingLinks) {
+        const key = `${link.calendarId}|${link.taskAssignmentId ?? ""}|${link.dateField}`;
+        const shouldKeep = link.calendarId === calendarId && desired.has(key);
+        if (shouldKeep) continue;
+        await calendar.events
+          .delete({ calendarId: link.calendarId, eventId: link.eventId })
+          .catch(() => {});
+        await dbStorage.deleteGoogleCalendarEventLinkById(link.id);
       }
     }
   } catch (err) {
