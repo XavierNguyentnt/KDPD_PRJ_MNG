@@ -23,8 +23,10 @@ import {
   buildGoogleCalendarAuthUrl,
   connectGoogleCalendarWithCode,
   createOAuthState,
+  deleteGoogleCalendarEventsForAssignmentIds,
   disconnectGoogleCalendar,
   getGoogleCalendarSyncStatus,
+  cleanupGoogleCalendarDuplicates,
   syncGoogleCalendarForTaskChange,
   syncGoogleCalendarForUser,
   updateGoogleCalendarSyncSettings,
@@ -617,7 +619,32 @@ export async function registerRoutes(
       const task = await storage.updateTask(id, input);
 
       if (db && assignmentsInput !== undefined) {
-        await dbStorage.deleteTaskAssignmentsByTaskId(id);
+        const inputKeys = new Set(
+          assignmentsInput.map(
+            (x) => `${x.userId}|${x.stageType}|${x.roundNumber ?? 1}`,
+          ),
+        );
+
+        const removed = prevAssignmentsList.filter(
+          (x) =>
+            !inputKeys.has(`${x.userId}|${x.stageType}|${x.roundNumber ?? 1}`),
+        );
+
+        if (removed.length > 0) {
+          const byUser = new Map<string, string[]>();
+          for (const r of removed) {
+            const list = byUser.get(r.userId);
+            if (list) list.push(r.id);
+            else byUser.set(r.userId, [r.id]);
+          }
+          for (const [userId, assignmentIds] of byUser.entries()) {
+            await deleteGoogleCalendarEventsForAssignmentIds({
+              userId,
+              assignmentIds,
+            }).catch(() => {});
+          }
+        }
+
         if (assignmentsInput.length > 0) {
           for (const a of assignmentsInput) {
             const isController =
@@ -637,7 +664,8 @@ export async function registerRoutes(
               completedAt =
                 prev?.completedAt != null ? new Date(prev.completedAt) : null;
             }
-            const assignment = await dbStorage.createTaskAssignment({
+
+            const assignmentData = {
               taskId: id,
               userId: a.userId,
               stageType: a.stageType,
@@ -657,8 +685,12 @@ export async function registerRoutes(
               status: a.status ?? "not_started",
               progress: a.progress ?? 0,
               notes: a.notes ?? null,
-            });
-            const key2 = `${a.userId}|${a.stageType}|${a.roundNumber ?? 1}`;
+            };
+
+            const assignment = prev
+              ? await dbStorage.updateTaskAssignment(prev.id, assignmentData)
+              : await dbStorage.createTaskAssignment(assignmentData);
+
             const existing = await dbStorage.getNotificationByTaskType(
               a.userId,
               id,
@@ -668,9 +700,7 @@ export async function registerRoutes(
               const controllerIdsInput = assignmentsInput
                 .filter((x) => x.stageType === "kiem_soat")
                 .map((x) => x.userId);
-              const controllerIdsDb = (
-                await dbStorage.getTaskAssignmentsByTaskId(id)
-              )
+              const controllerIdsDb = prevAssignmentsList
                 .filter((x) => x.stageType === "kiem_soat")
                 .map((x) => x.userId);
               const controllerIds = Array.from(
@@ -719,13 +749,11 @@ export async function registerRoutes(
             }
 
             if (a.completedAt && !prevCompletedKeys.has(key)) {
-              const controllers =
-                await dbStorage.getTaskAssignmentsByTaskId(id);
               const controllerIds = Array.from(
                 new Set(
-                  controllers
-                    .filter((c) => c.stageType === "kiem_soat")
-                    .map((c) => c.userId),
+                  assignmentsInput
+                    .filter((x) => x.stageType === "kiem_soat")
+                    .map((x) => x.userId),
                 ),
               ).filter((uid) => uid !== a.userId);
               const assigneeUser = await dbStorage.getUserById(a.userId);
@@ -796,6 +824,10 @@ export async function registerRoutes(
               }
             }
           }
+        }
+
+        for (const r of removed) {
+          await dbStorage.deleteTaskAssignment(r.id);
         }
         {
           const prevVote =
@@ -4194,6 +4226,25 @@ export async function registerRoutes(
     } catch (err) {
       res.status(500).json({
         message: err instanceof Error ? err.message : "Failed to sync",
+      });
+    }
+  });
+
+  app.post("/api/google-calendar/cleanup", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      const status = await getGoogleCalendarSyncStatus(userId);
+      if (!status.connected) {
+        return res.status(400).json({
+          message:
+            "Chưa kết nối Google Calendar. Vui lòng bấm 'Kết nối Google Calendar' trước.",
+        });
+      }
+      const summary = await cleanupGoogleCalendarDuplicates(userId);
+      res.json(summary);
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to cleanup",
       });
     }
   });

@@ -1110,6 +1110,21 @@ export async function getGoogleCalendarEventLinksByUserAndTask(
     );
 }
 
+export async function getGoogleCalendarEventLinksByUserAndAssignmentId(
+  userId: string,
+  taskAssignmentId: string,
+): Promise<GoogleCalendarEventLink[]> {
+  return requireDb()
+    .select()
+    .from(googleCalendarEventLinks)
+    .where(
+      and(
+        eq(googleCalendarEventLinks.userId, userId),
+        eq(googleCalendarEventLinks.taskAssignmentId, taskAssignmentId),
+      ),
+    );
+}
+
 export async function createGoogleCalendarEventLink(
   data: Omit<InsertGoogleCalendarEventLink, "id">,
 ): Promise<GoogleCalendarEventLink> {

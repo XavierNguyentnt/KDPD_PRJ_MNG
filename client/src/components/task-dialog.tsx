@@ -579,6 +579,7 @@ export function TaskDialog({
   type MultiAssigneeSlot = {
     id: string;
     label: string;
+    stageType: string | null;
     displayName: string;
     userId: string | null;
     receivedAt: string | null;
@@ -593,6 +594,7 @@ export function TaskDialog({
     {
       id: "1",
       label: "Nhân sự 1",
+      stageType: "primary",
       displayName: "",
       userId: null,
       receivedAt: null,
@@ -621,6 +623,7 @@ export function TaskDialog({
         {
           id: "1",
           label: "Nhân sự 1",
+          stageType: "primary",
           displayName: "",
           userId: null,
           receivedAt: null,
@@ -673,6 +676,7 @@ export function TaskDialog({
         return {
           id: (a.id ?? a.userId + "-" + i).toString(),
           label,
+          stageType: a.stageType ?? null,
           displayName,
           userId: a.userId,
           receivedAt: toDateStr(a.receivedAt),
@@ -1012,6 +1016,7 @@ export function TaskDialog({
         {
           id: "1",
           label: "Nhân sự 1",
+          stageType: "primary",
           displayName: "",
           userId: null,
           receivedAt: null,
@@ -1257,14 +1262,15 @@ export function TaskDialog({
           selectedGroup === "Thư ký hợp phần") &&
         multiAssigneesList.some((s) => s.userId)
       ) {
-        let nhanSuIndex = 0;
         payload.assignments = multiAssigneesList
           .filter((s) => s.userId)
           .map((slot) => {
             const isSupervisor = slot.label === "Người kiểm soát";
             const stageType = isSupervisor
               ? "kiem_soat"
-              : `nhan_su_${++nhanSuIndex}`;
+              : slot.stageType && slot.stageType !== "kiem_soat"
+                ? slot.stageType
+                : "primary";
             return {
               userId: slot.userId!,
               stageType,
@@ -1572,14 +1578,15 @@ export function TaskDialog({
         task.group === "Quét trùng lặp" ||
         task.group === "Thư ký hợp phần")
     ) {
-      let nhanSuIndex = 0;
       (payload as Record<string, unknown>).assignments = multiAssigneesList
         .filter((s) => s.userId)
         .map((slot) => {
           const isSupervisor = slot.label === "Người kiểm soát";
           const stageType = isSupervisor
             ? "kiem_soat"
-            : `nhan_su_${++nhanSuIndex}`;
+            : slot.stageType && slot.stageType !== "kiem_soat"
+              ? slot.stageType
+              : "primary";
           return {
             userId: slot.userId!,
             stageType,
@@ -2355,6 +2362,10 @@ export function TaskDialog({
                           {
                             id: String(Date.now()),
                             label: `Nhân sự ${nhanSuCount + 1}`,
+                            stageType:
+                              nhanSuCount + 1 === 1
+                                ? "primary"
+                                : `nhan_su_${nhanSuCount + 1}`,
                             displayName: "",
                             userId: null,
                             receivedAt: null,
@@ -2382,6 +2393,7 @@ export function TaskDialog({
                           {
                             id: "ks-" + Date.now(),
                             label: "Người kiểm soát",
+                            stageType: "kiem_soat",
                             displayName: "",
                             userId: null,
                             receivedAt: null,

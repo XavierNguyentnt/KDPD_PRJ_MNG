@@ -55,6 +55,18 @@ type GoogleCalendarSyncSummary = GoogleCalendarSyncStatus & {
   skippedNoEventId: number;
   errors: number;
 };
+type GoogleCalendarCleanupSummary = {
+  calendarId: string;
+  scanned: number;
+  candidates: number;
+  groups: number;
+  deletedEvents: number;
+  linked: number;
+  updatedLinks: number;
+  deletedLinks: number;
+  orphanGroupsDeleted: number;
+  errors: number;
+};
 
 function toDateKey(value: string | Date | null | undefined): string | null {
   if (!value) return null;
@@ -314,6 +326,7 @@ export function TaskCalendarView({
     useState<DateField>("dueDate");
   const [gcalBusy, setGcalBusy] = useState(false);
   const [gcalSyncing, setGcalSyncing] = useState(false);
+  const [gcalCleaning, setGcalCleaning] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -400,16 +413,23 @@ export function TaskCalendarView({
         throw new Error(e?.message || "Failed");
       }
       const summary = (await res.json()) as GoogleCalendarSyncSummary;
-      const changed = (summary.created ?? 0) + (summary.updated ?? 0) + (summary.deleted ?? 0);
+      const changed =
+        (summary.created ?? 0) +
+        (summary.updated ?? 0) +
+        (summary.deleted ?? 0);
       const detailVi =
         `calendarId=${summary.calendarId || "primary"} · ` +
         `tạo ${summary.created ?? 0}, cập nhật ${summary.updated ?? 0}, xoá ${summary.deleted ?? 0}` +
-        (summary.skippedNoDate ? `, bỏ qua ${summary.skippedNoDate} (không có ngày)` : "") +
+        (summary.skippedNoDate
+          ? `, bỏ qua ${summary.skippedNoDate} (không có ngày)`
+          : "") +
         (summary.errors ? `, lỗi ${summary.errors}` : "");
       const detailEn =
         `calendarId=${summary.calendarId || "primary"} · ` +
         `created ${summary.created ?? 0}, updated ${summary.updated ?? 0}, deleted ${summary.deleted ?? 0}` +
-        (summary.skippedNoDate ? `, skipped ${summary.skippedNoDate} (no date)` : "") +
+        (summary.skippedNoDate
+          ? `, skipped ${summary.skippedNoDate} (no date)`
+          : "") +
         (summary.errors ? `, errors ${summary.errors}` : "");
       toast({
         title: language === "vi" ? "Đã đồng bộ" : "Synced",
@@ -430,6 +450,49 @@ export function TaskCalendarView({
       });
     } finally {
       setGcalSyncing(false);
+    }
+  };
+
+  const cleanupGoogleCalendarNow = async () => {
+    try {
+      setGcalCleaning(true);
+      const res = await fetch("/api/google-calendar/cleanup", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({ message: "Failed" }));
+        throw new Error(e?.message || "Failed");
+      }
+      const summary = (await res.json()) as GoogleCalendarCleanupSummary;
+      const detailVi =
+        `calendarId=${summary.calendarId || "primary"} · ` +
+        `xoá event ${summary.deletedEvents ?? 0}, xoá link ${summary.deletedLinks ?? 0}` +
+        (summary.orphanGroupsDeleted
+          ? `, xoá orphan ${summary.orphanGroupsDeleted}`
+          : "") +
+        (summary.errors ? `, lỗi ${summary.errors}` : "");
+      const detailEn =
+        `calendarId=${summary.calendarId || "primary"} · ` +
+        `deleted events ${summary.deletedEvents ?? 0}, deleted links ${
+          summary.deletedLinks ?? 0
+        }` +
+        (summary.orphanGroupsDeleted
+          ? `, orphan deleted ${summary.orphanGroupsDeleted}`
+          : "") +
+        (summary.errors ? `, errors ${summary.errors}` : "");
+      toast({
+        title: language === "vi" ? "Đã dọn trùng" : "Cleanup done",
+        description: language === "vi" ? detailVi : detailEn,
+      });
+    } catch (err) {
+      toast({
+        title: language === "vi" ? "Dọn trùng thất bại" : "Cleanup failed",
+        description: err instanceof Error ? err.message : "Failed",
+        variant: "destructive",
+      });
+    } finally {
+      setGcalCleaning(false);
     }
   };
 
@@ -1322,9 +1385,7 @@ export function TaskCalendarView({
 
                 <div className="space-y-2">
                   <div className="text-xs text-muted-foreground">
-                    {language === "vi"
-                      ? "Sự kiện bổ sung"
-                      : "Extra event"}
+                    {language === "vi" ? "Sự kiện bổ sung" : "Extra event"}
                   </div>
                   <ToggleGroup
                     type="single"
@@ -1339,7 +1400,9 @@ export function TaskCalendarView({
                       {language === "vi" ? "Chỉ hạn" : "Deadline only"}
                     </ToggleGroupItem>
                     <ToggleGroupItem value="receivedAt" aria-label="receivedAt">
-                      {language === "vi" ? "Thêm ngày nhận" : "Add received day"}
+                      {language === "vi"
+                        ? "Thêm ngày nhận"
+                        : "Add received day"}
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
@@ -1362,6 +1425,21 @@ export function TaskCalendarView({
                       : gcalSyncing
                         ? "Syncing..."
                         : "Sync now"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={
+                      !gcalStatus?.connected || gcalBusy || gcalCleaning
+                    }
+                    onClick={() => void cleanupGoogleCalendarNow()}>
+                    {language === "vi"
+                      ? gcalCleaning
+                        ? "Đang dọn..."
+                        : "Dọn trùng"
+                      : gcalCleaning
+                        ? "Cleaning..."
+                        : "Cleanup"}
                   </Button>
                   <Button
                     type="button"

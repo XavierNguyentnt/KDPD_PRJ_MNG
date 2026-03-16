@@ -14,6 +14,9 @@ vite.config.ts.*
 .env.local
 .env.*.local
 
+# Database backups (may contain secrets/PII)
+attached_assets/DB Backup/
+
 # Google Service Account credentials
 server/credentials.json
 zeta-courage-*.json

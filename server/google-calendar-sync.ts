@@ -1,4 +1,4 @@
-import { google } from "googleapis";
+import { google, calendar_v3 } from "googleapis";
 import crypto from "crypto";
 import * as dbStorage from "./db-storage";
 import { DUE_SOON_DAYS } from "./notifications";
@@ -225,6 +225,34 @@ export async function updateGoogleCalendarSyncSettings(params: {
   }
   try {
     await dbStorage.upsertGoogleCalendarAccount(params.userId, next);
+  } catch (err) {
+    if (isMissingTableError(err)) return;
+    throw err;
+  }
+}
+
+export async function deleteGoogleCalendarEventsForAssignmentIds(params: {
+  userId: string;
+  assignmentIds: string[];
+}): Promise<void> {
+  try {
+    const client = await getAuthorizedCalendarClient(params.userId);
+    if (!client) return;
+    const { calendar } = client;
+    const unique = Array.from(new Set(params.assignmentIds.filter(Boolean)));
+    for (const assignmentId of unique) {
+      const links =
+        await dbStorage.getGoogleCalendarEventLinksByUserAndAssignmentId(
+          params.userId,
+          assignmentId,
+        );
+      for (const link of links) {
+        await calendar.events
+          .delete({ calendarId: link.calendarId, eventId: link.eventId })
+          .catch(() => {});
+        await dbStorage.deleteGoogleCalendarEventLinkById(link.id);
+      }
+    }
   } catch (err) {
     if (isMissingTableError(err)) return;
     throw err;
@@ -955,6 +983,197 @@ export async function syncGoogleCalendarForTaskChange(params: {
     }
   } catch (err) {
     if (isMissingTableError(err)) return;
+    throw err;
+  }
+}
+
+export type GoogleCalendarCleanupSummary = {
+  calendarId: string;
+  scanned: number;
+  candidates: number;
+  groups: number;
+  deletedEvents: number;
+  linked: number;
+  updatedLinks: number;
+  deletedLinks: number;
+  orphanGroupsDeleted: number;
+  errors: number;
+};
+
+export async function cleanupGoogleCalendarDuplicates(
+  userId: string,
+): Promise<GoogleCalendarCleanupSummary> {
+  const base: GoogleCalendarCleanupSummary = {
+    calendarId: "primary",
+    scanned: 0,
+    candidates: 0,
+    groups: 0,
+    deletedEvents: 0,
+    linked: 0,
+    updatedLinks: 0,
+    deletedLinks: 0,
+    orphanGroupsDeleted: 0,
+    errors: 0,
+  };
+  try {
+    const client = await getAuthorizedCalendarClient(userId);
+    if (!client) return base;
+    const { calendar, account } = client;
+    const calendarId = account.calendarId ?? "primary";
+    base.calendarId = calendarId;
+
+    const now = new Date();
+    const timeMin = new Date(now.getTime() - 3650 * 24 * 60 * 60 * 1000);
+    const timeMax = new Date(now.getTime() + 3650 * 24 * 60 * 60 * 1000);
+
+    const collected: Array<{
+      eventId: string;
+      taskId: string;
+      assignmentId: string;
+      dateField: string;
+      updated?: string;
+      created?: string;
+    }> = [];
+
+    let pageToken: string | undefined = undefined;
+    for (;;) {
+      const resp: { data: calendar_v3.Schema$Events } =
+        (await calendar.events.list({
+          calendarId,
+          maxResults: 2500,
+          pageToken,
+          showDeleted: false,
+          singleEvents: false,
+          timeMin: timeMin.toISOString(),
+          timeMax: timeMax.toISOString(),
+          q: "Task ID:",
+        })) as any;
+      const items = resp.data.items ?? [];
+      base.scanned += items.length;
+      for (const e of items) {
+        const eventId = e.id;
+        const priv = (e.extendedProperties as any)?.private ?? {};
+        const taskId =
+          typeof priv.kdpdTaskId === "string" ? priv.kdpdTaskId : "";
+        const assignmentId =
+          typeof priv.kdpdAssignmentId === "string"
+            ? priv.kdpdAssignmentId
+            : "";
+        const dateField =
+          typeof priv.kdpdDateField === "string" ? priv.kdpdDateField : "";
+        if (!eventId || !taskId || !assignmentId || !dateField) continue;
+        collected.push({
+          eventId,
+          taskId,
+          assignmentId,
+          dateField,
+          updated: e.updated ?? undefined,
+          created: e.created ?? undefined,
+        });
+      }
+      pageToken = resp.data.nextPageToken ?? undefined;
+      if (!pageToken) break;
+    }
+
+    base.candidates = collected.length;
+
+    const groups = new Map<string, typeof collected>();
+    for (const item of collected) {
+      const key = `${item.taskId}|${item.assignmentId}|${item.dateField}`;
+      const prev = groups.get(key);
+      if (prev) prev.push(item);
+      else groups.set(key, [item]);
+    }
+    base.groups = groups.size;
+
+    for (const [key, list] of groups.entries()) {
+      list.sort((a, b) => {
+        const au = Date.parse(a.updated ?? a.created ?? "") || 0;
+        const bu = Date.parse(b.updated ?? b.created ?? "") || 0;
+        return bu - au;
+      });
+
+      const keep = list[0];
+      if (!keep) continue;
+
+      const assignment = await dbStorage.getTaskAssignmentById(
+        keep.assignmentId,
+      );
+      const assignmentValid =
+        assignment && String(assignment.taskId) === String(keep.taskId);
+      if (!assignmentValid) {
+        for (const item of list) {
+          await calendar.events
+            .delete({ calendarId, eventId: item.eventId })
+            .catch(() => {});
+          base.deletedEvents += 1;
+        }
+        const links =
+          await dbStorage.getGoogleCalendarEventLinksByUserAndAssignmentId(
+            userId,
+            keep.assignmentId,
+          );
+        for (const link of links) {
+          await dbStorage.deleteGoogleCalendarEventLinkById(link.id);
+          base.deletedLinks += 1;
+        }
+        base.orphanGroupsDeleted += 1;
+        continue;
+      }
+
+      for (const item of list.slice(1)) {
+        await calendar.events
+          .delete({ calendarId, eventId: item.eventId })
+          .catch(() => {});
+        base.deletedEvents += 1;
+      }
+
+      try {
+        const existing = await dbStorage.getGoogleCalendarEventLink({
+          userId,
+          taskId: keep.taskId,
+          taskAssignmentId: keep.assignmentId,
+          dateField: keep.dateField,
+          calendarId,
+        });
+        if (!existing) {
+          await dbStorage.createGoogleCalendarEventLink({
+            userId,
+            taskId: keep.taskId,
+            taskAssignmentId: keep.assignmentId,
+            dateField: keep.dateField,
+            calendarId,
+            eventId: keep.eventId,
+          });
+          base.linked += 1;
+        } else if (existing.eventId !== keep.eventId) {
+          await dbStorage.updateGoogleCalendarEventLink(existing.id, {
+            eventId: keep.eventId,
+          });
+          base.updatedLinks += 1;
+        }
+
+        const links =
+          await dbStorage.getGoogleCalendarEventLinksByUserAndAssignmentId(
+            userId,
+            keep.assignmentId,
+          );
+        for (const link of links) {
+          if (link.calendarId !== calendarId) continue;
+          if (link.taskId !== keep.taskId) continue;
+          if (link.dateField !== keep.dateField) continue;
+          if (link.eventId === keep.eventId) continue;
+          await dbStorage.deleteGoogleCalendarEventLinkById(link.id);
+          base.deletedLinks += 1;
+        }
+      } catch {
+        base.errors += 1;
+      }
+    }
+
+    return base;
+  } catch (err) {
+    if (isMissingTableError(err)) return base;
     throw err;
   }
 }
