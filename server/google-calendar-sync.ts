@@ -322,16 +322,31 @@ async function syncAssignmentToCalendar(params: {
   }
 
   if (link) {
-    await calendar.events.patch({
-      calendarId,
-      eventId: link.eventId,
-      requestBody: event,
-    });
-    await dbStorage.updateGoogleCalendarEventLink(link.id, {
-      calendarId,
-      dateField: params.eventKey,
-    });
-    return "updated";
+    try {
+      await calendar.events.patch({
+        calendarId,
+        eventId: link.eventId,
+        requestBody: event,
+      });
+      await dbStorage.updateGoogleCalendarEventLink(link.id, {
+        calendarId,
+        dateField: params.eventKey,
+      });
+      return "updated";
+    } catch {
+      const created = await calendar.events.insert({
+        calendarId,
+        requestBody: event,
+      });
+      const eventId = created.data.id;
+      if (!eventId) return "skipped_no_event_id";
+      await dbStorage.updateGoogleCalendarEventLink(link.id, {
+        calendarId,
+        dateField: params.eventKey,
+        eventId,
+      });
+      return "updated";
+    }
   } else {
     const now = new Date();
     const timeMin = new Date(now.getTime() - 3650 * 24 * 60 * 60 * 1000);
@@ -446,10 +461,10 @@ export async function syncGoogleCalendarForUser(
 
         const actions: SyncAction[] = [];
 
-        const dueKeyKey = `${base.calendarId}|${assignment.id}|dueDate`;
-        const periodKeyKey = `${base.calendarId}|${assignment.id}|period`;
-        const dueSoonKeyKey = `${base.calendarId}|${assignment.id}|dueSoon`;
-        const receivedKeyKey = `${base.calendarId}|${assignment.id}|receivedAt`;
+        const dueKeyKey = `${base.calendarId}|${task.id}|${assignment.id}|dueDate`;
+        const periodKeyKey = `${base.calendarId}|${task.id}|${assignment.id}|period`;
+        const dueSoonKeyKey = `${base.calendarId}|${task.id}|${assignment.id}|dueSoon`;
+        const receivedKeyKey = `${base.calendarId}|${task.id}|${assignment.id}|receivedAt`;
         desired.add(dueKeyKey);
         desired.add(periodKeyKey);
         desired.add(dueSoonKeyKey);
@@ -656,15 +671,33 @@ export async function syncGoogleCalendarForUser(
     }
 
     const links = await dbStorage.getGoogleCalendarEventLinksByUserId(userId);
+    const byKey = new Map<string, typeof links>();
     for (const link of links) {
-      const key = `${link.calendarId}|${link.taskAssignmentId ?? ""}|${link.dateField}`;
+      const key = `${link.calendarId}|${link.taskId}|${link.taskAssignmentId ?? ""}|${link.dateField}`;
+      const prev = byKey.get(key);
+      if (prev) prev.push(link);
+      else byKey.set(key, [link]);
+    }
+    for (const [key, list] of byKey.entries()) {
+      list.sort(
+        (a, b) =>
+          (b.updatedAt?.getTime?.() ?? 0) - (a.updatedAt?.getTime?.() ?? 0),
+      );
+      const keep = list[0];
+      const dups = list.slice(1);
+      for (const dup of dups) {
+        await calendar.events
+          .delete({ calendarId: dup.calendarId, eventId: dup.eventId })
+          .catch(() => {});
+        await dbStorage.deleteGoogleCalendarEventLinkById(dup.id);
+      }
       const shouldKeep =
-        link.calendarId === base.calendarId && desired.has(key);
+        keep.calendarId === base.calendarId && desired.has(key);
       if (shouldKeep) continue;
       await calendar.events
-        .delete({ calendarId: link.calendarId, eventId: link.eventId })
+        .delete({ calendarId: keep.calendarId, eventId: keep.eventId })
         .catch(() => {});
-      await dbStorage.deleteGoogleCalendarEventLinkById(link.id);
+      await dbStorage.deleteGoogleCalendarEventLinkById(keep.id);
     }
 
     return base;
@@ -709,11 +742,11 @@ export async function syncGoogleCalendarForTaskChange(params: {
         const description = detailsParts.join("\n");
         const dueKey = formatDateOnly(a.dueDate ?? null);
         const receivedKey = formatDateOnly(a.receivedAt ?? null);
-        desired.add(`${calendarId}|${a.id}|dueDate`);
-        desired.add(`${calendarId}|${a.id}|period`);
-        desired.add(`${calendarId}|${a.id}|dueSoon`);
+        desired.add(`${calendarId}|${task.id}|${a.id}|dueDate`);
+        desired.add(`${calendarId}|${task.id}|${a.id}|period`);
+        desired.add(`${calendarId}|${task.id}|${a.id}|dueSoon`);
         if (syncDateField === "receivedAt")
-          desired.add(`${calendarId}|${a.id}|receivedAt`);
+          desired.add(`${calendarId}|${task.id}|${a.id}|receivedAt`);
 
         await syncAssignmentToCalendar({
           userId,
@@ -892,14 +925,32 @@ export async function syncGoogleCalendarForTaskChange(params: {
           userId,
           params.taskId,
         );
+      const byKey = new Map<string, typeof existingLinks>();
       for (const link of existingLinks) {
-        const key = `${link.calendarId}|${link.taskAssignmentId ?? ""}|${link.dateField}`;
-        const shouldKeep = link.calendarId === calendarId && desired.has(key);
+        const key = `${link.calendarId}|${link.taskId}|${link.taskAssignmentId ?? ""}|${link.dateField}`;
+        const prev = byKey.get(key);
+        if (prev) prev.push(link);
+        else byKey.set(key, [link]);
+      }
+      for (const [key, list] of byKey.entries()) {
+        list.sort(
+          (a, b) =>
+            (b.updatedAt?.getTime?.() ?? 0) - (a.updatedAt?.getTime?.() ?? 0),
+        );
+        const keep = list[0];
+        const dups = list.slice(1);
+        for (const dup of dups) {
+          await calendar.events
+            .delete({ calendarId: dup.calendarId, eventId: dup.eventId })
+            .catch(() => {});
+          await dbStorage.deleteGoogleCalendarEventLinkById(dup.id);
+        }
+        const shouldKeep = keep.calendarId === calendarId && desired.has(key);
         if (shouldKeep) continue;
         await calendar.events
-          .delete({ calendarId: link.calendarId, eventId: link.eventId })
+          .delete({ calendarId: keep.calendarId, eventId: keep.eventId })
           .catch(() => {});
-        await dbStorage.deleteGoogleCalendarEventLinkById(link.id);
+        await dbStorage.deleteGoogleCalendarEventLinkById(keep.id);
       }
     }
   } catch (err) {
