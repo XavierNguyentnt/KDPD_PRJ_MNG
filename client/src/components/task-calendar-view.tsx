@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { DayPicker } from "react-day-picker";
 import {
   addDays,
+  addMonths,
   addWeeks,
   format,
   startOfWeek,
   subDays,
+  subMonths,
   subWeeks,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
@@ -148,12 +150,21 @@ function stringToHslColor(input: string): string {
   const hue = Math.abs(hash) % 360;
   return `hsl(${hue} 70% 45%)`;
 }
+function getDefaultStatusClasses(status: string | null | undefined): string {
+  const s = (status ?? "").trim().toLowerCase();
+  if (s === "completed") return "bg-emerald-100 text-emerald-900";
+  if (s === "in_progress" || s === "in progress")
+    return "bg-blue-100 text-blue-900";
+  if (s === "pending" || s === "paused") return "bg-amber-100 text-amber-900";
+  if (s === "cancelled" || s === "canceled") return "bg-rose-100 text-rose-900";
+  return "bg-slate-100 text-slate-900";
+}
 
 function getTaskAssignees(task: TaskWithAssignmentDetails): string[] {
   const fromAssignments = Array.isArray(task.assignments)
-    ? task.assignments
-        .map((a: any) => normalizeAssigneeName(a?.displayName))
-        .filter((x: any): x is string => typeof x === "string")
+    ? (task.assignments as any[])
+        .map((a) => normalizeAssigneeName(a?.displayName))
+        .filter((x): x is string => typeof x === "string" && x.length > 0)
     : [];
   if (fromAssignments.length > 0) return Array.from(new Set(fromAssignments));
   const fromAssigneeField = normalizeAssigneeName(task.assignee);
@@ -259,7 +270,9 @@ function DraggableTaskChip({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "w-full text-left rounded-md border border-border/60 bg-background px-2 py-1 text-xs leading-4 shadow-sm hover:bg-muted/20 transition-colors",
+        "w-full text-left rounded-sm px-2 py-1 text-[11px] leading-4 transition-colors",
+        "border border-border/30 hover:border-border/60",
+        getDefaultStatusClasses(task.status ?? null),
         compact ? "py-0.5" : "",
         isDragging ? "opacity-50" : "",
       )}
@@ -270,21 +283,9 @@ function DraggableTaskChip({
         <div className="min-w-0 flex-1">
           <div className="truncate font-medium">{task.title}</div>
         </div>
-        {assignees.length > 0 ? (
-          <div className="flex items-center gap-1 shrink-0">
-            {assignees.slice(0, 3).map((name) => (
-              <span
-                key={name}
-                title={name}
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: stringToHslColor(name) }}
-              />
-            ))}
-            {assignees.length > 3 ? (
-              <span className="text-[10px] text-muted-foreground">
-                +{assignees.length - 3}
-              </span>
-            ) : null}
+        {assignees.length > 0 && !compact ? (
+          <div className="text-[10px] text-muted-foreground shrink-0 truncate max-w-[120px]">
+            {assignees.join(", ")}
           </div>
         ) : null}
       </div>
@@ -322,8 +323,6 @@ export function TaskCalendarView({
     null,
   );
   const [gcalCalendarId, setGcalCalendarId] = useState("primary");
-  const [gcalSyncDateField, setGcalSyncDateField] =
-    useState<DateField>("dueDate");
   const [gcalBusy, setGcalBusy] = useState(false);
   const [gcalSyncing, setGcalSyncing] = useState(false);
   const [gcalCleaning, setGcalCleaning] = useState(false);
@@ -346,9 +345,6 @@ export function TaskCalendarView({
       const data = (await res.json()) as GoogleCalendarSyncStatus;
       setGcalStatus(data);
       setGcalCalendarId(data.calendarId || "primary");
-      setGcalSyncDateField(
-        data.syncDateField === "receivedAt" ? "receivedAt" : "dueDate",
-      );
     } catch (err) {
       toast({
         title: language === "vi" ? "Không thể tải trạng thái" : "Load failed",
@@ -380,9 +376,6 @@ export function TaskCalendarView({
       const data = (await res.json()) as GoogleCalendarSyncStatus;
       setGcalStatus(data);
       setGcalCalendarId(data.calendarId || "primary");
-      setGcalSyncDateField(
-        data.syncDateField === "receivedAt" ? "receivedAt" : "dueDate",
-      );
       toast({
         title: language === "vi" ? "Đã lưu" : "Saved",
         description:
@@ -514,7 +507,6 @@ export function TaskCalendarView({
         syncDateField: "dueDate",
       });
       setGcalCalendarId("primary");
-      setGcalSyncDateField("dueDate");
       toast({
         title: language === "vi" ? "Đã ngắt kết nối" : "Disconnected",
       });
@@ -608,6 +600,11 @@ export function TaskCalendarView({
     return Array.from({ length: 7 }).map((_, idx) => addDays(weekStart, idx));
   }, [weekStart]);
 
+  const monthStart = useMemo(() => {
+    const d = selectedDate ?? new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }, [selectedDate]);
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragTaskId(String(event.active.id));
   };
@@ -662,6 +659,8 @@ export function TaskCalendarView({
       setSelectedDate((d) => subDays(d ?? new Date(), 1));
     else if (calendarView === "week")
       setSelectedDate((d) => subWeeks(d ?? new Date(), 1));
+    else if (calendarView === "month")
+      setSelectedDate((d) => subMonths(d ?? new Date(), 1));
   };
 
   const onNext = () => {
@@ -669,6 +668,8 @@ export function TaskCalendarView({
       setSelectedDate((d) => addDays(d ?? new Date(), 1));
     else if (calendarView === "week")
       setSelectedDate((d) => addWeeks(d ?? new Date(), 1));
+    else if (calendarView === "month")
+      setSelectedDate((d) => addMonths(d ?? new Date(), 1));
   };
 
   const headerRangeLabel = useMemo(() => {
@@ -680,24 +681,472 @@ export function TaskCalendarView({
       const end = addDays(weekStart, 6);
       return `${format(start, "dd/MM")} – ${format(end, "dd/MM/yyyy")}`;
     }
-    return language === "vi" ? "Tháng" : "Month";
-  }, [calendarView, selectedDate, weekStart, language]);
+    const m = monthStart.getMonth() + 1;
+    const y = monthStart.getFullYear();
+    return language === "vi"
+      ? `Tháng ${m}, ${y}`
+      : format(monthStart, "MMMM yyyy");
+  }, [calendarView, selectedDate, weekStart, language, monthStart]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      <Card className="lg:col-span-3 border border-border shadow-sm overflow-hidden">
-        <CardHeader className="py-4 px-5 border-b border-border bg-muted/20">
+    <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-4">
+      <div className="space-y-4">
+        <Card className="border border-border shadow-sm overflow-hidden">
+          <CardHeader className="py-3 px-4 border-b border-border bg-background">
+            <CardTitle className="text-sm font-semibold">
+              {language === "vi" ? "Tháng" : "Month"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-2">
+            <DayPicker
+              mode="single"
+              selected={selectedDate}
+              onSelect={(d) => d && setSelectedDate(d)}
+              month={monthStart}
+              onMonthChange={(m) => setSelectedDate(m)}
+              showOutsideDays
+              weekStartsOn={1}
+              captionLayout="buttons"
+              classNames={{
+                months: "flex flex-col",
+                month: "space-y-2",
+                caption: "flex items-center justify-between px-1",
+                caption_label: "text-sm font-medium",
+                nav: "flex items-center gap-1",
+                nav_button: cn(
+                  buttonVariants({ variant: "ghost" }),
+                  "h-7 w-7 p-0",
+                ),
+                table: "w-full border-collapse space-y-1 mt-1",
+                head_row: "grid grid-cols-7",
+                head_cell:
+                  "text-muted-foreground font-medium text-[10px] text-center py-1",
+                row: "grid grid-cols-7",
+                cell: "p-0",
+                day: cn(
+                  buttonVariants({ variant: "ghost" }),
+                  "h-8 w-8 p-0 font-normal aria-selected:opacity-100 rounded-full",
+                ),
+                day_selected:
+                  "bg-primary text-primary-foreground hover:bg-primary focus:bg-primary",
+                day_today: "border border-primary/60",
+                day_outside: "text-muted-foreground/60",
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border shadow-sm overflow-hidden">
+          <CardHeader className="py-3 px-4 border-b border-border bg-background">
+            <CardTitle className="text-sm font-semibold">
+              {language === "vi" ? "Chi tiết trong ngày" : "Day details"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="px-4 py-2 border-b border-border flex items-center justify-between gap-3 bg-background">
+              <div className="text-sm font-medium">
+                {selectedDate ? format(selectedDate, "dd/MM/yyyy") : "—"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {tasksInSelectedDate.length}{" "}
+                {language === "vi" ? "công việc" : "tasks"}
+              </div>
+            </div>
+            <ScrollArea className="h-[320px]">
+              <div className="p-3 space-y-2">
+                {tasksInSelectedDate.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-8">
+                    {language === "vi" ? "Không có công việc." : "No tasks."}
+                  </div>
+                ) : (
+                  tasksInSelectedDate.map((task) => {
+                    const dateKey =
+                      dateField === "dueDate"
+                        ? toDateKey(task.dueDate ?? null)
+                        : toDateKey(task.receivedAt ?? null);
+                    const gcal = getGoogleCalendarTemplateUrl({
+                      title: task.title ?? "",
+                      details: task.description ?? undefined,
+                      dateKey,
+                    });
+                    return (
+                      <div
+                        key={task.id}
+                        className="border border-border/60 rounded-md p-3 hover:bg-muted/20 transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <button
+                            type="button"
+                            className="text-left min-w-0 flex-1"
+                            onClick={() => onTaskClick(task)}>
+                            <div className="font-medium text-sm truncate">
+                              {task.title}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-1">
+                              <span className="truncate">
+                                {language === "vi" ? "Nhân sự:" : "Assignee:"}{" "}
+                                {task.assignee?.trim() ||
+                                  (language === "vi"
+                                    ? "Chưa giao"
+                                    : "Unassigned")}
+                              </span>
+                              {dateField === "dueDate" ? (
+                                <span>
+                                  {language === "vi" ? "Hạn:" : "Due:"}{" "}
+                                  {formatDateDDMMYYYY(task.dueDate)}
+                                </span>
+                              ) : (
+                                <span>
+                                  {language === "vi" ? "Nhận:" : "Received:"}{" "}
+                                  {formatDateDDMMYYYY(task.receivedAt)}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge
+                              className={cn(
+                                "font-normal",
+                                getStatusColor(task.status ?? ""),
+                              )}>
+                              {task.status}
+                            </Badge>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() =>
+                                window.open(
+                                  gcal,
+                                  "_blank",
+                                  "noopener,noreferrer",
+                                )
+                              }>
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Badge
+                            className={cn(
+                              "font-normal",
+                              getPriorityColor(task.priority ?? ""),
+                            )}>
+                            {task.priority}
+                          </Badge>
+                          {task.group ? (
+                            <Badge variant="outline" className="font-normal">
+                              {task.group}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border shadow-sm overflow-hidden">
+          <CardHeader className="py-3 px-4 border-b border-border bg-background">
+            <CardTitle className="text-sm font-semibold">
+              Google Calendar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            <Tabs defaultValue="embed">
+              <TabsList className="w-full">
+                <TabsTrigger value="embed" className="flex-1">
+                  {language === "vi" ? "Nhúng" : "Embed"}
+                </TabsTrigger>
+                <TabsTrigger value="open" className="flex-1">
+                  {language === "vi" ? "Mở" : "Open"}
+                </TabsTrigger>
+                <TabsTrigger value="sync" className="flex-1">
+                  {language === "vi" ? "Đồng bộ" : "Sync"}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="embed" className="mt-3 space-y-3">
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground">
+                    {language === "vi"
+                      ? "Dán liên kết nhúng (embed) từ Google Calendar."
+                      : "Paste an embed link from Google Calendar."}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={googleEmbedDraft}
+                      onChange={(e) => setGoogleEmbedDraft(e.target.value)}
+                      placeholder="https://calendar.google.com/..."
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const v = googleEmbedDraft.trim();
+                        if (v && !isValidGoogleCalendarEmbedUrl(v)) {
+                          toast({
+                            title:
+                              language === "vi"
+                                ? "Liên kết không hợp lệ"
+                                : "Invalid link",
+                            description:
+                              language === "vi"
+                                ? "Vui lòng dùng liên kết nhúng từ Google Calendar."
+                                : "Please use an embed link from Google Calendar.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        setGoogleEmbedUrl(v);
+                        if (typeof window !== "undefined") {
+                          window.localStorage.setItem(
+                            "kdpd_google_calendar_embed_url",
+                            v,
+                          );
+                        }
+                        toast({
+                          title: language === "vi" ? "Đã lưu" : "Saved",
+                        });
+                      }}>
+                      {language === "vi" ? "Lưu" : "Save"}
+                    </Button>
+                  </div>
+                </div>
+
+                {googleEmbedUrl ? (
+                  <div className="border border-border rounded-md overflow-hidden bg-background">
+                    <iframe
+                      title="Google Calendar"
+                      src={googleEmbedUrl}
+                      className="w-full h-[240px]"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border rounded-md">
+                    {language === "vi"
+                      ? "Chưa có liên kết nhúng."
+                      : "No embed link configured."}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="open" className="mt-3 space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() =>
+                    window.open(
+                      "https://calendar.google.com/calendar/u/0/r",
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                  }>
+                  {language === "vi"
+                    ? "Mở Google Calendar"
+                    : "Open Google Calendar"}
+                </Button>
+                {selectedDateKey ? (
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={() => {
+                      const u = new URL(
+                        "https://calendar.google.com/calendar/u/0/r/day",
+                      );
+                      const dt = dateKeyToLocalDate(selectedDateKey);
+                      if (dt)
+                        u.searchParams.set("date", format(dt, "yyyyMMdd"));
+                      window.open(
+                        u.toString(),
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                    }}>
+                    {language === "vi"
+                      ? "Mở đúng ngày đang chọn"
+                      : "Open selected day"}
+                  </Button>
+                ) : null}
+              </TabsContent>
+
+              <TabsContent value="sync" className="mt-3 space-y-3">
+                {gcalStatus?.connected ? (
+                  <div className="flex items-center justify-between gap-3 border border-border/60 rounded-md px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium">
+                        {language === "vi" ? "Đã kết nối" : "Connected"}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {language === "vi"
+                          ? "Bật/tắt đồng bộ tự động."
+                          : "Enable/disable auto-sync."}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Switch
+                        checked={!!gcalStatus.syncEnabled}
+                        disabled={gcalBusy}
+                        onCheckedChange={(checked) =>
+                          void saveGoogleCalendarSettings({
+                            syncEnabled: checked,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-border rounded-md p-3 space-y-2">
+                    <div className="text-sm text-muted-foreground">
+                      {language === "vi"
+                        ? "Chưa kết nối Google Calendar."
+                        : "Not connected to Google Calendar."}
+                    </div>
+                    <Button
+                      type="button"
+                      disabled={gcalBusy}
+                      className="w-full"
+                      onClick={() => {
+                        const returnTo =
+                          typeof window !== "undefined"
+                            ? window.location.pathname +
+                              window.location.search +
+                              window.location.hash
+                            : "/";
+                        window.location.href =
+                          "/api/google-calendar/connect?returnTo=" +
+                          encodeURIComponent(returnTo);
+                      }}>
+                      {language === "vi"
+                        ? "Kết nối Google Calendar"
+                        : "Connect Google Calendar"}
+                    </Button>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground">
+                    {language === "vi"
+                      ? "Lịch đích (calendarId)"
+                      : "Target calendarId"}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={gcalCalendarId}
+                      onChange={(e) => setGcalCalendarId(e.target.value)}
+                      placeholder="primary"
+                      disabled={!gcalStatus?.connected || gcalBusy}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!gcalStatus?.connected || gcalBusy}
+                      onClick={() =>
+                        void saveGoogleCalendarSettings({
+                          calendarId: gcalCalendarId,
+                        })
+                      }>
+                      {language === "vi" ? "Lưu" : "Save"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    disabled={
+                      !gcalStatus?.connected ||
+                      !gcalStatus.syncEnabled ||
+                      gcalSyncing ||
+                      gcalBusy
+                    }
+                    onClick={() => void syncGoogleCalendarNow()}
+                    className="flex-1">
+                    {language === "vi"
+                      ? gcalSyncing
+                        ? "Đang đồng bộ..."
+                        : "Đồng bộ"
+                      : gcalSyncing
+                        ? "Syncing..."
+                        : "Sync"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={
+                      !gcalStatus?.connected || gcalBusy || gcalCleaning
+                    }
+                    onClick={() => void cleanupGoogleCalendarNow()}>
+                    {language === "vi"
+                      ? gcalCleaning
+                        ? "Đang dọn..."
+                        : "Dọn"
+                      : gcalCleaning
+                        ? "Cleaning..."
+                        : "Cleanup"}
+                  </Button>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!gcalStatus?.connected || gcalBusy}
+                  onClick={() => void disconnectGoogleCalendarNow()}
+                  className="w-full">
+                  {language === "vi" ? "Ngắt kết nối" : "Disconnect"}
+                </Button>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border border-border shadow-sm overflow-hidden">
+        <CardHeader className="py-3 px-4 border-b border-border bg-background">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="text-base font-semibold">
-                {language === "vi" ? "Lịch công việc" : "Task calendar"}
-              </CardTitle>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                {headerRangeLabel}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="text-sm font-semibold">
+                {language === "vi" ? "Lịch" : "Calendar"}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9"
+                onClick={() => setSelectedDate(new Date())}>
+                {language === "vi" ? "Hôm nay" : "Today"}
+              </Button>
+              <div className="flex items-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={onPrev}
+                  aria-label={language === "vi" ? "Trước" : "Previous"}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={onNext}
+                  aria-label={language === "vi" ? "Sau" : "Next"}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="min-w-0">
+                <div className="text-lg font-medium truncate leading-6">
+                  {headerRangeLabel}
+                </div>
                 {isUpdating ? (
-                  <span className="ml-2">
+                  <div className="text-[11px] text-muted-foreground">
                     {language === "vi" ? "Đang cập nhật..." : "Updating..."}
-                  </span>
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -710,14 +1159,23 @@ export function TaskCalendarView({
                   (v === "month" || v === "week" || v === "day") &&
                   setCalendarView(v as CalendarView)
                 }
-                className="border rounded-md bg-background">
-                <ToggleGroupItem value="month" aria-label="Month">
+                className="bg-muted/30 rounded-full p-1 border border-border/60">
+                <ToggleGroupItem
+                  value="month"
+                  aria-label="Month"
+                  className="rounded-full px-3">
                   {language === "vi" ? "Tháng" : "Month"}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="week" aria-label="Week">
+                <ToggleGroupItem
+                  value="week"
+                  aria-label="Week"
+                  className="rounded-full px-3">
                   {language === "vi" ? "Tuần" : "Week"}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="day" aria-label="Day">
+                <ToggleGroupItem
+                  value="day"
+                  aria-label="Day"
+                  className="rounded-full px-3">
                   {language === "vi" ? "Ngày" : "Day"}
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -730,48 +1188,22 @@ export function TaskCalendarView({
                   (v === "dueDate" || v === "receivedAt") &&
                   setDateField(v as DateField)
                 }
-                className="border rounded-md bg-background">
+                className="bg-muted/30 rounded-full p-1 border border-border/60">
                 <ToggleGroupItem
                   value="dueDate"
-                  aria-label={language === "vi" ? "Theo hạn" : "By due date"}>
+                  aria-label={language === "vi" ? "Theo hạn" : "By due date"}
+                  className="rounded-full px-3">
                   {language === "vi" ? "Theo hạn" : "Due"}
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="receivedAt"
                   aria-label={
                     language === "vi" ? "Theo ngày nhận" : "By received date"
-                  }>
+                  }
+                  className="rounded-full px-3">
                   {language === "vi" ? "Ngày nhận" : "Received"}
                 </ToggleGroupItem>
               </ToggleGroup>
-
-              {calendarView === "week" || calendarView === "day" ? (
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={onPrev}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9"
-                    onClick={() => setSelectedDate(new Date())}>
-                    {language === "vi" ? "Hôm nay" : "Today"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={onNext}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : null}
             </div>
           </div>
         </CardHeader>
@@ -785,75 +1217,36 @@ export function TaskCalendarView({
                 mode="single"
                 selected={selectedDate}
                 onSelect={(d) => d && setSelectedDate(d)}
+                month={monthStart}
+                onMonthChange={(m) => setSelectedDate(m)}
                 showOutsideDays
                 weekStartsOn={1}
-                captionLayout="dropdown"
-                fromYear={2020}
-                toYear={2035}
+                captionLayout="buttons"
                 modifiers={modifiers}
-                className="p-3"
+                className="p-2"
                 classNames={{
                   months: "flex flex-col space-y-4",
                   month: "space-y-2",
-                  caption:
-                    "flex justify-center pt-2 pb-2 relative items-center mb-1",
-                  caption_label: "text-sm font-medium hidden",
-                  caption_dropdowns:
-                    "flex justify-center items-center gap-2.5 pb-1",
-                  dropdown: cn(
-                    "h-8 px-3 pr-8 text-sm font-medium",
-                    "border border-input bg-background rounded-md",
-                    "hover:bg-accent hover:text-accent-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
-                    "transition-colors cursor-pointer",
-                    "shadow-sm",
-                  ),
-                  dropdown_month: cn(
-                    "h-8 px-3 pr-8 text-sm font-medium min-w-[130px]",
-                    "border border-input bg-background rounded-md",
-                    "hover:bg-accent hover:text-accent-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
-                    "transition-colors cursor-pointer",
-                    "shadow-sm",
-                  ),
-                  dropdown_year: cn(
-                    "h-8 px-3 pr-8 text-sm font-medium min-w-[100px]",
-                    "border border-input bg-background rounded-md",
-                    "hover:bg-accent hover:text-accent-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
-                    "transition-colors cursor-pointer",
-                    "shadow-sm",
-                  ),
-                  dropdown_icon: "hidden",
+                  caption: "hidden",
+                  caption_label: "hidden",
                   nav: "hidden",
-                  table: "w-full border-collapse space-y-1 mt-1",
-                  head_row: "grid grid-cols-7 mb-1",
+                  table: "w-full border-collapse space-y-0.5 mt-1",
+                  head_row: "grid grid-cols-7 mb-0.5",
                   head_cell:
-                    "text-muted-foreground rounded-md font-medium text-[0.75rem] uppercase tracking-wider text-center py-1",
+                    "text-muted-foreground rounded-md font-medium text-[11px] text-center py-1",
                   row: "grid grid-cols-7",
-                  cell: "p-0 border border-border/40 h-24 align-top relative",
+                  cell: "p-0 border border-border/30 h-24 align-top relative bg-background",
                   day: cn(
                     buttonVariants({ variant: "ghost" }),
-                    "h-full w-full p-1 font-normal aria-selected:opacity-100 rounded-none flex flex-col items-stretch justify-start hover:bg-muted/40",
+                    "h-full w-full p-1 font-normal aria-selected:opacity-100 rounded-none flex flex-col items-stretch justify-start hover:bg-muted/30",
                   ),
                   day_selected:
                     "bg-primary/10 text-foreground hover:bg-primary/15 focus:bg-primary/15",
-                  day_today: "bg-accent/60 text-accent-foreground",
-                  day_outside: "day-outside text-muted-foreground bg-muted/10",
+                  day_today: "",
+                  day_outside:
+                    "day-outside text-muted-foreground/70 bg-muted/5",
                 }}
                 components={{
-                  IconLeft: ({ className, ...props }) => (
-                    <ChevronLeft
-                      className={cn("h-4 w-4", className)}
-                      {...props}
-                    />
-                  ),
-                  IconRight: ({ className, ...props }) => (
-                    <ChevronRight
-                      className={cn("h-4 w-4", className)}
-                      {...props}
-                    />
-                  ),
                   DayContent: ({ date, activeModifiers }) => {
                     const key = toDateKey(date) ?? "";
                     const count = key ? (taskCounts[key] ?? 0) : 0;
@@ -868,37 +1261,45 @@ export function TaskCalendarView({
                           isToday && !isSelected && "font-semibold",
                         )}>
                         <div className="flex items-start justify-between gap-2">
-                          <div className="text-xs tabular-nums">
+                          <div
+                            className={cn(
+                              "text-xs tabular-nums inline-flex items-center justify-center h-6 min-w-6 px-1 rounded-full",
+                              isToday
+                                ? "bg-primary text-primary-foreground"
+                                : "",
+                            )}>
                             {date.getDate()}
                           </div>
-                          {hasTasks ? (
-                            <Badge
-                              variant="secondary"
-                              className={cn(
-                                "px-1.5 py-0 text-[10px] leading-4 font-medium",
-                                isSelected ? "bg-primary/20" : "",
-                              )}>
-                              {count}
-                            </Badge>
-                          ) : null}
                         </div>
                         {hasTasks ? (
                           <div className="flex flex-col gap-1 overflow-hidden">
                             {(tasksByDateKey.get(key) ?? [])
-                              .slice(0, 2)
+                              .slice(0, 3)
                               .map((t) => (
-                                <div
+                                <button
+                                  type="button"
                                   key={t.id}
-                                  className="text-[11px] leading-4 truncate px-1 py-0.5 rounded bg-muted/30">
+                                  className={cn(
+                                    "w-full text-left text-[11px] leading-4 truncate px-1.5 py-0.5 rounded-sm",
+                                    "border border-border/40 bg-muted/20 hover:bg-muted/30 transition-colors",
+                                    getStatusColor(t.status ?? ""),
+                                  )}
+                                  onClick={() => onTaskClick(t)}>
                                   {t.title}
-                                </div>
+                                </button>
                               ))}
-                            {count > 2 ? (
-                              <div className="text-[11px] leading-4 text-muted-foreground truncate px-1">
+                            {count > 3 ? (
+                              <button
+                                type="button"
+                                className="text-[11px] leading-4 text-muted-foreground truncate px-1.5 text-left hover:underline"
+                                onClick={() => {
+                                  setSelectedDate(date);
+                                  setCalendarView("day");
+                                }}>
                                 {language === "vi"
-                                  ? `+${count - 2} việc`
-                                  : `+${count - 2} more`}
-                              </div>
+                                  ? `${count - 3} mục khác`
+                                  : `${count - 3} more`}
+                              </button>
                             ) : null}
                           </div>
                         ) : (
@@ -912,20 +1313,33 @@ export function TaskCalendarView({
             ) : calendarView === "week" ? (
               <div className="p-3">
                 <div className="grid grid-cols-7 gap-2 mb-2">
-                  {weekDays.map((d) => (
-                    <div
-                      key={d.toISOString()}
-                      className={cn(
-                        "text-xs font-medium text-muted-foreground px-1",
-                        toDateKey(d) === selectedDateKey
-                          ? "text-foreground"
-                          : "",
-                      )}>
-                      {language === "vi"
-                        ? format(d, "EEE dd/MM")
-                        : format(d, "EEE MMM dd")}
-                    </div>
-                  ))}
+                  {weekDays.map((d) => {
+                    const key = toDateKey(d);
+                    const isSel = key && key === selectedDateKey;
+                    const isToday = key && key === toDateKey(new Date());
+                    return (
+                      <div
+                        key={d.toISOString()}
+                        className="px-1 flex items-center gap-2">
+                        <div className="text-[11px] font-medium text-muted-foreground">
+                          {language === "vi"
+                            ? format(d, "EEE")
+                            : format(d, "EEE")}
+                        </div>
+                        <div
+                          className={cn(
+                            "h-6 w-6 rounded-full flex items-center justify-center text-sm font-medium",
+                            isToday
+                              ? "bg-primary text-primary-foreground"
+                              : isSel
+                                ? "bg-primary/10 text-primary"
+                                : "text-foreground",
+                          )}>
+                          {format(d, "d")}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="grid grid-cols-7 gap-2">
                   {weekDays.map((d) => {
@@ -1037,423 +1451,6 @@ export function TaskCalendarView({
           </DndContext>
         </CardContent>
       </Card>
-
-      <div className="lg:col-span-2 space-y-6">
-        <Card className="border border-border shadow-sm overflow-hidden">
-          <CardHeader className="py-4 px-5 border-b border-border bg-muted/20">
-            <CardTitle className="text-base font-semibold">
-              {language === "vi" ? "Chi tiết trong ngày" : "Day details"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="px-5 py-3 border-b border-border flex items-center justify-between gap-3">
-              <div className="text-sm font-medium">
-                {selectedDate ? format(selectedDate, "dd/MM/yyyy") : "—"}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {tasksInSelectedDate.length}{" "}
-                {language === "vi" ? "công việc" : "tasks"}
-              </div>
-            </div>
-            <ScrollArea className="h-[340px]">
-              <div className="p-4 space-y-2">
-                {tasksInSelectedDate.length === 0 ? (
-                  <div className="text-sm text-muted-foreground text-center py-8">
-                    {language === "vi" ? "Không có công việc." : "No tasks."}
-                  </div>
-                ) : (
-                  tasksInSelectedDate.map((task) => {
-                    const dateKey =
-                      dateField === "dueDate"
-                        ? toDateKey(task.dueDate ?? null)
-                        : toDateKey(task.receivedAt ?? null);
-                    const gcal = getGoogleCalendarTemplateUrl({
-                      title: task.title ?? "",
-                      details: task.description ?? undefined,
-                      dateKey,
-                    });
-                    return (
-                      <div
-                        key={task.id}
-                        className="border border-border/60 rounded-md p-3 hover:bg-muted/20 transition-colors">
-                        <div className="flex items-start justify-between gap-3">
-                          <button
-                            type="button"
-                            className="text-left min-w-0 flex-1"
-                            onClick={() => onTaskClick(task)}>
-                            <div className="font-medium text-sm truncate">
-                              {task.title}
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-1">
-                              <span className="truncate">
-                                {language === "vi" ? "Nhân sự:" : "Assignee:"}{" "}
-                                {task.assignee?.trim() ||
-                                  (language === "vi"
-                                    ? "Chưa giao"
-                                    : "Unassigned")}
-                              </span>
-                              {dateField === "dueDate" ? (
-                                <span>
-                                  {language === "vi" ? "Hạn:" : "Due:"}{" "}
-                                  {formatDateDDMMYYYY(task.dueDate)}
-                                </span>
-                              ) : (
-                                <span>
-                                  {language === "vi" ? "Nhận:" : "Received:"}{" "}
-                                  {formatDateDDMMYYYY(task.receivedAt)}
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Badge
-                              className={cn(
-                                "font-normal",
-                                getStatusColor(task.status ?? ""),
-                              )}>
-                              {task.status}
-                            </Badge>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() =>
-                                window.open(
-                                  gcal,
-                                  "_blank",
-                                  "noopener,noreferrer",
-                                )
-                              }>
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Badge
-                            className={cn(
-                              "font-normal",
-                              getPriorityColor(task.priority ?? ""),
-                            )}>
-                            {task.priority}
-                          </Badge>
-                          {task.group ? (
-                            <Badge variant="outline" className="font-normal">
-                              {task.group}
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-border shadow-sm overflow-hidden">
-          <CardHeader className="py-4 px-5 border-b border-border bg-muted/20">
-            <CardTitle className="text-base font-semibold">
-              {language === "vi" ? "Google Calendar" : "Google Calendar"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <Tabs defaultValue="embed">
-              <TabsList className="w-full">
-                <TabsTrigger value="embed" className="flex-1">
-                  {language === "vi" ? "Nhúng lịch" : "Embed"}
-                </TabsTrigger>
-                <TabsTrigger value="open" className="flex-1">
-                  {language === "vi" ? "Mở Google Calendar" : "Open"}
-                </TabsTrigger>
-                <TabsTrigger value="sync" className="flex-1">
-                  {language === "vi" ? "Đồng bộ" : "Sync"}
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="embed" className="mt-4 space-y-3">
-                <div className="space-y-2">
-                  <div className="text-xs text-muted-foreground">
-                    {language === "vi"
-                      ? "Dán liên kết nhúng (embed) của Google Calendar (calendar.google.com)."
-                      : "Paste a Google Calendar embed link (calendar.google.com)."}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={googleEmbedDraft}
-                      onChange={(e) => setGoogleEmbedDraft(e.target.value)}
-                      placeholder={
-                        language === "vi"
-                          ? "https://calendar.google.com/..."
-                          : "https://calendar.google.com/..."
-                      }
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        const v = googleEmbedDraft.trim();
-                        if (v && !isValidGoogleCalendarEmbedUrl(v)) {
-                          toast({
-                            title:
-                              language === "vi"
-                                ? "Liên kết không hợp lệ"
-                                : "Invalid link",
-                            description:
-                              language === "vi"
-                                ? "Vui lòng dùng liên kết nhúng từ Google Calendar."
-                                : "Please use an embed link from Google Calendar.",
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-                        setGoogleEmbedUrl(v);
-                        if (typeof window !== "undefined") {
-                          window.localStorage.setItem(
-                            "kdpd_google_calendar_embed_url",
-                            v,
-                          );
-                        }
-                        toast({
-                          title: language === "vi" ? "Đã lưu" : "Saved",
-                          description:
-                            language === "vi"
-                              ? "Đã lưu liên kết Google Calendar trên trình duyệt."
-                              : "Saved Google Calendar link in this browser.",
-                        });
-                      }}>
-                      {language === "vi" ? "Lưu" : "Save"}
-                    </Button>
-                  </div>
-                </div>
-
-                {googleEmbedUrl ? (
-                  <div className="border border-border rounded-md overflow-hidden bg-background">
-                    <iframe
-                      title="Google Calendar"
-                      src={googleEmbedUrl}
-                      className="w-full h-[360px]"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground text-center py-10 border border-dashed border-border rounded-md">
-                    {language === "vi"
-                      ? "Chưa có liên kết nhúng."
-                      : "No embed link configured."}
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="open" className="mt-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm text-muted-foreground">
-                    {language === "vi"
-                      ? "Mở Google Calendar ở tab mới."
-                      : "Open Google Calendar in a new tab."}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      window.open(
-                        "https://calendar.google.com/calendar/u/0/r",
-                        "_blank",
-                        "noopener,noreferrer",
-                      )
-                    }>
-                    {language === "vi" ? "Mở" : "Open"}
-                  </Button>
-                </div>
-
-                {selectedDateKey ? (
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      const u = new URL(
-                        "https://calendar.google.com/calendar/u/0/r/day",
-                      );
-                      const dt = dateKeyToLocalDate(selectedDateKey);
-                      if (dt)
-                        u.searchParams.set("date", format(dt, "yyyyMMdd"));
-                      window.open(
-                        u.toString(),
-                        "_blank",
-                        "noopener,noreferrer",
-                      );
-                    }}
-                    className="w-full">
-                    {language === "vi"
-                      ? "Mở đúng ngày đang chọn"
-                      : "Open selected day"}
-                  </Button>
-                ) : null}
-              </TabsContent>
-
-              <TabsContent value="sync" className="mt-4 space-y-4">
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">
-                    {language === "vi"
-                      ? "Tự động đồng bộ với Google Calendar"
-                      : "Auto-sync with Google Calendar"}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {language === "vi"
-                      ? "Hệ thống sẽ tự tạo/cập nhật sự kiện hạn (deadline), thời gian thực hiện và cảnh báo sắp đến hạn."
-                      : "The app will create/update deadline, work-span, and due-soon warning events."}
-                  </div>
-                </div>
-
-                {gcalStatus?.connected ? (
-                  <div className="flex items-center justify-between gap-3 border border-border/60 rounded-md px-3 py-2">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium">
-                        {language === "vi" ? "Đã kết nối" : "Connected"}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {language === "vi"
-                          ? "Bạn có thể bật/tắt đồng bộ tự động."
-                          : "You can enable/disable auto-sync."}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Switch
-                        checked={!!gcalStatus.syncEnabled}
-                        disabled={gcalBusy}
-                        onCheckedChange={(checked) =>
-                          void saveGoogleCalendarSettings({
-                            syncEnabled: checked,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border border-dashed border-border rounded-md p-4 space-y-3">
-                    <div className="text-sm text-muted-foreground">
-                      {language === "vi"
-                        ? "Chưa kết nối Google Calendar."
-                        : "Not connected to Google Calendar."}
-                    </div>
-                    <Button
-                      type="button"
-                      disabled={gcalBusy}
-                      onClick={() => {
-                        const returnTo =
-                          typeof window !== "undefined"
-                            ? window.location.pathname +
-                              window.location.search +
-                              window.location.hash
-                            : "/";
-                        window.location.href =
-                          "/api/google-calendar/connect?returnTo=" +
-                          encodeURIComponent(returnTo);
-                      }}>
-                      {language === "vi"
-                        ? "Kết nối Google Calendar"
-                        : "Connect Google Calendar"}
-                    </Button>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <div className="text-xs text-muted-foreground">
-                    {language === "vi"
-                      ? "Lịch đích (calendarId)"
-                      : "Target calendar (calendarId)"}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={gcalCalendarId}
-                      onChange={(e) => setGcalCalendarId(e.target.value)}
-                      placeholder="primary"
-                      disabled={!gcalStatus?.connected || gcalBusy}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!gcalStatus?.connected || gcalBusy}
-                      onClick={() =>
-                        void saveGoogleCalendarSettings({
-                          calendarId: gcalCalendarId,
-                        })
-                      }>
-                      {language === "vi" ? "Lưu" : "Save"}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs text-muted-foreground">
-                    {language === "vi" ? "Sự kiện bổ sung" : "Extra event"}
-                  </div>
-                  <ToggleGroup
-                    type="single"
-                    value={gcalSyncDateField}
-                    onValueChange={(v) => {
-                      if (v !== "dueDate" && v !== "receivedAt") return;
-                      setGcalSyncDateField(v);
-                      void saveGoogleCalendarSettings({ syncDateField: v });
-                    }}
-                    className="border rounded-md bg-background">
-                    <ToggleGroupItem value="dueDate" aria-label="dueDate">
-                      {language === "vi" ? "Chỉ hạn" : "Deadline only"}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="receivedAt" aria-label="receivedAt">
-                      {language === "vi"
-                        ? "Thêm ngày nhận"
-                        : "Add received day"}
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    disabled={
-                      !gcalStatus?.connected ||
-                      !gcalStatus.syncEnabled ||
-                      gcalSyncing ||
-                      gcalBusy
-                    }
-                    onClick={() => void syncGoogleCalendarNow()}
-                    className="flex-1">
-                    {language === "vi"
-                      ? gcalSyncing
-                        ? "Đang đồng bộ..."
-                        : "Đồng bộ ngay"
-                      : gcalSyncing
-                        ? "Syncing..."
-                        : "Sync now"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={
-                      !gcalStatus?.connected || gcalBusy || gcalCleaning
-                    }
-                    onClick={() => void cleanupGoogleCalendarNow()}>
-                    {language === "vi"
-                      ? gcalCleaning
-                        ? "Đang dọn..."
-                        : "Dọn trùng"
-                      : gcalCleaning
-                        ? "Cleaning..."
-                        : "Cleanup"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!gcalStatus?.connected || gcalBusy}
-                    onClick={() => void disconnectGoogleCalendarNow()}>
-                    {language === "vi" ? "Ngắt" : "Disconnect"}
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

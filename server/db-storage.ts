@@ -1179,6 +1179,21 @@ export async function deleteGoogleCalendarEventLinksByUserAndTask(
     );
 }
 
+export async function deleteGoogleCalendarEventLinksByUserAndDateFields(
+  userId: string,
+  dateFields: string[],
+): Promise<void> {
+  if (dateFields.length === 0) return;
+  await requireDb()
+    .delete(googleCalendarEventLinks)
+    .where(
+      and(
+        eq(googleCalendarEventLinks.userId, userId),
+        inArray(googleCalendarEventLinks.dateField, dateFields),
+      ),
+    );
+}
+
 // -----------------------------------------------------------------------------
 // Notifications CRUD
 // -----------------------------------------------------------------------------

@@ -30,6 +30,96 @@ export type GoogleCalendarSyncSummary = {
   errors: number;
 };
 
+type KdpdStatus =
+  | "not_started"
+  | "in_progress"
+  | "pending"
+  | "cancelled"
+  | "completed";
+
+function normalizeKdpdStatus(input: unknown): KdpdStatus | null {
+  const raw = (typeof input === "string" ? input : "").trim();
+  if (!raw) return null;
+  const s = raw.toLowerCase();
+  if (s === "completed") return "completed";
+  if (s === "in progress" || s === "in_progress") return "in_progress";
+  if (s === "pending" || s === "paused") return "pending";
+  if (s === "cancelled" || s === "canceled") return "cancelled";
+  if (s === "not started" || s === "not_started") return "not_started";
+  if (s === "archived") return "cancelled";
+  return null;
+}
+
+function stripStatusPrefix(summary: string): string {
+  const prefixes = [
+    "Đang thực hiện:",
+    "Hoàn thành:",
+    "Tạm dừng:",
+    "Đã huỷ:",
+    "Đã hủy:",
+    "In progress:",
+    "Completed:",
+    "Paused:",
+    "Cancelled:",
+  ];
+  for (const p of prefixes) {
+    if (summary.startsWith(p)) return summary.slice(p.length).trimStart();
+  }
+  return summary;
+}
+
+function getGoogleEventPresentation(status: KdpdStatus): {
+  prefix: string;
+  colorId: string;
+  transparency: "opaque" | "transparent";
+  statusLabelVi: string;
+  removeReminders: boolean;
+} {
+  if (status === "in_progress") {
+    return {
+      prefix: "Đang thực hiện: ",
+      colorId: "9",
+      transparency: "opaque",
+      statusLabelVi: "Đang thực hiện",
+      removeReminders: false,
+    };
+  }
+  if (status === "completed") {
+    return {
+      prefix: "Hoàn thành: ",
+      colorId: "10",
+      transparency: "transparent",
+      statusLabelVi: "Hoàn thành",
+      removeReminders: true,
+    };
+  }
+  if (status === "pending") {
+    return {
+      prefix: "Tạm dừng: ",
+      colorId: "5",
+      transparency: "opaque",
+      statusLabelVi: "Tạm dừng",
+      removeReminders: false,
+    };
+  }
+  if (status === "cancelled") {
+    return {
+      prefix: "Đã huỷ: ",
+      colorId: "11",
+      transparency: "transparent",
+      statusLabelVi: "Đã huỷ",
+      removeReminders: true,
+    };
+  }
+  return {
+    prefix: "",
+    colorId: "8",
+    transparency: "opaque",
+    statusLabelVi: "Chưa bắt đầu",
+    removeReminders: false,
+  };
+}
+
 function getOAuthClient() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -84,6 +174,48 @@ function addDaysKey(dateKey: string, deltaDays: number): string {
   const mm = String(dt.getMonth() + 1).padStart(2, "0");
   const dd = String(dt.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function getWideTimeRange() {
+  const now = new Date();
+  const timeMin = new Date(now.getTime() - 3650 * 24 * 60 * 60 * 1000);
+  const timeMax = new Date(now.getTime() + 3650 * 24 * 60 * 60 * 1000);
+  return { timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString() };
+}
+
+async function deleteEventsByPrivateExtendedProperty(params: {
+  calendar: calendar_v3.Calendar;
+  calendarId: string;
+  privateExtendedProperty: string[];
+}): Promise<number> {
+  const { calendar, calendarId, privateExtendedProperty } = params;
+  const { timeMin, timeMax } = getWideTimeRange();
+  let deleted = 0;
+  let pageToken: string | undefined = undefined;
+  for (;;) {
+    const resp: { data: calendar_v3.Schema$Events } =
+      (await calendar.events.list({
+        calendarId,
+        maxResults: 2500,
+        pageToken,
+        showDeleted: false,
+        singleEvents: false,
+        timeMin,
+        timeMax,
+        privateExtendedProperty,
+      })) as any;
+    const items = resp.data.items ?? [];
+    for (const e of items) {
+      if (!e.id) continue;
+      await calendar.events
+        .delete({ calendarId, eventId: e.id })
+        .catch(() => {});
+      deleted += 1;
+    }
+    pageToken = resp.data.nextPageToken ?? undefined;
+    if (!pageToken) break;
+  }
+  return deleted;
 }
 
 function isMissingTableError(err: unknown): boolean {
@@ -293,12 +425,15 @@ async function syncAssignmentToCalendar(params: {
     id: string;
     dueDate: Date | string | null;
     receivedAt: Date | string | null;
+    status?: string | null;
   };
-  eventKey: "dueDate" | "receivedAt" | "period" | "dueSoon";
+  eventKey: "dueDate";
   startDateKey: string | null;
   endDateKey: string | null;
   summary: string;
   description: string;
+  colorId?: string;
+  transparency?: "opaque" | "transparent";
   reminders?: {
     useDefault: boolean;
     overrides?: Array<{ method: "popup" | "email"; minutes: number }>;
@@ -345,6 +480,8 @@ async function syncAssignmentToCalendar(params: {
       },
     },
   };
+  if (params.colorId) event.colorId = params.colorId;
+  if (params.transparency) event.transparency = params.transparency;
   if (params.reminders) {
     event.reminders = params.reminders;
   }
@@ -484,19 +621,25 @@ export async function syncGoogleCalendarForUser(
         if (task.description) detailsParts.push(task.description);
         const description = detailsParts.join("\n");
 
+        const assignmentStatusRaw = (assignment as { status?: unknown }).status;
+        const status =
+          normalizeKdpdStatus(assignmentStatusRaw) ??
+          normalizeKdpdStatus(task.status) ??
+          "not_started";
+        const pres = getGoogleEventPresentation(status);
+        const descriptionWithStatus = `${description}\n\nTrạng thái: ${pres.statusLabelVi}`;
+
         const dueKey = formatDateOnly(assignment.dueDate ?? null);
         const receivedKey = formatDateOnly(assignment.receivedAt ?? null);
+        const completedKey = formatDateOnly(
+          (assignment as { completedAt?: Date | string | null }).completedAt ??
+            null,
+        );
 
         const actions: SyncAction[] = [];
 
         const dueKeyKey = `${base.calendarId}|${task.id}|${assignment.id}|dueDate`;
-        const periodKeyKey = `${base.calendarId}|${task.id}|${assignment.id}|period`;
-        const dueSoonKeyKey = `${base.calendarId}|${task.id}|${assignment.id}|dueSoon`;
-        const receivedKeyKey = `${base.calendarId}|${task.id}|${assignment.id}|receivedAt`;
         desired.add(dueKeyKey);
-        desired.add(periodKeyKey);
-        desired.add(dueSoonKeyKey);
-        if (base.syncDateField === "receivedAt") desired.add(receivedKeyKey);
 
         actions.push(
           await syncAssignmentToCalendar({
@@ -513,14 +656,22 @@ export async function syncGoogleCalendarForUser(
               id: assignment.id,
               dueDate: assignment.dueDate ?? null,
               receivedAt: assignment.receivedAt ?? null,
+              status: (assignment as { status?: string | null }).status ?? null,
             },
             eventKey: "dueDate",
             startDateKey: dueKey,
             endDateKey: dueKey ? addOneDay(dueKey) : null,
-            summary: task.title ?? "Công việc",
-            description,
-            reminders:
-              dueKey && DUE_SOON_DAYS > 0
+            summary: `${pres.prefix}${stripStatusPrefix(task.title ?? "Công việc")}`,
+            description:
+              descriptionWithStatus +
+              (receivedKey ? `\nNgày nhận: ${receivedKey}` : "") +
+              (dueKey ? `\nHạn: ${dueKey}` : "") +
+              (completedKey ? `\nHoàn thành: ${completedKey}` : ""),
+            colorId: pres.colorId,
+            transparency: pres.transparency,
+            reminders: pres.removeReminders
+              ? { useDefault: false, overrides: [] }
+              : dueKey && DUE_SOON_DAYS > 0
                 ? {
                     useDefault: false,
                     overrides: [
@@ -531,157 +682,6 @@ export async function syncGoogleCalendarForUser(
                 : undefined,
           }),
         );
-
-        if (receivedKey && dueKey) {
-          actions.push(
-            await syncAssignmentToCalendar({
-              userId,
-              calendarId: base.calendarId,
-              task: {
-                id: task.id,
-                title: task.title ?? null,
-                description: task.description ?? null,
-                group: task.group ?? null,
-                status: task.status ?? null,
-              },
-              assignment: {
-                id: assignment.id,
-                dueDate: assignment.dueDate ?? null,
-                receivedAt: assignment.receivedAt ?? null,
-              },
-              eventKey: "period",
-              startDateKey: receivedKey,
-              endDateKey: addOneDay(dueKey),
-              summary: `${task.title ?? "Công việc"} (Thời gian thực hiện)`,
-              description,
-            }),
-          );
-        } else {
-          actions.push(
-            await syncAssignmentToCalendar({
-              userId,
-              calendarId: base.calendarId,
-              task: {
-                id: task.id,
-                title: task.title ?? null,
-                description: task.description ?? null,
-                group: task.group ?? null,
-                status: task.status ?? null,
-              },
-              assignment: {
-                id: assignment.id,
-                dueDate: assignment.dueDate ?? null,
-                receivedAt: assignment.receivedAt ?? null,
-              },
-              eventKey: "period",
-              startDateKey: null,
-              endDateKey: null,
-              summary: `${task.title ?? "Công việc"} (Thời gian thực hiện)`,
-              description,
-            }),
-          );
-        }
-
-        if (dueKey && DUE_SOON_DAYS > 0) {
-          const warnKey = addDaysKey(dueKey, -DUE_SOON_DAYS);
-          actions.push(
-            await syncAssignmentToCalendar({
-              userId,
-              calendarId: base.calendarId,
-              task: {
-                id: task.id,
-                title: task.title ?? null,
-                description: task.description ?? null,
-                group: task.group ?? null,
-                status: task.status ?? null,
-              },
-              assignment: {
-                id: assignment.id,
-                dueDate: assignment.dueDate ?? null,
-                receivedAt: assignment.receivedAt ?? null,
-              },
-              eventKey: "dueSoon",
-              startDateKey: warnKey,
-              endDateKey: addOneDay(warnKey),
-              summary: `Sắp đến hạn: ${task.title ?? "Công việc"}`,
-              description: `${description}\n\nHạn: ${dueKey}`,
-            }),
-          );
-        } else {
-          actions.push(
-            await syncAssignmentToCalendar({
-              userId,
-              calendarId: base.calendarId,
-              task: {
-                id: task.id,
-                title: task.title ?? null,
-                description: task.description ?? null,
-                group: task.group ?? null,
-                status: task.status ?? null,
-              },
-              assignment: {
-                id: assignment.id,
-                dueDate: assignment.dueDate ?? null,
-                receivedAt: assignment.receivedAt ?? null,
-              },
-              eventKey: "dueSoon",
-              startDateKey: null,
-              endDateKey: null,
-              summary: `Sắp đến hạn: ${task.title ?? "Công việc"}`,
-              description,
-            }),
-          );
-        }
-
-        if (base.syncDateField === "receivedAt") {
-          actions.push(
-            await syncAssignmentToCalendar({
-              userId,
-              calendarId: base.calendarId,
-              task: {
-                id: task.id,
-                title: task.title ?? null,
-                description: task.description ?? null,
-                group: task.group ?? null,
-                status: task.status ?? null,
-              },
-              assignment: {
-                id: assignment.id,
-                dueDate: assignment.dueDate ?? null,
-                receivedAt: assignment.receivedAt ?? null,
-              },
-              eventKey: "receivedAt",
-              startDateKey: receivedKey,
-              endDateKey: receivedKey ? addOneDay(receivedKey) : null,
-              summary: `Nhận việc: ${task.title ?? "Công việc"}`,
-              description,
-            }),
-          );
-        } else {
-          actions.push(
-            await syncAssignmentToCalendar({
-              userId,
-              calendarId: base.calendarId,
-              task: {
-                id: task.id,
-                title: task.title ?? null,
-                description: task.description ?? null,
-                group: task.group ?? null,
-                status: task.status ?? null,
-              },
-              assignment: {
-                id: assignment.id,
-                dueDate: assignment.dueDate ?? null,
-                receivedAt: assignment.receivedAt ?? null,
-              },
-              eventKey: "receivedAt",
-              startDateKey: null,
-              endDateKey: null,
-              summary: `Nhận việc: ${task.title ?? "Công việc"}`,
-              description,
-            }),
-          );
-        }
 
         for (const action of actions) {
           if (action === "created") base.created += 1;
@@ -728,6 +728,29 @@ export async function syncGoogleCalendarForUser(
       await dbStorage.deleteGoogleCalendarEventLinkById(keep.id);
     }
 
+    await deleteEventsByPrivateExtendedProperty({
+      calendar,
+      calendarId: base.calendarId,
+      privateExtendedProperty: ["kdpdDateField=period"],
+    }).catch(() => {});
+    await deleteEventsByPrivateExtendedProperty({
+      calendar,
+      calendarId: base.calendarId,
+      privateExtendedProperty: ["kdpdDateField=dueSoon"],
+    }).catch(() => {});
+    await deleteEventsByPrivateExtendedProperty({
+      calendar,
+      calendarId: base.calendarId,
+      privateExtendedProperty: ["kdpdDateField=receivedAt"],
+    }).catch(() => {});
+    await dbStorage
+      .deleteGoogleCalendarEventLinksByUserAndDateFields(userId, [
+        "period",
+        "dueSoon",
+        "receivedAt",
+      ])
+      .catch(() => {});
+
     return base;
   } catch (err) {
     if (isMissingTableError(err)) return base;
@@ -755,8 +778,6 @@ export async function syncGoogleCalendarForTaskChange(params: {
       if (!account.syncEnabled) continue;
 
       const calendarId = account.calendarId ?? "primary";
-      const syncDateField =
-        (account.syncDateField as SyncDateField) ?? "dueDate";
 
       const mine = assignments.filter(
         (a) => String(a.userId) === String(userId),
@@ -768,13 +789,20 @@ export async function syncGoogleCalendarForTaskChange(params: {
         detailsParts.push(`Task ID: ${task.id}`);
         if (task.description) detailsParts.push(task.description);
         const description = detailsParts.join("\n");
+        const status =
+          normalizeKdpdStatus((a as { status?: unknown }).status) ??
+          normalizeKdpdStatus(task.status) ??
+          "not_started";
+        const pres = getGoogleEventPresentation(status);
         const dueKey = formatDateOnly(a.dueDate ?? null);
         const receivedKey = formatDateOnly(a.receivedAt ?? null);
+        const completedKey = formatDateOnly((a as any).completedAt ?? null);
+        const descriptionWithStatus =
+          `${description}\n\nTrạng thái: ${pres.statusLabelVi}` +
+          (receivedKey ? `\nNgày nhận: ${receivedKey}` : "") +
+          (dueKey ? `\nHạn: ${dueKey}` : "") +
+          (completedKey ? `\nHoàn thành: ${completedKey}` : "");
         desired.add(`${calendarId}|${task.id}|${a.id}|dueDate`);
-        desired.add(`${calendarId}|${task.id}|${a.id}|period`);
-        desired.add(`${calendarId}|${task.id}|${a.id}|dueSoon`);
-        if (syncDateField === "receivedAt")
-          desired.add(`${calendarId}|${task.id}|${a.id}|receivedAt`);
 
         await syncAssignmentToCalendar({
           userId,
@@ -790,14 +818,18 @@ export async function syncGoogleCalendarForTaskChange(params: {
             id: a.id,
             dueDate: a.dueDate ?? null,
             receivedAt: a.receivedAt ?? null,
+            status: (a as { status?: string | null }).status ?? null,
           },
           eventKey: "dueDate",
           startDateKey: dueKey,
           endDateKey: dueKey ? addOneDay(dueKey) : null,
-          summary: task.title ?? "Công việc",
-          description,
-          reminders:
-            dueKey && DUE_SOON_DAYS > 0
+          summary: `${pres.prefix}${stripStatusPrefix(task.title ?? "Công việc")}`,
+          description: descriptionWithStatus,
+          colorId: pres.colorId,
+          transparency: pres.transparency,
+          reminders: pres.removeReminders
+            ? { useDefault: false, overrides: [] }
+            : dueKey && DUE_SOON_DAYS > 0
               ? {
                   useDefault: false,
                   overrides: [
@@ -807,145 +839,6 @@ export async function syncGoogleCalendarForTaskChange(params: {
                 }
               : undefined,
         });
-
-        if (receivedKey && dueKey) {
-          await syncAssignmentToCalendar({
-            userId,
-            calendarId,
-            task: {
-              id: task.id,
-              title: task.title ?? null,
-              description: task.description ?? null,
-              group: task.group ?? null,
-              status: task.status ?? null,
-            },
-            assignment: {
-              id: a.id,
-              dueDate: a.dueDate ?? null,
-              receivedAt: a.receivedAt ?? null,
-            },
-            eventKey: "period",
-            startDateKey: receivedKey,
-            endDateKey: addOneDay(dueKey),
-            summary: `${task.title ?? "Công việc"} (Thời gian thực hiện)`,
-            description,
-          });
-        } else {
-          await syncAssignmentToCalendar({
-            userId,
-            calendarId,
-            task: {
-              id: task.id,
-              title: task.title ?? null,
-              description: task.description ?? null,
-              group: task.group ?? null,
-              status: task.status ?? null,
-            },
-            assignment: {
-              id: a.id,
-              dueDate: a.dueDate ?? null,
-              receivedAt: a.receivedAt ?? null,
-            },
-            eventKey: "period",
-            startDateKey: null,
-            endDateKey: null,
-            summary: `${task.title ?? "Công việc"} (Thời gian thực hiện)`,
-            description,
-          });
-        }
-
-        if (dueKey && DUE_SOON_DAYS > 0) {
-          const warnKey = addDaysKey(dueKey, -DUE_SOON_DAYS);
-          await syncAssignmentToCalendar({
-            userId,
-            calendarId,
-            task: {
-              id: task.id,
-              title: task.title ?? null,
-              description: task.description ?? null,
-              group: task.group ?? null,
-              status: task.status ?? null,
-            },
-            assignment: {
-              id: a.id,
-              dueDate: a.dueDate ?? null,
-              receivedAt: a.receivedAt ?? null,
-            },
-            eventKey: "dueSoon",
-            startDateKey: warnKey,
-            endDateKey: addOneDay(warnKey),
-            summary: `Sắp đến hạn: ${task.title ?? "Công việc"}`,
-            description: `${description}\n\nHạn: ${dueKey}`,
-          });
-        } else {
-          await syncAssignmentToCalendar({
-            userId,
-            calendarId,
-            task: {
-              id: task.id,
-              title: task.title ?? null,
-              description: task.description ?? null,
-              group: task.group ?? null,
-              status: task.status ?? null,
-            },
-            assignment: {
-              id: a.id,
-              dueDate: a.dueDate ?? null,
-              receivedAt: a.receivedAt ?? null,
-            },
-            eventKey: "dueSoon",
-            startDateKey: null,
-            endDateKey: null,
-            summary: `Sắp đến hạn: ${task.title ?? "Công việc"}`,
-            description,
-          });
-        }
-
-        if (syncDateField === "receivedAt") {
-          await syncAssignmentToCalendar({
-            userId,
-            calendarId,
-            task: {
-              id: task.id,
-              title: task.title ?? null,
-              description: task.description ?? null,
-              group: task.group ?? null,
-              status: task.status ?? null,
-            },
-            assignment: {
-              id: a.id,
-              dueDate: a.dueDate ?? null,
-              receivedAt: a.receivedAt ?? null,
-            },
-            eventKey: "receivedAt",
-            startDateKey: receivedKey,
-            endDateKey: receivedKey ? addOneDay(receivedKey) : null,
-            summary: `Nhận việc: ${task.title ?? "Công việc"}`,
-            description,
-          });
-        } else {
-          await syncAssignmentToCalendar({
-            userId,
-            calendarId,
-            task: {
-              id: task.id,
-              title: task.title ?? null,
-              description: task.description ?? null,
-              group: task.group ?? null,
-              status: task.status ?? null,
-            },
-            assignment: {
-              id: a.id,
-              dueDate: a.dueDate ?? null,
-              receivedAt: a.receivedAt ?? null,
-            },
-            eventKey: "receivedAt",
-            startDateKey: null,
-            endDateKey: null,
-            summary: `Nhận việc: ${task.title ?? "Công việc"}`,
-            description,
-          });
-        }
       }
 
       const existingLinks =
@@ -980,6 +873,31 @@ export async function syncGoogleCalendarForTaskChange(params: {
           .catch(() => {});
         await dbStorage.deleteGoogleCalendarEventLinkById(keep.id);
       }
+
+      await deleteEventsByPrivateExtendedProperty({
+        calendar,
+        calendarId,
+        privateExtendedProperty: [
+          `kdpdTaskId=${params.taskId}`,
+          "kdpdDateField=period",
+        ],
+      }).catch(() => {});
+      await deleteEventsByPrivateExtendedProperty({
+        calendar,
+        calendarId,
+        privateExtendedProperty: [
+          `kdpdTaskId=${params.taskId}`,
+          "kdpdDateField=dueSoon",
+        ],
+      }).catch(() => {});
+      await deleteEventsByPrivateExtendedProperty({
+        calendar,
+        calendarId,
+        privateExtendedProperty: [
+          `kdpdTaskId=${params.taskId}`,
+          "kdpdDateField=receivedAt",
+        ],
+      }).catch(() => {});
     }
   } catch (err) {
     if (isMissingTableError(err)) return;
