@@ -448,8 +448,8 @@ export default function ThietKePage() {
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:flex-wrap">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={
@@ -464,7 +464,7 @@ export default function ThietKePage() {
               />
             </div>
             <Select value={groupFilter} onValueChange={setGroupFilter}>
-              <SelectTrigger className="w-[160px] bg-background">
+              <SelectTrigger className="w-full sm:w-[160px] bg-background">
                 <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
                 <SelectValue placeholder={t.task.group} />
               </SelectTrigger>
@@ -485,19 +485,20 @@ export default function ThietKePage() {
               onValueChange={(v) =>
                 v && (v === "table" || v === "board") && setViewMode(v)
               }
-              className="toggle-group-box">
+              className="toggle-group-box w-full sm:w-auto">
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
-                <List className="h-4 w-4 mr-1.5" />
-                {t.dashboard.viewTable}
+                <List className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">{t.dashboard.viewTable}</span>
               </ToggleGroupItem>
               <ToggleGroupItem value="board" aria-label={t.dashboard.viewBoard}>
-                <LayoutGrid className="h-4 w-4 mr-1.5" />
-                {t.dashboard.viewBoard}
+                <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">{t.dashboard.viewBoard}</span>
               </ToggleGroupItem>
             </ToggleGroup>
             <Button
               onClick={() => handleExportTasks(filteredTasks, language, toast)}
-              disabled={filteredTasks.length === 0}>
+              disabled={filteredTasks.length === 0}
+              className="w-full sm:w-auto">
               Xuất Excel
             </Button>
           </div>

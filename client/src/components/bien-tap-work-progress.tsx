@@ -479,7 +479,7 @@ export function BienTapWorkProgress({ tasks, works, components }: BienTapWorkPro
                       <div className="flex flex-wrap gap-2">
                         {rounds.map((round) => (
                           <Badge
-                            key={`${work.id}-${round.roundNumber}`}
+                            key={`${work.id}-${round.roundNumber}-${round.task.id}`}
                             variant="outline"
                             className={`${getRoundPillClass(round)} text-xs`}
                           >
@@ -544,7 +544,9 @@ export function BienTapWorkProgress({ tasks, works, components }: BienTapWorkPro
               </div>
               <div className="space-y-3">
                 {detailRounds.map((round) => (
-                  <div key={`${selectedGroup.work.id}-${round.roundNumber}`} className="border rounded-md p-3">
+                  <div
+                    key={`${selectedGroup.work.id}-${round.roundNumber}-${round.task.id}`}
+                    className="border rounded-md p-3">
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-sm">{round.roundType}</div>
                       <Badge variant="outline" className={statusBadgeClasses[round.status]}>

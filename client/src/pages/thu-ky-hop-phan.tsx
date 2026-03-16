@@ -3214,11 +3214,19 @@ export default function ThuKyHopPhanPage() {
           setLocation(tabToPath(v));
         }}
         className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
-          <TabsTrigger value="tasks">Công việc</TabsTrigger>
-          <TabsTrigger value="works">Danh mục tác phẩm</TabsTrigger>
-          <TabsTrigger value="translation">Hợp đồng dịch thuật</TabsTrigger>
-          <TabsTrigger value="proofreading">Hợp đồng hiệu đính</TabsTrigger>
+        <TabsList className="w-full flex-nowrap overflow-x-auto lg:w-auto lg:overflow-visible">
+          <TabsTrigger value="tasks" className="shrink-0 whitespace-nowrap">
+            Công việc
+          </TabsTrigger>
+          <TabsTrigger value="works" className="shrink-0 whitespace-nowrap">
+            Danh mục tác phẩm
+          </TabsTrigger>
+          <TabsTrigger value="translation" className="shrink-0 whitespace-nowrap">
+            Hợp đồng dịch thuật
+          </TabsTrigger>
+          <TabsTrigger value="proofreading" className="shrink-0 whitespace-nowrap">
+            Hợp đồng hiệu đính
+          </TabsTrigger>
         </TabsList>
 
         {/* Tab: Tasks */}

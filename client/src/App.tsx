@@ -166,7 +166,7 @@ function AuthGate() {
   const { user, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-muted/30">
         <p className="text-muted-foreground">Đang tải...</p>
       </div>
     );

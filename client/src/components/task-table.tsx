@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { useI18n } from "@/hooks/use-i18n";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatDateDDMMYYYY } from "@/lib/utils";
 import { Workflow, BienTapWorkflowHelpers, BienTapStageType, StageStatus } from "@shared/workflow";
 import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Pencil, Trash2, Copy as CopyIcon } from "lucide-react";
@@ -148,6 +149,7 @@ export function TaskTable({
   getStatusColor 
 }: TaskTableProps) {
   const { t, language } = useI18n();
+  const isMobile = useIsMobile();
   
   // Helper function to get stage label
   const getStageLabel = (type: BienTapStageType): string => {
@@ -208,116 +210,104 @@ export function TaskTable({
     return stageType;
   };
 
-  // Helper function to render assignee cell
-  const renderAssigneeCell = (task: TaskWithAssignmentDetails) => {
-    // For "Biên tập" tasks, show workflow assignees with status colors
-    if (task.group === 'Biên tập' && task.workflow) {
+  const renderAssigneeContent = (task: TaskWithAssignmentDetails) => {
+    if (task.group === "Biên tập" && task.workflow) {
       try {
         const workflow = (typeof task.workflow === "string" ? JSON.parse(task.workflow) : task.workflow) as Workflow;
-        const currentRound = workflow.rounds.find(r => r.roundNumber === workflow.currentRound) || workflow.rounds[0];
-        const assignees = currentRound?.stages
-          .map(stage => {
-            const stageLabel = getStageLabel(stage.type);
-            return { 
-              label: stageLabel, 
-              name: stage.assignee || (language === 'vi' ? 'Chưa giao' : 'Unassigned'),
-              status: stage.status,
-              hasAssignee: !!stage.assignee
-            };
-          }) || [];
-        
+        const currentRound =
+          workflow.rounds.find((r) => r.roundNumber === workflow.currentRound) || workflow.rounds[0];
+        const assignees =
+          currentRound?.stages
+            .map((stage) => {
+              const stageLabel = getStageLabel(stage.type);
+              return {
+                label: stageLabel,
+                name: stage.assignee || (language === "vi" ? "Chưa giao" : "Unassigned"),
+                status: stage.status,
+              };
+            }) || [];
+
         if (assignees.length > 0) {
           return (
-            <td className="p-4 align-middle min-w-[220px]">
-              <div className="flex flex-col gap-1.5">
-                {assignees.map((assignee, idx) => {
-                  const statusColor = getStageStatusColor(assignee.status);
-                  // Ensure label is displayed correctly
-                  const displayLabel = assignee.label || 'Unknown';
-                  const displayName = assignee.name || (language === 'vi' ? 'Chưa giao' : 'Unassigned');
-                  return (
-                    <div key={idx} className="flex items-center">
-                      <span className={`text-xs px-2 py-0.5 rounded border ${statusColor} font-medium`}>
-                        {displayLabel}: {displayName}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </td>
+            <div className="flex flex-col gap-1.5">
+              {assignees.map((assignee, idx) => {
+                const statusColor = getStageStatusColor(assignee.status);
+                const displayLabel = assignee.label || "Unknown";
+                const displayName = assignee.name || (language === "vi" ? "Chưa giao" : "Unassigned");
+                return (
+                  <div key={idx} className="flex items-center">
+                    <span className={`text-xs px-2 py-0.5 rounded border ${statusColor} font-medium`}>
+                      {displayLabel}: {displayName}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           );
         }
       } catch (e) {
-        console.error('Failed to parse workflow', e);
+        console.error("Failed to parse workflow", e);
       }
     }
-    
-    // CV chung / Thiết kế / CNTT / Quét: hiển thị đầy đủ nhân sự từ assignments với màu trạng thái
-    const assignments = (task as TaskWithAssignmentDetails & { assignments?: Array<{ stageType: string; status?: string; displayName?: string | null }> }).assignments;
+
+    const assignments = (task as TaskWithAssignmentDetails & {
+      assignments?: Array<{ stageType: string; status?: string; displayName?: string | null }>;
+    }).assignments;
     if (assignments && assignments.length > 0) {
       return (
-        <td className="p-4 align-middle min-w-[220px]">
-          <div className="flex flex-col gap-1.5">
-            {assignments.map((asn, idx) => {
-              const label = getAssignmentLabel(asn.stageType);
-              const name = (asn as { displayName?: string | null }).displayName ?? (language === "vi" ? "Chưa giao" : "Unassigned");
-              const statusColor = getAssignmentStatusColor(asn.status);
-              return (
-                <div key={idx} className="flex items-center">
-                  <span className={`text-xs px-2 py-0.5 rounded border ${statusColor} font-medium`}>
-                    {label}: {name}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </td>
+        <div className="flex flex-col gap-1.5">
+          {assignments.map((asn, idx) => {
+            const label = getAssignmentLabel(asn.stageType);
+            const name =
+              (asn as { displayName?: string | null }).displayName ?? (language === "vi" ? "Chưa giao" : "Unassigned");
+            const statusColor = getAssignmentStatusColor(asn.status);
+            return (
+              <div key={idx} className="flex items-center">
+                <span className={`text-xs px-2 py-0.5 rounded border ${statusColor} font-medium`}>
+                  {label}: {name}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       );
     }
 
-    // Default: show regular assignee
-    return (
-      <td className="p-4 align-middle min-w-[220px]">
-        {task.assignee ? (
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
-              {task.assignee.substring(0, 2).toUpperCase()}
-            </div>
-            <span className="text-sm">{task.assignee}</span>
-          </div>
-        ) : (
-          <span className="text-muted-foreground text-xs italic">{t.task.unassigned}</span>
-        )}
-      </td>
+    return task.assignee ? (
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+          {task.assignee.substring(0, 2).toUpperCase()}
+        </div>
+        <span className="text-sm">{task.assignee}</span>
+      </div>
+    ) : (
+      <span className="text-muted-foreground text-xs italic">{t.task.unassigned}</span>
     );
   };
+
+  const renderAssigneeCell = (task: TaskWithAssignmentDetails) => {
+    return <td className="p-4 align-middle min-w-[220px]">{renderAssigneeContent(task)}</td>;
+  };
   
-  // Helper function to render progress cell
-  const renderProgressCell = (task: TaskWithAssignmentDetails) => {
-    // For "Biên tập" tasks, calculate progress from workflow
-    if (task.group === 'Biên tập' && task.workflow) {
+  const getProgressValue = (task: TaskWithAssignmentDetails): number => {
+    if (task.group === "Biên tập" && task.workflow) {
       try {
         const workflow = (typeof task.workflow === "string" ? JSON.parse(task.workflow) : task.workflow) as Workflow;
-        const workflowProgress = BienTapWorkflowHelpers.calculateProgress(workflow);
-        return (
-          <td className="p-4 align-middle">
-            <div className="flex items-center gap-2">
-              <Progress value={workflowProgress} className="h-2 w-16" />
-              <span className="text-xs text-muted-foreground w-8 text-right">{workflowProgress}%</span>
-            </div>
-          </td>
-        );
+        return BienTapWorkflowHelpers.calculateProgress(workflow);
       } catch (e) {
-        console.error('Failed to parse workflow for progress', e);
+        console.error("Failed to parse workflow for progress", e);
       }
     }
-    
-    // Default: show regular progress
+    return task.progress || 0;
+  };
+
+  const renderProgressCell = (task: TaskWithAssignmentDetails) => {
+    const value = getProgressValue(task);
     return (
       <td className="p-4 align-middle">
         <div className="flex items-center gap-2">
-          <Progress value={task.progress || 0} className="h-2 w-16" />
-          <span className="text-xs text-muted-foreground w-8 text-right">{task.progress || 0}%</span>
+          <Progress value={value} className="h-2 w-16" />
+          <span className="text-xs text-muted-foreground w-8 text-right">{value}%</span>
         </div>
       </td>
     );
@@ -384,8 +374,168 @@ export function TaskTable({
   // Calculate left position for title column
   const titleColumnLeft = defaultColumns.id ? 80 : 0;
   
+  if (isMobile) {
+    return (
+      <div className="w-full space-y-3">
+        {tasks.length === 0 ? (
+          <div className="rounded-lg border border-border/50 bg-card p-6 text-center text-sm text-muted-foreground">
+            {t.dashboard.noTasksFound}
+          </div>
+        ) : (
+          tasks.map((task) => {
+            const statusLabel =
+              task.status === "Not Started"
+                ? t.status.notStarted
+                : task.status === "In Progress"
+                  ? t.status.inProgress
+                  : task.status === "Completed"
+                    ? t.status.completed
+                    : task.status === "Pending"
+                      ? t.status.pending
+                      : task.status === "Cancelled"
+                        ? t.status.cancelled
+                        : task.status;
+
+            const priorityLabel =
+              task.priority === "Low"
+                ? t.priority.low
+                : task.priority === "Medium"
+                  ? t.priority.medium
+                  : task.priority === "High"
+                    ? t.priority.high
+                    : task.priority === "Critical"
+                      ? t.priority.critical
+                      : task.priority;
+
+            const progressValue = getProgressValue(task);
+
+            return (
+              <div
+                key={task.id}
+                role="button"
+                tabIndex={0}
+                className="rounded-lg border border-border/50 bg-card p-4 shadow-sm active:bg-muted/30"
+                onClick={() => onTaskClick(task)}
+                onKeyDown={(e) => e.key === "Enter" && onTaskClick(task)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {defaultColumns.id && (
+                        <span className="font-mono text-[11px] text-muted-foreground">#{task.id}</span>
+                      )}
+                      {defaultColumns.group && task.group && (
+                        <Badge variant="secondary" className="font-normal text-[11px]">
+                          {task.group}
+                        </Badge>
+                      )}
+                      {defaultColumns.dueDate && (
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                          {formatDateDDMMYYYY(task.dueDate) || "—"}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-1 font-medium text-sm truncate">{task.title}</div>
+
+                    {getBienTapRoundType(task) && (
+                      <div className="mt-1 text-xs text-muted-foreground truncate">
+                        {t.task.roundTypeLabel}: {getBienTapRoundType(task)}
+                      </div>
+                    )}
+
+                    {task.description && (
+                      <div className="mt-1 text-xs text-muted-foreground truncate">{task.description}</div>
+                    )}
+                  </div>
+
+                  {defaultColumns.status && (
+                    <Badge
+                      variant="outline"
+                      className={`shrink-0 font-normal border ${statusColorFn(task.status)}`}
+                    >
+                      {statusLabel}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {defaultColumns.priority && (
+                    <Badge variant="outline" className={`font-normal border-0 ${priorityColorFn(task.priority)}`}>
+                      {priorityLabel}
+                    </Badge>
+                  )}
+                  {defaultColumns.vote && (
+                    <span className="text-xs text-muted-foreground">{getVoteLabel((task as any).vote)}</span>
+                  )}
+                </div>
+
+                {defaultColumns.assignee && <div className="mt-3">{renderAssigneeContent(task)}</div>}
+
+                {defaultColumns.progress && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <Progress value={progressValue} className="h-2 flex-1" />
+                    <span className="text-xs text-muted-foreground w-10 text-right tabular-nums">
+                      {progressValue}%
+                    </span>
+                  </div>
+                )}
+
+                {hasActions && (
+                  <div className="mt-3 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    {actions?.onView && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => actions.onView?.(task)}
+                        title={language === "vi" ? "Xem" : "View"}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {actions?.onDuplicate && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => actions.onDuplicate?.(task)}
+                        title={language === "vi" ? "Tạo bản sao công việc" : "Duplicate task"}
+                      >
+                        <CopyIcon className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {actions?.onEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => actions.onEdit?.(task)}
+                        title={language === "vi" ? "Sửa" : "Edit"}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {actions?.onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => actions.onDelete?.(task)}
+                        title={language === "vi" ? "Xoá" : "Delete"}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
+    <div className="relative w-full overflow-auto max-h-[calc(100dvh-300px)]">
       <table className="w-full caption-bottom text-sm border-collapse">
         <thead className="[&_tr]:border-b sticky top-0 z-20">
           <tr className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm">

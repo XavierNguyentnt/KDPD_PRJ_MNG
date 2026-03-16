@@ -351,7 +351,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="min-h-screen bg-gray-50/50 md:grid overflow-x-hidden"
+      className="min-h-[100dvh] bg-gray-50/50 md:grid overflow-x-hidden"
       style={{
         gridTemplateColumns: sidebarOpen ? "16rem 1fr" : "0px 1fr",
         transition: "grid-template-columns 300ms ease-in-out",
@@ -455,7 +455,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       {/* Main Content */}
-      <main ref={mainContentRef} className="flex flex-col min-h-screen min-w-0">
+      <main
+        ref={mainContentRef}
+        className="flex flex-col min-h-[100dvh] min-w-0">
         {/* Header */}
         <header className="h-16 border-b border-border/50 bg-card/50 backdrop-blur-xl px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-4">
@@ -575,7 +577,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[360px] p-0">
+              <DropdownMenuContent
+                align="end"
+                className="w-[calc(100vw-2rem)] sm:w-[360px] p-0">
                 <div className="px-3 py-2 border-b border-border/50">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold">

@@ -165,20 +165,20 @@ export function TaskFilters({
   const { t, language } = useI18n();
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
+    <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-3">
       <div className="flex items-center gap-2 text-muted-foreground shrink-0">
         <Filter className="w-3.5 h-3.5" />
         <span className="text-xs font-medium">{t.common.filter}</span>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 w-full sm:w-auto">
         <Label className="text-xs text-muted-foreground">
           {t.filter.staff}
         </Label>
         <Select
           value={filters.staffId}
           onValueChange={(v) => onFiltersChange({ staffId: v })}>
-          <SelectTrigger className="w-[160px] h-9 bg-background">
+          <SelectTrigger className="w-full sm:w-[160px] h-9 bg-background">
             <SelectValue placeholder={t.filter.allStaff} />
           </SelectTrigger>
           <SelectContent>
@@ -194,14 +194,14 @@ export function TaskFilters({
         </Select>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 w-full sm:w-auto">
         <Label className="text-xs text-muted-foreground">
           {t.filter.component}
         </Label>
         <Select
           value={filters.componentId}
           onValueChange={(v) => onFiltersChange({ componentId: v })}>
-          <SelectTrigger className="w-[180px] h-9 bg-background">
+          <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background">
             <SelectValue placeholder={t.filter.allComponents} />
           </SelectTrigger>
           <SelectContent>
@@ -215,14 +215,14 @@ export function TaskFilters({
         </Select>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 w-full sm:w-auto">
         <Label className="text-xs text-muted-foreground">
           {t.filter.stage}
         </Label>
         <Select
           value={filters.stage}
           onValueChange={(v) => onFiltersChange({ stage: v })}>
-          <SelectTrigger className="w-[140px] h-9 bg-background">
+          <SelectTrigger className="w-full sm:w-[140px] h-9 bg-background">
             <SelectValue placeholder={t.filter.allStages} />
           </SelectTrigger>
           <SelectContent>
@@ -236,14 +236,14 @@ export function TaskFilters({
         </Select>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 w-full sm:w-auto">
         <Label className="text-xs text-muted-foreground">
           {t.filter.status}
         </Label>
         <Select
           value={filters.status}
           onValueChange={(v) => onFiltersChange({ status: v })}>
-          <SelectTrigger className="w-[150px] h-9 bg-background">
+          <SelectTrigger className="w-full sm:w-[150px] h-9 bg-background">
             <SelectValue placeholder={t.filter.status} />
           </SelectTrigger>
           <SelectContent>
@@ -258,14 +258,14 @@ export function TaskFilters({
       </div>
 
       {showVoteFilter && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 w-full sm:w-auto">
           <Label className="text-xs text-muted-foreground">
             {t.filter.vote}
           </Label>
           <Select
             value={filters.vote}
             onValueChange={(v) => onFiltersChange({ vote: v })}>
-            <SelectTrigger className="w-[160px] h-9 bg-background">
+            <SelectTrigger className="w-full sm:w-[160px] h-9 bg-background">
               <SelectValue placeholder={t.filter.allVotes} />
             </SelectTrigger>
             <SelectContent>
@@ -287,14 +287,14 @@ export function TaskFilters({
         </div>
       )}
       {showRoundTypeFilter && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 w-full sm:w-auto">
           <Label className="text-xs text-muted-foreground">
             {t.filter.roundType ?? t.task.roundTypeLabel}
           </Label>
           <Select
             value={filters.roundType}
             onValueChange={(v) => onFiltersChange({ roundType: v })}>
-            <SelectTrigger className="w-[180px] h-9 bg-background">
+            <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background">
               <SelectValue
                 placeholder={t.filter.allRoundTypes ?? t.task.selectRoundType}
               />
@@ -314,7 +314,7 @@ export function TaskFilters({
         </div>
       )}
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 w-full sm:w-auto">
         <Label className="text-xs text-muted-foreground">
           {t.filter.dateFrom}
         </Label>
@@ -322,11 +322,11 @@ export function TaskFilters({
           value={filters.dateFrom || null}
           onChange={(v) => onFiltersChange({ dateFrom: v ?? "" })}
           placeholder="dd/mm/yyyy"
-          className="h-9 w-[120px] bg-background"
+          className="h-9 w-full sm:w-[120px] bg-background"
         />
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 w-full sm:w-auto">
         <Label className="text-xs text-muted-foreground">
           {t.filter.dateTo}
         </Label>
@@ -334,7 +334,7 @@ export function TaskFilters({
           value={filters.dateTo || null}
           onChange={(v) => onFiltersChange({ dateTo: v ?? "" })}
           placeholder="dd/mm/yyyy"
-          className="h-9 w-[120px] bg-background"
+          className="h-9 w-full sm:w-[120px] bg-background"
         />
       </div>
     </div>

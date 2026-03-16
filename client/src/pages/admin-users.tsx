@@ -7,6 +7,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +42,7 @@ import {
 } from "@/components/ui/command";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { KeyRound, Loader2, Pencil, Check, ChevronsUpDown, Users, UserCheck, UserX, ShieldCheck, Edit3, ClipboardList, UserPlus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@shared/routes";
@@ -142,6 +144,7 @@ export default function AdminUsersPage() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [passwordDialog, setPasswordDialog] = useState<{
     user: ApiUser;
   } | null>(null);
@@ -532,57 +535,146 @@ export default function AdminUsersPage() {
             <p className="text-destructive py-4">{(error as Error).message}</p>
           )}
           {!isLoading && !error && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Họ tên</TableHead>
-                  <TableHead>Phòng ban</TableHead>
-                  <TableHead>Vai trò</TableHead>
-                  <TableHead>Nhóm nhân sự</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.email}</TableCell>
-                    <TableCell>{u.displayName}</TableCell>
-                    <TableCell>{u.department ?? "—"}</TableCell>
-                    <TableCell>
-                      {u.roles?.map((r) => r.name).join(", ") || "—"}
-                    </TableCell>
-                    <TableCell>
-                      {u.groups?.map((g) => g.name).join(", ") || "—"}
-                    </TableCell>
-                    <TableCell>{u.isActive ? "Hoạt động" : "Tắt"}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openEditDialog(u)}
-                        className="gap-1">
-                        <Pencil className="w-3.5 h-3.5" />
-                        Sửa
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setPasswordDialog({ user: u });
-                          setNewPassword("");
-                          setConfirmPassword("");
-                        }}
-                        className="gap-1">
-                        <KeyRound className="w-3.5 h-3.5" />
-                        Đổi mật khẩu
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              {isMobile ? (
+                <div className="space-y-3">
+                  {filteredUsers.map((u) => (
+                    <div
+                      key={u.id}
+                      className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm truncate">
+                            {u.displayName || "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground break-words">
+                            {u.email}
+                          </div>
+                        </div>
+                        <Badge
+                          variant={u.isActive ? "secondary" : "outline"}
+                          className={cn(
+                            "shrink-0",
+                            u.isActive
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {u.isActive ? "Hoạt động" : "Tắt"}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-3 grid gap-2">
+                        <div className="grid gap-0.5">
+                          <div className="text-[11px] text-muted-foreground">
+                            Phòng ban
+                          </div>
+                          <div className="text-sm break-words">
+                            {u.department ?? "—"}
+                          </div>
+                        </div>
+                        <div className="grid gap-0.5">
+                          <div className="text-[11px] text-muted-foreground">
+                            Vai trò
+                          </div>
+                          <div className="text-sm break-words">
+                            {u.roles?.map((r) => r.name).join(", ") || "—"}
+                          </div>
+                        </div>
+                        <div className="grid gap-0.5">
+                          <div className="text-[11px] text-muted-foreground">
+                            Nhóm nhân sự
+                          </div>
+                          <div className="text-sm break-words">
+                            {u.groups?.map((g) => g.name).join(", ") || "—"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-col gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditDialog(u)}
+                          className="w-full gap-1.5"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Sửa
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPasswordDialog({ user: u });
+                            setNewPassword("");
+                            setConfirmPassword("");
+                          }}
+                          className="w-full gap-1.5"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                          Đổi mật khẩu
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Họ tên</TableHead>
+                      <TableHead>Phòng ban</TableHead>
+                      <TableHead>Vai trò</TableHead>
+                      <TableHead>Nhóm nhân sự</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">{u.email}</TableCell>
+                        <TableCell>{u.displayName}</TableCell>
+                        <TableCell>{u.department ?? "—"}</TableCell>
+                        <TableCell>
+                          {u.roles?.map((r) => r.name).join(", ") || "—"}
+                        </TableCell>
+                        <TableCell>
+                          {u.groups?.map((g) => g.name).join(", ") || "—"}
+                        </TableCell>
+                        <TableCell>{u.isActive ? "Hoạt động" : "Tắt"}</TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(u)}
+                            className="gap-1"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Sửa
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPasswordDialog({ user: u });
+                              setNewPassword("");
+                              setConfirmPassword("");
+                            }}
+                            className="gap-1"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            Đổi mật khẩu
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
