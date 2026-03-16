@@ -19,6 +19,16 @@ import multer from "multer";
 import { buildNotificationContent } from "./notifications";
 import { sendNotificationEmail } from "./email";
 import { getPublicKey as getPushPublicKey, sendWebPushToUser } from "./push";
+import {
+  buildGoogleCalendarAuthUrl,
+  connectGoogleCalendarWithCode,
+  createOAuthState,
+  disconnectGoogleCalendar,
+  getGoogleCalendarSyncStatus,
+  syncGoogleCalendarForTaskChange,
+  syncGoogleCalendarForUser,
+  updateGoogleCalendarSyncSettings,
+} from "./google-calendar-sync";
 
 /** Feature flag: Work/Contract taxonomy (theo Docs refactor – tắt được khi rollback). */
 const FEATURE_WORK_ENABLED = process.env.FEATURE_WORK_ENABLED === "true";
@@ -391,12 +401,10 @@ export async function registerRoutes(
       const vote = oldTask.vote ?? null;
       const allowedVotes = new Set(["khong_tot", "khong_hoan_thanh"]);
       if (!allowedVotes.has(String(vote))) {
-        return res
-          .status(400)
-          .json({
-            message:
-              "Chỉ cho phép làm lại khi đánh giá là 'Không tốt' hoặc 'Không hoàn thành'",
-          });
+        return res.status(400).json({
+          message:
+            "Chỉ cho phép làm lại khi đánh giá là 'Không tốt' hoặc 'Không hoàn thành'",
+        });
       }
       const assignments = await dbStorage.getTaskAssignmentsByTaskId(id);
       const reqUser = req.user as UserWithRolesAndGroups;
@@ -467,11 +475,9 @@ export async function registerRoutes(
       ) {
         return res.status(503).json({ message: err.message });
       }
-      res
-        .status(500)
-        .json({
-          message: err instanceof Error ? err.message : "Failed to redo task",
-        });
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to redo task",
+      });
     }
   });
 
@@ -842,6 +848,18 @@ export async function registerRoutes(
         }
       }
 
+      if (db) {
+        const ids = new Set<string>();
+        for (const a of prevAssignmentsList) ids.add(String(a.userId));
+        if (assignmentsInput) {
+          for (const a of assignmentsInput) ids.add(String(a.userId));
+        }
+        syncGoogleCalendarForTaskChange({
+          taskId: id,
+          userIds: Array.from(ids),
+        }).catch(() => {});
+      }
+
       res.json(task);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1011,6 +1029,15 @@ export async function registerRoutes(
             });
           }
         }
+      }
+
+      if (db && assignmentsInput && assignmentsInput.length > 0) {
+        const ids = new Set<string>();
+        for (const a of assignmentsInput) ids.add(String(a.userId));
+        syncGoogleCalendarForTaskChange({
+          taskId: task.id,
+          userIds: Array.from(ids),
+        }).catch(() => {});
       }
 
       res.json(task);
@@ -4029,6 +4056,157 @@ export async function registerRoutes(
       res
         .status(500)
         .json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+
+  app.get("/api/google-calendar/status", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      res.json(await getGoogleCalendarSyncStatus(userId));
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to get status",
+      });
+    }
+  });
+
+  app.get("/api/google-calendar/connect", requireAuth, async (req, res) => {
+    const clientId = (process.env.GOOGLE_CLIENT_ID ?? "").trim();
+    const clientSecret = (process.env.GOOGLE_CLIENT_SECRET ?? "").trim();
+    const redirectUri = (
+      process.env.GOOGLE_CALENDAR_REDIRECT_URI ||
+      process.env.GOOGLE_REDIRECT_URI ||
+      ""
+    ).trim();
+    const missing: string[] = [];
+    if (!clientId) missing.push("GOOGLE_CLIENT_ID");
+    if (!clientSecret) missing.push("GOOGLE_CLIENT_SECRET");
+    if (!redirectUri) missing.push("GOOGLE_CALENDAR_REDIRECT_URI");
+    if (redirectUri.includes("developers.google.com/oauthplayground")) {
+      return res.status(400).json({
+        message:
+          "GOOGLE_CALENDAR_REDIRECT_URI không được dùng OAuth Playground. Hãy đặt về URL callback của chương trình: /api/google-calendar/oauth2/callback",
+      });
+    }
+    if (missing.length > 0) {
+      return res.status(503).json({
+        message:
+          "Google Calendar chưa được cấu hình. Thiếu: " + missing.join(", "),
+      });
+    }
+    const state = createOAuthState();
+    const returnToRaw =
+      typeof req.query.returnTo === "string" ? req.query.returnTo : "/";
+    const returnTo =
+      returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")
+        ? returnToRaw
+        : "/";
+    (req.session as any).gcalOAuthState = state;
+    (req.session as any).gcalReturnTo = returnTo;
+    const url = buildGoogleCalendarAuthUrl({ state });
+    if (!url) {
+      return res.status(503).json({
+        message:
+          "Google Calendar chưa được cấu hình. Kiểm tra GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET/GOOGLE_CALENDAR_REDIRECT_URI và restart server.",
+      });
+    }
+    return res.redirect(url);
+  });
+
+  app.get(
+    "/api/google-calendar/oauth2/callback",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const code = typeof req.query.code === "string" ? req.query.code : "";
+        const state =
+          typeof req.query.state === "string" ? req.query.state : "";
+        const expected = String((req.session as any).gcalOAuthState ?? "");
+        if (!code || !state || !expected || state !== expected) {
+          return res.status(400).json({ message: "Invalid OAuth state/code" });
+        }
+        const userId = (req.user as UserWithRolesAndGroups).id;
+        await connectGoogleCalendarWithCode({ userId, code });
+        const returnTo = String((req.session as any).gcalReturnTo ?? "/");
+        (req.session as any).gcalOAuthState = null;
+        (req.session as any).gcalReturnTo = null;
+        const safeReturnTo =
+          returnTo.startsWith("/") && !returnTo.startsWith("//")
+            ? returnTo
+            : "/";
+        const url = safeReturnTo.includes("?")
+          ? `${safeReturnTo}&gcal=connected`
+          : `${safeReturnTo}?gcal=connected`;
+        return res.redirect(url);
+      } catch (err) {
+        return res.status(500).json({
+          message: err instanceof Error ? err.message : "OAuth callback failed",
+        });
+      }
+    },
+  );
+
+  app.post("/api/google-calendar/settings", requireAuth, async (req, res) => {
+    try {
+      const input = z
+        .object({
+          syncEnabled: z.boolean().optional(),
+          calendarId: z.string().optional(),
+          syncDateField: z.enum(["dueDate", "receivedAt"]).optional(),
+        })
+        .parse(req.body);
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      await updateGoogleCalendarSyncSettings({
+        userId,
+        syncEnabled: input.syncEnabled,
+        calendarId: input.calendarId,
+        syncDateField: input.syncDateField,
+      });
+      res.json(await getGoogleCalendarSyncStatus(userId));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to save settings",
+      });
+    }
+  });
+
+  app.post("/api/google-calendar/sync-now", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      const status = await getGoogleCalendarSyncStatus(userId);
+      if (!status.connected) {
+        return res.status(400).json({
+          message:
+            "Chưa kết nối Google Calendar. Vui lòng bấm 'Kết nối Google Calendar' trước.",
+        });
+      }
+      if (!status.syncEnabled) {
+        return res.status(400).json({
+          message:
+            "Đồng bộ tự động đang tắt. Vui lòng bật 'Tự động đồng bộ' trước.",
+        });
+      }
+      const summary = await syncGoogleCalendarForUser(userId);
+      res.json(summary);
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to sync",
+      });
+    }
+  });
+
+  app.post("/api/google-calendar/disconnect", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as UserWithRolesAndGroups).id;
+      await disconnectGoogleCalendar(userId);
+      res.json({ message: "OK" });
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to disconnect",
+      });
     }
   });
 

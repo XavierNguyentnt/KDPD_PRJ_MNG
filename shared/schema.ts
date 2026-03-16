@@ -328,6 +328,70 @@ export const selectTaskAssignmentSchema = createSelectSchema(taskAssignments);
 export type TaskAssignment = typeof taskAssignments.$inferSelect;
 export type InsertTaskAssignment = z.infer<typeof insertTaskAssignmentSchema>;
 
+export const googleCalendarAccounts = pgTable("google_calendar_accounts", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  scope: text("scope"),
+  tokenType: text("token_type"),
+  expiryDate: timestamp("expiry_date", { withTimezone: true }),
+  calendarId: text("calendar_id").notNull().default("primary"),
+  syncEnabled: boolean("sync_enabled").notNull().default(false),
+  syncDateField: text("sync_date_field").notNull().default("dueDate"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const insertGoogleCalendarAccountSchema =
+  createInsertSchema(googleCalendarAccounts);
+export const selectGoogleCalendarAccountSchema =
+  createSelectSchema(googleCalendarAccounts);
+export type GoogleCalendarAccount = typeof googleCalendarAccounts.$inferSelect;
+export type InsertGoogleCalendarAccount = z.infer<
+  typeof insertGoogleCalendarAccountSchema
+>;
+
+export const googleCalendarEventLinks = pgTable("google_calendar_event_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  taskAssignmentId: uuid("task_assignment_id").references(
+    () => taskAssignments.id,
+    { onDelete: "cascade" },
+  ),
+  dateField: text("date_field").notNull(),
+  calendarId: text("calendar_id").notNull(),
+  eventId: text("event_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const insertGoogleCalendarEventLinkSchema = createInsertSchema(
+  googleCalendarEventLinks,
+);
+export const selectGoogleCalendarEventLinkSchema = createSelectSchema(
+  googleCalendarEventLinks,
+);
+export type GoogleCalendarEventLink =
+  typeof googleCalendarEventLinks.$inferSelect;
+export type InsertGoogleCalendarEventLink = z.infer<
+  typeof insertGoogleCalendarEventLinkSchema
+>;
+
 // -----------------------------------------------------------------------------
 // Notifications (thông báo cho nhân sự)
 // -----------------------------------------------------------------------------

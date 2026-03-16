@@ -20,6 +20,7 @@ import {
   type TaskSortColumn,
 } from "@/components/task-table";
 import { TaskKanbanBoard } from "@/components/task-kanban-board";
+import { TaskCalendarView } from "@/components/task-calendar-view";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
@@ -71,7 +72,9 @@ export default function Dashboard() {
   const [selectedTask, setSelectedTask] =
     useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"table" | "board">("table");
+  const [viewMode, setViewMode] = useState<"table" | "board" | "calendar">(
+    "table",
+  );
   const taskListRef = useRef<HTMLDivElement>(null);
   const dialogMode = useMemo<"view" | "edit">(() => {
     if (!selectedTask) return "view";
@@ -608,7 +611,9 @@ export default function Dashboard() {
               type="single"
               value={viewMode}
               onValueChange={(v) =>
-                v && (v === "table" || v === "board") && setViewMode(v)
+                v &&
+                (v === "table" || v === "board" || v === "calendar") &&
+                setViewMode(v)
               }
               className="border rounded-md bg-background">
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
@@ -618,6 +623,12 @@ export default function Dashboard() {
               <ToggleGroupItem value="board" aria-label={t.dashboard.viewBoard}>
                 <LayoutGrid className="h-4 w-4 mr-1.5" />
                 {t.dashboard.viewBoard}
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="calendar"
+                aria-label={t.dashboard.calendar}>
+                <Calendar className="h-4 w-4 mr-1.5" />
+                {t.dashboard.calendar}
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
@@ -661,7 +672,7 @@ export default function Dashboard() {
             getPriorityColor={getPriorityColor}
             getStatusColor={getStatusColor}
           />
-        ) : (
+        ) : viewMode === "board" ? (
           <TaskKanbanBoard
             tasks={filteredTasks}
             onTaskClick={setSelectedTask}
@@ -669,6 +680,15 @@ export default function Dashboard() {
             getStatusColor={getStatusColor}
             noGroupLabel={language === "vi" ? "(Không nhóm)" : "(No group)"}
           />
+        ) : (
+          <div className="p-4 sm:p-5">
+            <TaskCalendarView
+              tasks={filteredTasks}
+              onTaskClick={setSelectedTask}
+              getPriorityColor={getPriorityColor}
+              getStatusColor={getStatusColor}
+            />
+          </div>
         )}
       </section>
 

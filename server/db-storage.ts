@@ -1,4 +1,4 @@
-import { eq, asc, inArray, and, desc, ne } from "drizzle-orm";
+import { eq, asc, inArray, and, desc, ne, isNull } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -69,6 +69,12 @@ import {
   pushSubscriptions,
   type PushSubscriptionRow,
   type InsertPushSubscriptionRow,
+  googleCalendarAccounts,
+  googleCalendarEventLinks,
+  type GoogleCalendarAccount,
+  type InsertGoogleCalendarAccount,
+  type GoogleCalendarEventLink,
+  type InsertGoogleCalendarEventLink,
 } from "@shared/schema";
 
 function requireDb() {
@@ -1003,6 +1009,135 @@ export async function deleteTaskAssignmentsByTaskId(
   await requireDb()
     .delete(taskAssignments)
     .where(eq(taskAssignments.taskId, taskId));
+}
+
+// -----------------------------------------------------------------------------
+// Google Calendar sync
+// -----------------------------------------------------------------------------
+export async function getGoogleCalendarAccountByUserId(
+  userId: string,
+): Promise<GoogleCalendarAccount | undefined> {
+  const rows = await requireDb()
+    .select()
+    .from(googleCalendarAccounts)
+    .where(eq(googleCalendarAccounts.userId, userId))
+    .limit(1);
+  return rows[0];
+}
+
+export async function upsertGoogleCalendarAccount(
+  userId: string,
+  data: Partial<Omit<InsertGoogleCalendarAccount, "userId">>,
+): Promise<GoogleCalendarAccount> {
+  const existing = await getGoogleCalendarAccountByUserId(userId);
+  if (!existing) {
+    const rows = await requireDb()
+      .insert(googleCalendarAccounts)
+      .values({
+        userId,
+        ...data,
+      } as InsertGoogleCalendarAccount)
+      .returning();
+    if (!rows[0]) throw new Error("Failed to create Google Calendar account");
+    return rows[0];
+  }
+  const rows = await requireDb()
+    .update(googleCalendarAccounts)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(googleCalendarAccounts.userId, userId))
+    .returning();
+  if (!rows[0]) throw new Error("Failed to update Google Calendar account");
+  return rows[0];
+}
+
+export async function deleteGoogleCalendarAccountByUserId(
+  userId: string,
+): Promise<void> {
+  await requireDb()
+    .delete(googleCalendarAccounts)
+    .where(eq(googleCalendarAccounts.userId, userId));
+}
+
+export async function getGoogleCalendarEventLink(params: {
+  userId: string;
+  taskId: string;
+  taskAssignmentId?: string | null;
+  dateField: string;
+  calendarId: string;
+}): Promise<GoogleCalendarEventLink | undefined> {
+  const rows = await requireDb()
+    .select()
+    .from(googleCalendarEventLinks)
+    .where(
+      and(
+        eq(googleCalendarEventLinks.userId, params.userId),
+        eq(googleCalendarEventLinks.taskId, params.taskId),
+        params.taskAssignmentId
+          ? eq(
+              googleCalendarEventLinks.taskAssignmentId,
+              params.taskAssignmentId,
+            )
+          : isNull(googleCalendarEventLinks.taskAssignmentId),
+        eq(googleCalendarEventLinks.dateField, params.dateField),
+        eq(googleCalendarEventLinks.calendarId, params.calendarId),
+      ),
+    )
+    .limit(1);
+  return rows[0];
+}
+
+export async function createGoogleCalendarEventLink(
+  data: Omit<InsertGoogleCalendarEventLink, "id">,
+): Promise<GoogleCalendarEventLink> {
+  const rows = await requireDb()
+    .insert(googleCalendarEventLinks)
+    .values(data as Omit<InsertGoogleCalendarEventLink, "id">)
+    .returning();
+  if (!rows[0]) throw new Error("Failed to create Google Calendar event link");
+  return rows[0];
+}
+
+export async function updateGoogleCalendarEventLink(
+  id: string,
+  data: Partial<Omit<InsertGoogleCalendarEventLink, "id">>,
+): Promise<GoogleCalendarEventLink> {
+  const rows = await requireDb()
+    .update(googleCalendarEventLinks)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(googleCalendarEventLinks.id, id))
+    .returning();
+  if (!rows[0]) throw new Error("Failed to update Google Calendar event link");
+  return rows[0];
+}
+
+export async function deleteGoogleCalendarEventLinkById(
+  id: string,
+): Promise<void> {
+  await requireDb()
+    .delete(googleCalendarEventLinks)
+    .where(eq(googleCalendarEventLinks.id, id));
+}
+
+export async function deleteGoogleCalendarEventLinksByUserId(
+  userId: string,
+): Promise<void> {
+  await requireDb()
+    .delete(googleCalendarEventLinks)
+    .where(eq(googleCalendarEventLinks.userId, userId));
+}
+
+export async function deleteGoogleCalendarEventLinksByUserAndTask(
+  userId: string,
+  taskId: string,
+): Promise<void> {
+  await requireDb()
+    .delete(googleCalendarEventLinks)
+    .where(
+      and(
+        eq(googleCalendarEventLinks.userId, userId),
+        eq(googleCalendarEventLinks.taskId, taskId),
+      ),
+    );
 }
 
 // -----------------------------------------------------------------------------

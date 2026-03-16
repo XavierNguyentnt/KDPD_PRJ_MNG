@@ -340,10 +340,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       ? [{ href: "/thiet-ke", label: "Thiết kế", icon: Palette }]
       : []),
     ...(canViewCNTT ? [{ href: "/cntt", label: "CNTT", icon: Code }] : []),
-    { href: "/team", label: "Team", icon: Users },
     ...(canViewThuKyHopPhan
       ? [{ href: "/thu-ky-hop-phan", label: "Thư ký hợp phần", icon: FileText }]
       : []),
+    { href: "/team", label: "Team", icon: Users },
     ...(role === UserRole.ADMIN || role === UserRole.MANAGER
       ? [{ href: "/admin/users", label: "Quản lý người dùng", icon: UserCog }]
       : []),

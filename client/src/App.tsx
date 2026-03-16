@@ -152,10 +152,10 @@ function Router() {
         <Route path="/thiet-ke" component={GuardedThietKePage} />
         <Route path="/cntt" component={GuardedCNTTPage} />
         <Route path="/tasks" component={Dashboard} /> {/* Legacy route */}
-        <Route path="/team" component={Team} />
-        <Route path="/admin/users" component={AdminUsersPage} />
         <Route path="/thu-ky-hop-phan" component={ThuKyHopPhanPage} />
         <Route path="/thu-ky-hop-phan/:sub" component={ThuKyHopPhanPage} />
+        <Route path="/team" component={Team} />
+        <Route path="/admin/users" component={AdminUsersPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
