@@ -315,6 +315,18 @@ export function TaskDialog({
     }
     return true;
   };
+  const isDueDateValid = (
+    dueYyyyMmDd?: string | null,
+    receivedYyyyMmDd?: string | null,
+  ): boolean => {
+    if (!dueYyyyMmDd || !receivedYyyyMmDd) return true;
+    const due = parseYyyyMmDdLocal(dueYyyyMmDd);
+    const received = parseYyyyMmDdLocal(receivedYyyyMmDd);
+    if (!due || !received) return true;
+    due.setHours(0, 0, 0, 0);
+    received.setHours(0, 0, 0, 0);
+    return due.getTime() >= received.getTime();
+  };
 
   const guardCompletedDateOrToast = (
     completedYyyyMmDd: string,
@@ -417,7 +429,9 @@ export function TaskDialog({
     };
     ensure(defaultGroup);
 
-    return filtered.length > 0 ? filtered : base.filter((g) => always.has(norm(String(g))));
+    return filtered.length > 0
+      ? filtered
+      : base.filter((g) => always.has(norm(String(g))));
   }, [allTasks, role, user?.groups, isNewTask, defaultGroup]);
 
   const getMaxBienTapRoundForWork = (
@@ -1143,6 +1157,256 @@ export function TaskDialog({
   }
 
   const onSubmit = (data: FormData) => {
+    const dueErrMsgVi = "Hạn không nhỏ hơn ngày nhận.";
+    const dueErrMsgEn = "Due must be on or after received date.";
+    const compErrMsgViFuture =
+      "Ngày hoàn thành thực tế không được lớn hơn ngày hiện tại.";
+    const compErrMsgViBefore =
+      "Ngày hoàn thành thực tế không được nhỏ hơn ngày nhận công việc.";
+    const compErrMsgEnFuture =
+      "Actual completion date cannot be in the future.";
+    const compErrMsgEnBefore =
+      "Actual completion date cannot be earlier than received date.";
+
+    const showCompErr = (isFuture: boolean) =>
+      language === "vi"
+        ? isFuture
+          ? compErrMsgViFuture
+          : compErrMsgViBefore
+        : isFuture
+          ? compErrMsgEnFuture
+          : compErrMsgEnBefore;
+
+    const checkEditorialDates = () => {
+      let invalid = false;
+      if (
+        data.btv2DueDate &&
+        data.btv2ReceiveDate &&
+        !isDueDateValid(data.btv2DueDate, data.btv2ReceiveDate)
+      ) {
+        form.setError("btv2DueDate", {
+          message: language === "vi" ? dueErrMsgVi : dueErrMsgEn,
+        });
+        invalid = true;
+      }
+      if (data.btv2CompleteDate) {
+        const ok = isCompletedDateValid(
+          data.btv2CompleteDate,
+          data.btv2ReceiveDate || null,
+        );
+        if (!ok) {
+          const comp = data.btv2CompleteDate;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const c = parseYyyyMmDdLocal(comp);
+          const isFuture =
+            c != null &&
+            !Number.isNaN(c.getTime()) &&
+            (() => {
+              c.setHours(0, 0, 0, 0);
+              return c.getTime() > today.getTime();
+            })();
+          form.setError("btv2CompleteDate", {
+            message: showCompErr(isFuture),
+          });
+          invalid = true;
+        }
+      }
+      if (
+        data.btv1DueDate &&
+        data.btv1ReceiveDate &&
+        !isDueDateValid(data.btv1DueDate, data.btv1ReceiveDate)
+      ) {
+        form.setError("btv1DueDate", {
+          message: language === "vi" ? dueErrMsgVi : dueErrMsgEn,
+        });
+        invalid = true;
+      }
+      if (data.btv1CompleteDate) {
+        const ok = isCompletedDateValid(
+          data.btv1CompleteDate,
+          data.btv1ReceiveDate || null,
+        );
+        if (!ok) {
+          const comp = data.btv1CompleteDate;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const c = parseYyyyMmDdLocal(comp);
+          const isFuture =
+            c != null &&
+            !Number.isNaN(c.getTime()) &&
+            (() => {
+              c.setHours(0, 0, 0, 0);
+              return c.getTime() > today.getTime();
+            })();
+          form.setError("btv1CompleteDate", {
+            message: showCompErr(isFuture),
+          });
+          invalid = true;
+        }
+      }
+      if (
+        data.docDuyetDueDate &&
+        data.docDuyetReceiveDate &&
+        !isDueDateValid(data.docDuyetDueDate, data.docDuyetReceiveDate)
+      ) {
+        form.setError("docDuyetDueDate", {
+          message: language === "vi" ? dueErrMsgVi : dueErrMsgEn,
+        });
+        invalid = true;
+      }
+      if (data.docDuyetCompleteDate) {
+        const ok = isCompletedDateValid(
+          data.docDuyetCompleteDate,
+          data.docDuyetReceiveDate || null,
+        );
+        if (!ok) {
+          const comp = data.docDuyetCompleteDate;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const c = parseYyyyMmDdLocal(comp);
+          const isFuture =
+            c != null &&
+            !Number.isNaN(c.getTime()) &&
+            (() => {
+              c.setHours(0, 0, 0, 0);
+              return c.getTime() > today.getTime();
+            })();
+          form.setError("docDuyetCompleteDate", {
+            message: showCompErr(isFuture),
+          });
+          invalid = true;
+        }
+      }
+      return !invalid;
+    };
+
+    const checkDesignAndMultiDates = () => {
+      const group = data.group || defaultGroup || "";
+      if (group === "Thiết kế") {
+        if (
+          thietKeKtvChinh.dueDate &&
+          thietKeKtvChinh.receiveDate &&
+          !isDueDateValid(thietKeKtvChinh.dueDate, thietKeKtvChinh.receiveDate)
+        ) {
+          toast({
+            title: t.common.error,
+            description: language === "vi" ? dueErrMsgVi : dueErrMsgEn,
+            variant: "destructive",
+          });
+          return false;
+        }
+        if (
+          thietKeKtvChinh.completeDate &&
+          !isCompletedDateValid(
+            thietKeKtvChinh.completeDate,
+            thietKeKtvChinh.receiveDate || null,
+          )
+        ) {
+          const comp = thietKeKtvChinh.completeDate;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const c = parseYyyyMmDdLocal(comp);
+          const isFuture =
+            c != null &&
+            !Number.isNaN(c.getTime()) &&
+            (() => {
+              c.setHours(0, 0, 0, 0);
+              return c.getTime() > today.getTime();
+            })();
+          toast({
+            title: t.common.error,
+            description: showCompErr(isFuture),
+            variant: "destructive",
+          });
+          return false;
+        }
+        for (const s of thietKeTroLyList) {
+          if (
+            s.dueDate &&
+            s.receiveDate &&
+            !isDueDateValid(s.dueDate, s.receiveDate)
+          ) {
+            toast({
+              title: t.common.error,
+              description: language === "vi" ? dueErrMsgVi : dueErrMsgEn,
+              variant: "destructive",
+            });
+            return false;
+          }
+          if (
+            s.completeDate &&
+            !isCompletedDateValid(s.completeDate, s.receiveDate || null)
+          ) {
+            const comp = s.completeDate;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const c = parseYyyyMmDdLocal(comp);
+            const isFuture =
+              c != null &&
+              !Number.isNaN(c.getTime()) &&
+              (() => {
+                c.setHours(0, 0, 0, 0);
+                return c.getTime() > today.getTime();
+              })();
+            toast({
+              title: t.common.error,
+              description: showCompErr(isFuture),
+              variant: "destructive",
+            });
+            return false;
+          }
+        }
+      } else if (
+        group === "Công việc chung" ||
+        group === "CNTT" ||
+        group === "Quét trùng lặp" ||
+        group === "Thư ký hợp phần"
+      ) {
+        for (const s of multiAssigneesList) {
+          if (
+            s.dueDate &&
+            s.receivedAt &&
+            !isDueDateValid(s.dueDate, s.receivedAt)
+          ) {
+            toast({
+              title: t.common.error,
+              description: language === "vi" ? dueErrMsgVi : dueErrMsgEn,
+              variant: "destructive",
+            });
+            return false;
+          }
+          if (
+            s.completedAt &&
+            !isCompletedDateValid(s.completedAt, s.receivedAt || null)
+          ) {
+            const comp = s.completedAt;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const c = parseYyyyMmDdLocal(comp);
+            const isFuture =
+              c != null &&
+              !Number.isNaN(c.getTime()) &&
+              (() => {
+                c.setHours(0, 0, 0, 0);
+                return c.getTime() > today.getTime();
+              })();
+            toast({
+              title: t.common.error,
+              description: showCompErr(isFuture),
+              variant: "destructive",
+            });
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+
+    if (form.watch("group") === "Biên tập") {
+      if (!checkEditorialDates()) return;
+    }
+    if (!checkDesignAndMultiDates()) return;
     if (
       isNewTask &&
       duplicateMode &&
@@ -2275,6 +2539,18 @@ export function TaskDialog({
                                   className="bg-background w-32"
                                   disabled={!canEditMeta && !isNewTask}
                                 />
+                                {slot.dueDate &&
+                                  slot.receivedAt &&
+                                  !isDueDateValid(
+                                    slot.dueDate,
+                                    slot.receivedAt,
+                                  ) && (
+                                    <p className="text-xs text-destructive">
+                                      {language === "vi"
+                                        ? "Hạn không nhỏ hơn ngày nhận."
+                                        : "Due must be on or after received date."}
+                                    </p>
+                                  )}
                               </div>
                               <div className="space-y-1">
                                 <div className="flex items-center gap-1">
@@ -2364,6 +2640,17 @@ export function TaskDialog({
                                   className="bg-background w-32"
                                   disabled={slot.userId !== currentUserId}
                                 />
+                                {slot.completedAt &&
+                                  !isCompletedDateValid(
+                                    slot.completedAt,
+                                    slot.receivedAt ?? null,
+                                  ) && (
+                                    <p className="text-xs text-destructive">
+                                      {language === "vi"
+                                        ? "Ngày hoàn thành không hợp lệ."
+                                        : "Invalid completed date."}
+                                    </p>
+                                  )}
                               </div>
                             </>
                           )}
@@ -2549,6 +2836,18 @@ export function TaskDialog({
                           className="bg-background w-32"
                           disabled={!canEditMeta && !isNewTask}
                         />
+                        {thietKeKtvChinh.dueDate &&
+                          thietKeKtvChinh.receiveDate &&
+                          !isDueDateValid(
+                            thietKeKtvChinh.dueDate,
+                            thietKeKtvChinh.receiveDate,
+                          ) && (
+                            <p className="text-xs text-destructive">
+                              {language === "vi"
+                                ? "Hạn không nhỏ hơn ngày nhận."
+                                : "Due must be on or after received date."}
+                            </p>
+                          )}
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">
@@ -2576,6 +2875,17 @@ export function TaskDialog({
                           className="bg-background w-32"
                           disabled={!canEditMeta && !isNewTask}
                         />
+                        {thietKeKtvChinh.completeDate &&
+                          !isCompletedDateValid(
+                            thietKeKtvChinh.completeDate,
+                            thietKeKtvChinh.receiveDate || null,
+                          ) && (
+                            <p className="text-xs text-destructive">
+                              {language === "vi"
+                                ? "Ngày hoàn thành không hợp lệ."
+                                : "Invalid completed date."}
+                            </p>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -2649,6 +2959,15 @@ export function TaskDialog({
                             className="bg-background w-32"
                             disabled={!canEditMeta && !isNewTask}
                           />
+                          {slot.dueDate &&
+                            slot.receiveDate &&
+                            !isDueDateValid(slot.dueDate, slot.receiveDate) && (
+                              <p className="text-xs text-destructive">
+                                {language === "vi"
+                                  ? "Hạn không nhỏ hơn ngày nhận."
+                                  : "Due must be on or after received date."}
+                              </p>
+                            )}
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">
@@ -2679,6 +2998,17 @@ export function TaskDialog({
                             className="bg-background w-32"
                             disabled={!canEditMeta && !isNewTask}
                           />
+                          {slot.completeDate &&
+                            !isCompletedDateValid(
+                              slot.completeDate,
+                              slot.receiveDate || null,
+                            ) && (
+                              <p className="text-xs text-destructive">
+                                {language === "vi"
+                                  ? "Ngày hoàn thành không hợp lệ."
+                                  : "Invalid completed date."}
+                              </p>
+                            )}
                         </div>
                         <Button
                           type="button"
@@ -2806,6 +3136,18 @@ export function TaskDialog({
                         className="bg-background"
                         disabled={!isNewTask && !canEditMeta}
                       />
+                      {form.watch("btv2DueDate") &&
+                        form.watch("btv2ReceiveDate") &&
+                        !isDueDateValid(
+                          form.watch("btv2DueDate"),
+                          form.watch("btv2ReceiveDate"),
+                        ) && (
+                          <p className="text-xs text-destructive">
+                            {language === "vi"
+                              ? "Hạn không nhỏ hơn ngày nhận."
+                              : "Due must be on or after received date."}
+                          </p>
+                        )}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs">
@@ -2830,6 +3172,17 @@ export function TaskDialog({
                         className="bg-background"
                         disabled={!isNewTask && !canEditMeta}
                       />
+                      {form.watch("btv2CompleteDate") &&
+                        !isCompletedDateValid(
+                          String(form.watch("btv2CompleteDate") || ""),
+                          form.watch("btv2ReceiveDate") || null,
+                        ) && (
+                          <p className="text-xs text-destructive">
+                            {language === "vi"
+                              ? "Ngày hoàn thành không hợp lệ."
+                              : "Invalid completed date."}
+                          </p>
+                        )}
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
@@ -2938,6 +3291,18 @@ export function TaskDialog({
                         className="bg-background"
                         disabled={!isNewTask && !canEditMeta}
                       />
+                      {form.watch("btv1DueDate") &&
+                        form.watch("btv1ReceiveDate") &&
+                        !isDueDateValid(
+                          form.watch("btv1DueDate"),
+                          form.watch("btv1ReceiveDate"),
+                        ) && (
+                          <p className="text-xs text-destructive">
+                            {language === "vi"
+                              ? "Hạn không nhỏ hơn ngày nhận."
+                              : "Due must be on or after received date."}
+                          </p>
+                        )}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs">
@@ -2962,6 +3327,17 @@ export function TaskDialog({
                         className="bg-background"
                         disabled={!isNewTask && !canEditMeta}
                       />
+                      {form.watch("btv1CompleteDate") &&
+                        !isCompletedDateValid(
+                          String(form.watch("btv1CompleteDate") || ""),
+                          form.watch("btv1ReceiveDate") || null,
+                        ) && (
+                          <p className="text-xs text-destructive">
+                            {language === "vi"
+                              ? "Ngày hoàn thành không hợp lệ."
+                              : "Invalid completed date."}
+                          </p>
+                        )}
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
@@ -3072,6 +3448,18 @@ export function TaskDialog({
                         className="bg-background"
                         disabled={!isNewTask && !canEditMeta}
                       />
+                      {form.watch("docDuyetDueDate") &&
+                        form.watch("docDuyetReceiveDate") &&
+                        !isDueDateValid(
+                          form.watch("docDuyetDueDate"),
+                          form.watch("docDuyetReceiveDate"),
+                        ) && (
+                          <p className="text-xs text-destructive">
+                            {language === "vi"
+                              ? "Hạn không nhỏ hơn ngày nhận."
+                              : "Due must be on or after received date."}
+                          </p>
+                        )}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs">
@@ -3099,6 +3487,17 @@ export function TaskDialog({
                         className="bg-background"
                         disabled={!isNewTask && !canEditMeta}
                       />
+                      {form.watch("docDuyetCompleteDate") &&
+                        !isCompletedDateValid(
+                          String(form.watch("docDuyetCompleteDate") || ""),
+                          form.watch("docDuyetReceiveDate") || null,
+                        ) && (
+                          <p className="text-xs text-destructive">
+                            {language === "vi"
+                              ? "Ngày hoàn thành không hợp lệ."
+                              : "Invalid completed date."}
+                          </p>
+                        )}
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
