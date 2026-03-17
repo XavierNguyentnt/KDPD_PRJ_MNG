@@ -369,7 +369,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     ...(canViewThuKyHopPhan
       ? [{ href: "/thu-ky-hop-phan", label: "Thư ký hợp phần", icon: FileText }]
       : []),
-    { href: "/team", label: "Team", icon: Users },
+    { href: "/team", label: language === "vi" ? "Nhóm" : "Team", icon: Users },
     ...(role === UserRole.ADMIN
       ? [{ href: "/admin/users", label: "Quản lý người dùng", icon: UserCog }]
       : []),
@@ -512,20 +512,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4 ml-auto">
-            {/* Protend-style: Create New Project CTA on Dashboard */}
-            {(role === UserRole.ADMIN || role === UserRole.MANAGER) &&
-              location === "/" && (
-                <Link href="/#create">
-                  <Button
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm gap-1.5 font-medium">
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">
-                      {t.dashboard.createNewProject}
-                    </span>
-                  </Button>
-                </Link>
-              )}
             {/* Language Switcher */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

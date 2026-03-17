@@ -31,6 +31,7 @@ export function useUsers() {
     queryKey: [api.users.list.path],
     queryFn: async (): Promise<User[]> => {
       const res = await fetch(api.users.list.path, { credentials: "include" });
+      if (res.status === 503) return [];
       if (!res.ok) throw new Error("Failed to fetch users");
       return api.users.list.responses[200].parse(await res.json());
     },
