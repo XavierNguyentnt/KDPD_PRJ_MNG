@@ -111,6 +111,12 @@ function getSessionStore(): session.Store {
 }
 
 export function initSession(app: Express): void {
+  if (
+    process.env.NODE_ENV === "production" &&
+    SESSION_SECRET === "kdpd-session-secret-change-in-production"
+  ) {
+    throw new Error("SESSION_SECRET must be set in production");
+  }
   app.use(
     session({
       secret: SESSION_SECRET,

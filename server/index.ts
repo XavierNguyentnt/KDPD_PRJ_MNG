@@ -46,6 +46,7 @@ export function log(message: string, source = "express") {
 async function main() {
   const app = express();
   const httpServer = createServer(app);
+  app.disable("x-powered-by");
 
   const { securityHeaders, csrfOriginCheck } = await import("./middleware");
   const { initSession } = await import("./auth");

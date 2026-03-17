@@ -125,12 +125,14 @@ export function requireRoleOrGroup(options: {
 
 /** Thiết lập header bảo mật cơ bản cho mọi response. */
 export function securityHeaders(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): void {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-DNS-Prefetch-Control", "off");
+  res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader(
     "Permissions-Policy",
@@ -138,6 +140,17 @@ export function securityHeaders(
   );
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
   res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  const xfProto = String(req.headers["x-forwarded-proto"] || "")
+    .split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  const isHttps = req.secure || xfProto === "https";
+  if (isHttps) {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+  }
   if (process.env.CSP_ENABLED === "true") {
     const csp = [
       "default-src 'self'",
@@ -145,9 +158,9 @@ export function securityHeaders(
       "object-src 'none'",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' ws:",
+      "connect-src 'self' ws: wss: https:",
       "frame-ancestors 'none'",
     ].join("; ");
     res.setHeader("Content-Security-Policy", csp);
@@ -156,18 +169,28 @@ export function securityHeaders(
 }
 
 /** Rate limit đơn giản theo IP cho một cửa sổ thời gian. */
-export function rateLimit(options: { windowMs: number; max: number }) {
+export function rateLimit(options: {
+  windowMs: number;
+  max: number;
+  keyPrefix?: string;
+}) {
   const hits = new Map<string, { count: number; resetAt: number }>();
-  const { windowMs, max } = options;
+  const { windowMs, max, keyPrefix } = options;
   return (req: Request, res: Response, next: NextFunction) => {
-    const ip =
-      (req.headers["x-forwarded-for"] as string) ||
-      req.socket.remoteAddress ||
-      "unknown";
+    const xff = String(req.headers["x-forwarded-for"] || "");
+    const ip = (xff ? xff.split(",")[0] : req.socket.remoteAddress || "")
+      .trim()
+      .toLowerCase() || "unknown";
+    const key = (keyPrefix ? `${keyPrefix}:` : "") + ip;
     const now = Date.now();
-    const entry = hits.get(ip);
+    const entry = hits.get(key);
     if (!entry || now > entry.resetAt) {
-      hits.set(ip, { count: 1, resetAt: now + windowMs });
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      if (hits.size > 5000) {
+        for (const [k, v] of hits) {
+          if (now > v.resetAt) hits.delete(k);
+        }
+      }
       return next();
     }
     entry.count += 1;

@@ -153,7 +153,21 @@ export async function registerRoutes(
   };
 
   // ---------- Auth (public login; me/logout require auth) ----------
-  const loginRateLimit = rateLimit({ windowMs: 60_000, max: 10 });
+  const loginRateLimit = rateLimit({
+    windowMs: 60_000,
+    max: 10,
+    keyPrefix: "auth:login",
+  });
+  const verifyPasswordRateLimit = rateLimit({
+    windowMs: 60_000,
+    max: 10,
+    keyPrefix: "auth:verifyPassword",
+  });
+  const changePasswordRateLimit = rateLimit({
+    windowMs: 60_000,
+    max: 5,
+    keyPrefix: "auth:changePassword",
+  });
   app.post(api.auth.login.path, loginRateLimit, (req, res, next) => {
     const input = api.auth.login.input.safeParse(req.body);
     if (!input.success) {
@@ -213,69 +227,79 @@ export async function registerRoutes(
     res.json(sanitizeUser(req.user as User));
   });
 
-  app.post(api.auth.verifyPassword.path, requireAuth, async (req, res) => {
-    try {
-      const body = api.auth.verifyPassword.input.parse(req.body);
-      const userId = (req.user as User).id;
-      const u = await dbStorage.getUserById(userId);
-      if (!u) return res.status(404).json({ message: "User not found" });
-      const ok = await bcrypt.compare(
-        body.currentPassword,
-        u.passwordHash || "",
-      );
-      if (!ok)
+  app.post(
+    api.auth.verifyPassword.path,
+    requireAuth,
+    verifyPasswordRateLimit,
+    async (req, res) => {
+      try {
+        const body = api.auth.verifyPassword.input.parse(req.body);
+        const userId = (req.user as User).id;
+        const u = await dbStorage.getUserById(userId);
+        if (!u) return res.status(404).json({ message: "User not found" });
+        const ok = await bcrypt.compare(
+          body.currentPassword,
+          u.passwordHash || "",
+        );
+        if (!ok)
+          return res
+            .status(400)
+            .json({ message: "Mật khẩu hiện tại không đúng" });
+        return res.json({ valid: true });
+      } catch (err) {
+        if (err instanceof z.ZodError) {
+          return res.status(400).json({ message: err.errors[0].message });
+        }
+        if (
+          err instanceof Error &&
+          err.message.includes("Database not configured")
+        ) {
+          return res.status(503).json({ message: err.message });
+        }
         return res
-          .status(400)
-          .json({ message: "Mật khẩu hiện tại không đúng" });
-      return res.json({ valid: true });
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+          .status(500)
+          .json({ message: err instanceof Error ? err.message : "Failed" });
       }
-      if (
-        err instanceof Error &&
-        err.message.includes("Database not configured")
-      ) {
-        return res.status(503).json({ message: err.message });
-      }
-      return res
-        .status(500)
-        .json({ message: err instanceof Error ? err.message : "Failed" });
-    }
-  });
+    },
+  );
 
-  app.post(api.auth.changePassword.path, requireAuth, async (req, res) => {
-    try {
-      const body = api.auth.changePassword.input.parse(req.body);
-      const userId = (req.user as User).id;
-      const u = await dbStorage.getUserById(userId);
-      if (!u) return res.status(404).json({ message: "User not found" });
-      const ok = await bcrypt.compare(
-        body.currentPassword,
-        u.passwordHash || "",
-      );
-      if (!ok)
+  app.post(
+    api.auth.changePassword.path,
+    requireAuth,
+    changePasswordRateLimit,
+    async (req, res) => {
+      try {
+        const body = api.auth.changePassword.input.parse(req.body);
+        const userId = (req.user as User).id;
+        const u = await dbStorage.getUserById(userId);
+        if (!u) return res.status(404).json({ message: "User not found" });
+        const ok = await bcrypt.compare(
+          body.currentPassword,
+          u.passwordHash || "",
+        );
+        if (!ok)
+          return res
+            .status(400)
+            .json({ message: "Mật khẩu hiện tại không đúng" });
+        const hash = await bcrypt.hash(body.newPassword, 10);
+        await dbStorage.updateUser(userId, { passwordHash: hash });
+        return res.json({ message: "Đổi mật khẩu thành công" });
+      } catch (err) {
+        if (err instanceof z.ZodError) {
+          return res.status(400).json({ message: err.errors[0].message });
+        }
+        if (
+          err instanceof Error &&
+          err.message.includes("Database not configured")
+        ) {
+          return res.status(503).json({ message: err.message });
+        }
         return res
-          .status(400)
-          .json({ message: "Mật khẩu hiện tại không đúng" });
-      const hash = await bcrypt.hash(body.newPassword, 10);
-      await dbStorage.updateUser(userId, { passwordHash: hash });
-      return res.json({ message: "Đổi mật khẩu thành công" });
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+          .status(500)
+          .json({ message: err instanceof Error ? err.message : "Failed" });
       }
-      if (
-        err instanceof Error &&
-        err.message.includes("Database not configured")
-      ) {
-        return res.status(503).json({ message: err.message });
-      }
-      return res
-        .status(500)
-        .json({ message: err instanceof Error ? err.message : "Failed" });
-    }
-  });
+    },
+  );
 
   // ---------- Dev only: gán lại hash đúng cho mật khẩu 123456 (seed users) ----------
   if (process.env.NODE_ENV === "development" && pool) {
@@ -2437,6 +2461,36 @@ export async function registerRoutes(
     storage: multer.memoryStorage(),
     limits: { fileSize: 2 * 1024 * 1024 },
   });
+  const avatarUploadRateLimit = rateLimit({
+    windowMs: 60_000,
+    max: 10,
+    keyPrefix: "users:uploadAvatar",
+  });
+
+  const isValidImageUpload = (buffer: Buffer, ext: string): boolean => {
+    if (!buffer || buffer.length < 12) return false;
+    if (ext === ".jpg") {
+      return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    }
+    if (ext === ".png") {
+      return (
+        buffer[0] === 0x89 &&
+        buffer[1] === 0x50 &&
+        buffer[2] === 0x4e &&
+        buffer[3] === 0x47 &&
+        buffer[4] === 0x0d &&
+        buffer[5] === 0x0a &&
+        buffer[6] === 0x1a &&
+        buffer[7] === 0x0a
+      );
+    }
+    if (ext === ".webp") {
+      const riff = buffer.toString("ascii", 0, 4) === "RIFF";
+      const webp = buffer.toString("ascii", 8, 12) === "WEBP";
+      return riff && webp;
+    }
+    return false;
+  };
 
   app.get(api.users.list.path, requireAuth, async (_req, res) => {
     try {
@@ -2520,6 +2574,7 @@ export async function registerRoutes(
   app.post(
     api.users.uploadAvatar.path,
     requireAuth,
+    avatarUploadRateLimit,
     (req, res, next) => {
       avatarUpload.single("file")(req, res, (err) => {
         if (err) {
@@ -2553,6 +2608,11 @@ export async function registerRoutes(
         if (!ext) {
           return res.status(400).json({
             message: "Chỉ hỗ trợ ảnh JPG/PNG/WEBP",
+          });
+        }
+        if (!isValidImageUpload(file.buffer, ext)) {
+          return res.status(400).json({
+            message: "File ảnh không hợp lệ",
           });
         }
 
