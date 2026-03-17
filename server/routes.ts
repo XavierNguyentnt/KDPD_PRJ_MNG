@@ -2596,7 +2596,7 @@ export async function registerRoutes(
         requireDb();
         const input = api.users.create.input.parse(req.body);
         const user = await dbStorage.createUser(input);
-        res.json(user);
+        res.json(sanitizeUser(user));
       } catch (err) {
         if (err instanceof z.ZodError) {
           return res.status(400).json({

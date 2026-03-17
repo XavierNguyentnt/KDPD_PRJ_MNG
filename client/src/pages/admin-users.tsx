@@ -43,7 +43,21 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { KeyRound, Loader2, Pencil, Check, ChevronsUpDown, Users, UserCheck, UserX, ShieldCheck, Edit3, ClipboardList, UserPlus, Search } from "lucide-react";
+import {
+  KeyRound,
+  Loader2,
+  Pencil,
+  Check,
+  ChevronsUpDown,
+  Users,
+  UserCheck,
+  UserX,
+  ShieldCheck,
+  Edit3,
+  ClipboardList,
+  UserPlus,
+  Search,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@shared/routes";
 
@@ -140,6 +154,29 @@ async function updateUser(
   return res.json();
 }
 
+type CreateUserPayload = {
+  email: string;
+  displayName: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  department?: string | null;
+  isActive?: boolean;
+};
+
+async function createUser(data: CreateUserPayload): Promise<ApiUser> {
+  const res = await fetch(api.users.create.path, {
+    method: api.users.create.method,
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err.message as string) || "Tạo người dùng thất bại");
+  }
+  return res.json();
+}
+
 export default function AdminUsersPage() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
@@ -149,11 +186,16 @@ export default function AdminUsersPage() {
     user: ApiUser;
   } | null>(null);
   const [editDialog, setEditDialog] = useState<{ user: ApiUser } | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [roleComboboxOpen, setRoleComboboxOpen] = useState(false);
   const [groupComboboxOpen, setGroupComboboxOpen] = useState(false);
   const [componentComboboxOpen, setComponentComboboxOpen] = useState(false);
+  const [createRoleComboboxOpen, setCreateRoleComboboxOpen] = useState(false);
+  const [createGroupComboboxOpen, setCreateGroupComboboxOpen] = useState(false);
+  const [createComponentComboboxOpen, setCreateComponentComboboxOpen] =
+    useState(false);
   const [editForm, setEditForm] = useState<
     Pick<ApiUser, "displayName" | "firstName" | "lastName" | "department"> & {
       isActive: boolean;
@@ -163,6 +205,27 @@ export default function AdminUsersPage() {
       componentIds: string[];
     }
   >({
+    displayName: "",
+    firstName: "",
+    lastName: "",
+    department: "",
+    isActive: true,
+    roleIds: [],
+    groupIds: [],
+    componentIds: [],
+  });
+  const [createForm, setCreateForm] = useState<
+    Pick<
+      ApiUser,
+      "email" | "displayName" | "firstName" | "lastName" | "department"
+    > & {
+      isActive: boolean;
+      roleIds: string[];
+      groupIds: string[];
+      componentIds: string[];
+    }
+  >({
+    email: "",
     displayName: "",
     firstName: "",
     lastName: "",
@@ -203,7 +266,9 @@ export default function AdminUsersPage() {
   const { data: componentsList = [] } = useQuery<ComponentItem[]>({
     queryKey: [api.components.list.path],
     queryFn: async () => {
-      const res = await fetch(api.components.list.path, { credentials: "include" });
+      const res = await fetch(api.components.list.path, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Không tải được danh sách hợp phần");
       return res.json();
     },
@@ -253,6 +318,51 @@ export default function AdminUsersPage() {
     },
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: async (input: {
+      user: CreateUserPayload;
+      roleIds: string[];
+      groupIds: string[];
+      roleAssignments?: { roleId: string; componentId: string | null }[];
+    }) => {
+      const created = await createUser(input.user);
+      if (input.roleAssignments) {
+        await updateUser(created.id, {
+          roleAssignments: input.roleAssignments,
+          groupIds: input.groupIds,
+        });
+      } else if (input.roleIds.length || input.groupIds.length) {
+        await updateUser(created.id, {
+          roleIds: input.roleIds,
+          groupIds: input.groupIds,
+        });
+      }
+      return created;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      setCreateDialogOpen(false);
+      setCreateForm({
+        email: "",
+        displayName: "",
+        firstName: "",
+        lastName: "",
+        department: "",
+        isActive: true,
+        roleIds: [],
+        groupIds: [],
+        componentIds: [],
+      });
+      toast({
+        title: "Đã thêm người dùng",
+        description: "Người dùng mới đã được tạo trong DB.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ variant: "destructive", title: "Lỗi", description: err.message });
+    },
+  });
+
   const handleSubmitPassword = () => {
     if (!passwordDialog) return;
     if (newPassword.length < 6) {
@@ -274,13 +384,19 @@ export default function AdminUsersPage() {
     passwordMutation.mutate({ userId: passwordDialog.user.id, newPassword });
   };
 
-  const roleThuKyHopPhan = rolesList.find((r) => r.name === "Thư ký hợp phần" || r.code === "prj_secretary");
-  const groupHopPhanDichThuat = groupsList.find((g) => g.name === "Hợp phần dịch thuật" || g.code === "hop_phan_dich_thuat");
+  const roleThuKyHopPhan = rolesList.find(
+    (r) => r.name === "Thư ký hợp phần" || r.code === "prj_secretary",
+  );
+  const groupHopPhanDichThuat = groupsList.find(
+    (g) => g.name === "Hợp phần dịch thuật" || g.code === "hop_phan_dich_thuat",
+  );
 
   const openEditDialog = (user: ApiUser) => {
     setEditDialog({ user });
     const roleIds = user.roles?.map((r) => r.id) ?? [];
-    const thuKyRole = rolesList.find((r) => r.name === "Thư ký hợp phần" || r.code === "prj_secretary");
+    const thuKyRole = rolesList.find(
+      (r) => r.name === "Thư ký hợp phần" || r.code === "prj_secretary",
+    );
     const componentIdsFromRole =
       thuKyRole && user.roleAssignments
         ? user.roleAssignments
@@ -302,7 +418,16 @@ export default function AdminUsersPage() {
   const showComponentField =
     !!roleThuKyHopPhan &&
     (editForm.roleIds.includes(roleThuKyHopPhan.id) ||
-      (editDialog?.user.groups?.some((g) => g.id === groupHopPhanDichThuat?.id) ?? false));
+      (editDialog?.user.groups?.some(
+        (g) => g.id === groupHopPhanDichThuat?.id,
+      ) ??
+        false));
+
+  const showCreateComponentField =
+    !!roleThuKyHopPhan &&
+    (createForm.roleIds.includes(roleThuKyHopPhan.id) ||
+      (!!groupHopPhanDichThuat &&
+        createForm.groupIds.includes(groupHopPhanDichThuat.id)));
 
   const handleSubmitEdit = () => {
     if (!editDialog) return;
@@ -318,7 +443,10 @@ export default function AdminUsersPage() {
       roleThuKyHopPhan && showComponentField
         ? editForm.roleIds.flatMap((roleId) => {
             if (roleId === roleThuKyHopPhan.id) {
-              return (editForm.componentIds || []).map((componentId) => ({ roleId, componentId }));
+              return (editForm.componentIds || []).map((componentId) => ({
+                roleId,
+                componentId,
+              }));
             }
             return [{ roleId, componentId: null as string | null }];
           })
@@ -331,9 +459,59 @@ export default function AdminUsersPage() {
         lastName: editForm.lastName?.trim() || null,
         department: editForm.department?.trim() || null,
         isActive: editForm.isActive,
-        ...(roleAssignments !== undefined ? { roleAssignments } : { roleIds: editForm.roleIds }),
+        ...(roleAssignments !== undefined
+          ? { roleAssignments }
+          : { roleIds: editForm.roleIds }),
         groupIds: editForm.groupIds,
       },
+    });
+  };
+
+  const handleSubmitCreate = () => {
+    const email = createForm.email.trim().toLowerCase();
+    const displayName = createForm.displayName.trim();
+    if (!email) {
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: "Email không được để trống.",
+      });
+      return;
+    }
+    if (!displayName) {
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: "Họ tên không được để trống.",
+      });
+      return;
+    }
+
+    const roleAssignments =
+      roleThuKyHopPhan && showCreateComponentField
+        ? createForm.roleIds.flatMap((roleId) => {
+            if (roleId === roleThuKyHopPhan.id) {
+              return (createForm.componentIds || []).map((componentId) => ({
+                roleId,
+                componentId,
+              }));
+            }
+            return [{ roleId, componentId: null as string | null }];
+          })
+        : undefined;
+
+    createUserMutation.mutate({
+      user: {
+        email,
+        displayName,
+        firstName: createForm.firstName?.trim() || null,
+        lastName: createForm.lastName?.trim() || null,
+        department: createForm.department?.trim() || null,
+        isActive: createForm.isActive,
+      },
+      roleIds: createForm.roleIds,
+      groupIds: createForm.groupIds,
+      ...(roleAssignments !== undefined ? { roleAssignments } : {}),
     });
   };
 
@@ -363,15 +541,27 @@ export default function AdminUsersPage() {
           r.code?.toLowerCase() === "manager" ||
           r.name === "Manager" ||
           r.name === "Quản lý" ||
-          (r.name && (r.name.includes("Trưởng ban") || r.name.includes("Phó trưởng ban"))) ||
-          (r.code && (r.code.replace(/\t/g, "").trim() === "tbtk" || r.code.replace(/\t/g, "").trim() === "ptbtk")),
+          (r.name &&
+            (r.name.includes("Trưởng ban") ||
+              r.name.includes("Phó trưởng ban"))) ||
+          (r.code &&
+            (r.code.replace(/\t/g, "").trim() === "tbtk" ||
+              r.code.replace(/\t/g, "").trim() === "ptbtk")),
       );
     const isThuKyUser = (u: ApiUser) =>
-      (u.roles ?? []).some((r) => r.code === "prj_secretary" || r.name === "Thư ký hợp phần") ||
-      (u.groups ?? []).some((g) => g.code === "thu_ky_hop_phan" || g.name === "Thư ký hợp phần");
+      (u.roles ?? []).some(
+        (r) => r.code === "prj_secretary" || r.name === "Thư ký hợp phần",
+      ) ||
+      (u.groups ?? []).some(
+        (g) => g.code === "thu_ky_hop_phan" || g.name === "Thư ký hợp phần",
+      );
     const isEditorUser = (u: ApiUser) =>
-      (u.roles ?? []).some((r) => r.code === "editor" || r.name === "Biên tập viên") ||
-      (u.groups ?? []).some((g) => g.code === "bien_tap" || g.name === "Biên tập");
+      (u.roles ?? []).some(
+        (r) => r.code === "editor" || r.name === "Biên tập viên",
+      ) ||
+      (u.groups ?? []).some(
+        (g) => g.code === "bien_tap" || g.name === "Biên tập",
+      );
     const isPartnerUser = (u: ApiUser) =>
       (u.roles ?? []).some((r) => r.code === "partner" || r.name === "Đối tác");
     const managers = users.filter(isManagerUser).length;
@@ -381,7 +571,15 @@ export default function AdminUsersPage() {
     return { total, active, inactive, managers, thuKy, bienTap, congTacVien };
   })();
 
-  const [badgeFilter, setBadgeFilter] = useState<"all" | "active" | "inactive" | "manager" | "secretary" | "editor" | "partner">("all");
+  const [badgeFilter, setBadgeFilter] = useState<
+    | "all"
+    | "active"
+    | "inactive"
+    | "manager"
+    | "secretary"
+    | "editor"
+    | "partner"
+  >("all");
   const [search, setSearch] = useState("");
 
   const filteredUsers = users
@@ -408,17 +606,34 @@ export default function AdminUsersPage() {
               r.code?.toLowerCase() === "manager" ||
               r.name === "Manager" ||
               r.name === "Quản lý" ||
-              (r.name && (r.name.includes("Trưởng ban") || r.name.includes("Phó trưởng ban"))) ||
-              (r.code && (r.code.replace(/\t/g, "").trim() === "tbtk" || r.code.replace(/\t/g, "").trim() === "ptbtk")),
+              (r.name &&
+                (r.name.includes("Trưởng ban") ||
+                  r.name.includes("Phó trưởng ban"))) ||
+              (r.code &&
+                (r.code.replace(/\t/g, "").trim() === "tbtk" ||
+                  r.code.replace(/\t/g, "").trim() === "ptbtk")),
           );
         case "secretary":
-          return roles.some((r) => r.code === "prj_secretary" || r.name === "Thư ký hợp phần") ||
-            groups.some((g) => g.code === "thu_ky_hop_phan" || g.name === "Thư ký hợp phần");
+          return (
+            roles.some(
+              (r) => r.code === "prj_secretary" || r.name === "Thư ký hợp phần",
+            ) ||
+            groups.some(
+              (g) =>
+                g.code === "thu_ky_hop_phan" || g.name === "Thư ký hợp phần",
+            )
+          );
         case "editor":
-          return roles.some((r) => r.code === "editor" || r.name === "Biên tập viên") ||
-            groups.some((g) => g.code === "bien_tap" || g.name === "Biên tập");
+          return (
+            roles.some(
+              (r) => r.code === "editor" || r.name === "Biên tập viên",
+            ) ||
+            groups.some((g) => g.code === "bien_tap" || g.name === "Biên tập")
+          );
         case "partner":
-          return roles.some((r) => r.code === "partner" || r.name === "Đối tác");
+          return roles.some(
+            (r) => r.code === "partner" || r.name === "Đối tác",
+          );
         default:
           return true;
       }
@@ -428,100 +643,163 @@ export default function AdminUsersPage() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
-          <Card className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "all" ? "ring-2 ring-primary/30" : ""}`} onClick={() => setBadgeFilter("all")}>
+          <Card
+            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "all" ? "ring-2 ring-primary/30" : ""}`}
+            onClick={() => setBadgeFilter("all")}>
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200/60">
                 <Users className="h-6 w-6 text-slate-700" />
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">Tổng người dùng</p>
-                <h3 className="text-2xl font-bold tabular-nums">{stats.total}</h3>
+                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                  Tổng người dùng
+                </p>
+                <h3 className="text-2xl font-bold tabular-nums">
+                  {stats.total}
+                </h3>
               </div>
             </CardContent>
           </Card>
-          <Card className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "active" ? "ring-2 ring-primary/30" : ""}`} onClick={() => setBadgeFilter("active")}>
+          <Card
+            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "active" ? "ring-2 ring-primary/30" : ""}`}
+            onClick={() => setBadgeFilter("active")}>
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-200/60">
                 <UserCheck className="h-6 w-6 text-emerald-700" />
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">Đang hoạt động</p>
-                <h3 className="text-2xl font-bold tabular-nums">{stats.active}</h3>
+                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                  Đang hoạt động
+                </p>
+                <h3 className="text-2xl font-bold tabular-nums">
+                  {stats.active}
+                </h3>
               </div>
             </CardContent>
           </Card>
-          <Card className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "inactive" ? "ring-2 ring-primary/30" : ""}`} onClick={() => setBadgeFilter("inactive")}>
+          <Card
+            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "inactive" ? "ring-2 ring-primary/30" : ""}`}
+            onClick={() => setBadgeFilter("inactive")}>
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-200/60">
                 <UserX className="h-6 w-6 text-rose-700" />
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">Không hoạt động</p>
-                <h3 className="text-2xl font-bold tabular-nums">{stats.inactive}</h3>
+                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                  Không hoạt động
+                </p>
+                <h3 className="text-2xl font-bold tabular-nums">
+                  {stats.inactive}
+                </h3>
               </div>
             </CardContent>
           </Card>
-          <Card className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "manager" ? "ring-2 ring-primary/30" : ""}`} onClick={() => setBadgeFilter("manager")}>
+          <Card
+            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "manager" ? "ring-2 ring-primary/30" : ""}`}
+            onClick={() => setBadgeFilter("manager")}>
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-200/60">
                 <ShieldCheck className="h-6 w-6 text-indigo-700" />
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">Quản lý</p>
-                <h3 className="text-2xl font-bold tabular-nums">{stats.managers}</h3>
+                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                  Quản lý
+                </p>
+                <h3 className="text-2xl font-bold tabular-nums">
+                  {stats.managers}
+                </h3>
               </div>
             </CardContent>
           </Card>
-          <Card className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "secretary" ? "ring-2 ring-primary/30" : ""}`} onClick={() => setBadgeFilter("secretary")}>
+          <Card
+            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "secretary" ? "ring-2 ring-primary/30" : ""}`}
+            onClick={() => setBadgeFilter("secretary")}>
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-200/60">
                 <ClipboardList className="h-6 w-6 text-amber-700" />
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">Thư ký hợp phần</p>
-                <h3 className="text-2xl font-bold tabular-nums">{stats.thuKy}</h3>
+                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                  Thư ký hợp phần
+                </p>
+                <h3 className="text-2xl font-bold tabular-nums">
+                  {stats.thuKy}
+                </h3>
               </div>
             </CardContent>
           </Card>
-          <Card className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "editor" ? "ring-2 ring-primary/30" : ""}`} onClick={() => setBadgeFilter("editor")}>
+          <Card
+            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "editor" ? "ring-2 ring-primary/30" : ""}`}
+            onClick={() => setBadgeFilter("editor")}>
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-200/60">
                 <Edit3 className="h-6 w-6 text-blue-700" />
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">Biên tập viên</p>
-                <h3 className="text-2xl font-bold tabular-nums">{stats.bienTap}</h3>
+                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                  Biên tập viên
+                </p>
+                <h3 className="text-2xl font-bold tabular-nums">
+                  {stats.bienTap}
+                </h3>
               </div>
             </CardContent>
           </Card>
-          <Card className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "partner" ? "ring-2 ring-primary/30" : ""}`} onClick={() => setBadgeFilter("partner")}>
+          <Card
+            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "partner" ? "ring-2 ring-primary/30" : ""}`}
+            onClick={() => setBadgeFilter("partner")}>
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-200/60">
                 <UserPlus className="h-6 w-6 text-teal-700" />
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">Cộng tác viên</p>
-                <h3 className="text-2xl font-bold tabular-nums">{stats.congTacVien}</h3>
+                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                  Cộng tác viên
+                </p>
+                <h3 className="text-2xl font-bold tabular-nums">
+                  {stats.congTacVien}
+                </h3>
               </div>
             </CardContent>
           </Card>
         </div>
-        <div className="relative max-w-md">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên hoặc email..."
-            className="pl-8 h-9 bg-background"
-          />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative max-w-md w-full">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm theo tên hoặc email..."
+              className="pl-8 h-9 bg-background"
+            />
+          </div>
+          <Button
+            className="gap-2"
+            onClick={() => {
+              setCreateDialogOpen(true);
+              setCreateForm({
+                email: "",
+                displayName: "",
+                firstName: "",
+                lastName: "",
+                department: "",
+                isActive: true,
+                roleIds: [],
+                groupIds: [],
+                componentIds: [],
+              });
+            }}>
+            <UserPlus className="h-4 w-4" />
+            Thêm người dùng
+          </Button>
         </div>
       </div>
       <Card>
         <CardHeader>
           <CardTitle>Quản lý người dùng</CardTitle>
           <CardDescription>
-            Xem danh sách người dùng và đổi mật khẩu. Chỉ Admin/Manager mới thấy
-            trang này.
+            Xem danh sách người dùng, thêm mới và đổi mật khẩu. Chỉ
+            Admin/Manager mới thấy trang này.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -541,8 +819,7 @@ export default function AdminUsersPage() {
                   {filteredUsers.map((u) => (
                     <div
                       key={u.id}
-                      className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
-                    >
+                      className="rounded-xl border border-border/50 bg-card p-4 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="font-semibold text-sm truncate">
@@ -559,8 +836,7 @@ export default function AdminUsersPage() {
                             u.isActive
                               ? "bg-emerald-100 text-emerald-700"
                               : "text-muted-foreground",
-                          )}
-                        >
+                          )}>
                           {u.isActive ? "Hoạt động" : "Tắt"}
                         </Badge>
                       </div>
@@ -597,8 +873,7 @@ export default function AdminUsersPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => openEditDialog(u)}
-                          className="w-full gap-1.5"
-                        >
+                          className="w-full gap-1.5">
                           <Pencil className="w-3.5 h-3.5" />
                           Sửa
                         </Button>
@@ -610,8 +885,7 @@ export default function AdminUsersPage() {
                             setNewPassword("");
                             setConfirmPassword("");
                           }}
-                          className="w-full gap-1.5"
-                        >
+                          className="w-full gap-1.5">
                           <KeyRound className="w-3.5 h-3.5" />
                           Đổi mật khẩu
                         </Button>
@@ -644,14 +918,15 @@ export default function AdminUsersPage() {
                         <TableCell>
                           {u.groups?.map((g) => g.name).join(", ") || "—"}
                         </TableCell>
-                        <TableCell>{u.isActive ? "Hoạt động" : "Tắt"}</TableCell>
+                        <TableCell>
+                          {u.isActive ? "Hoạt động" : "Tắt"}
+                        </TableCell>
                         <TableCell className="text-right space-x-2">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => openEditDialog(u)}
-                            className="gap-1"
-                          >
+                            className="gap-1">
                             <Pencil className="w-3.5 h-3.5" />
                             Sửa
                           </Button>
@@ -663,8 +938,7 @@ export default function AdminUsersPage() {
                               setNewPassword("");
                               setConfirmPassword("");
                             }}
-                            className="gap-1"
-                          >
+                            className="gap-1">
                             <KeyRound className="w-3.5 h-3.5" />
                             Đổi mật khẩu
                           </Button>
@@ -678,6 +952,306 @@ export default function AdminUsersPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Thêm người dùng</DialogTitle>
+            <DialogDescription>
+              Tạo nhân sự mới trong bảng users (DB).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="create-email">Email *</Label>
+              <Input
+                id="create-email"
+                value={createForm.email ?? ""}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, email: e.target.value }))
+                }
+                placeholder="ten@donvi.vn"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="create-displayName">Họ tên (hiển thị) *</Label>
+              <Input
+                id="create-displayName"
+                value={createForm.displayName ?? ""}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, displayName: e.target.value }))
+                }
+                placeholder="Ví dụ: Nguyễn Văn A"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-2">
+                <Label htmlFor="create-firstName">Tên</Label>
+                <Input
+                  id="create-firstName"
+                  value={createForm.firstName ?? ""}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, firstName: e.target.value }))
+                  }
+                  placeholder="Văn A"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="create-lastName">Họ</Label>
+                <Input
+                  id="create-lastName"
+                  value={createForm.lastName ?? ""}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, lastName: e.target.value }))
+                  }
+                  placeholder="Nguyễn"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="create-department">Phòng ban</Label>
+              <Input
+                id="create-department"
+                value={createForm.department ?? ""}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, department: e.target.value }))
+                }
+                placeholder="Ban Thư ký"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Vai trò (nhiều)</Label>
+              <Popover
+                open={createRoleComboboxOpen}
+                onOpenChange={setCreateRoleComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={createRoleComboboxOpen}
+                    className="w-full justify-between font-normal min-h-9 h-auto py-2 text-left">
+                    <span className="flex-1 min-w-0 break-words whitespace-normal mr-2">
+                      {createForm.roleIds.length
+                        ? createForm.roleIds
+                            .map(
+                              (id) => rolesList.find((r) => r.id === id)?.name,
+                            )
+                            .filter(Boolean)
+                            .join(", ")
+                        : "Chọn vai trò..."}
+                    </span>
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 flex-shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                  align="start">
+                  <Command>
+                    <CommandInput placeholder="Tìm vai trò..." />
+                    <CommandList>
+                      <CommandEmpty>Không tìm thấy vai trò.</CommandEmpty>
+                      <CommandGroup>
+                        {rolesList.map((r) => {
+                          const selected = createForm.roleIds.includes(r.id);
+                          return (
+                            <CommandItem
+                              key={r.id}
+                              value={r.name}
+                              onSelect={() => {
+                                setCreateForm((f) => ({
+                                  ...f,
+                                  roleIds: selected
+                                    ? f.roleIds.filter((id) => id !== r.id)
+                                    : [...f.roleIds, r.id],
+                                }));
+                              }}>
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selected ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              {r.name}
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid gap-2">
+              <Label>Nhóm nhân sự (nhiều)</Label>
+              <Popover
+                open={createGroupComboboxOpen}
+                onOpenChange={setCreateGroupComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={createGroupComboboxOpen}
+                    className="w-full justify-between font-normal min-h-9 h-auto py-2 text-left">
+                    <span className="flex-1 min-w-0 break-words whitespace-normal mr-2">
+                      {createForm.groupIds.length
+                        ? createForm.groupIds
+                            .map(
+                              (id) => groupsList.find((g) => g.id === id)?.name,
+                            )
+                            .filter(Boolean)
+                            .join(", ")
+                        : "Chọn nhóm nhân sự..."}
+                    </span>
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 flex-shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                  align="start">
+                  <Command>
+                    <CommandInput placeholder="Tìm nhóm nhân sự..." />
+                    <CommandList>
+                      <CommandEmpty>Không tìm thấy nhóm.</CommandEmpty>
+                      <CommandGroup>
+                        {groupsList.map((g) => {
+                          const selected = createForm.groupIds.includes(g.id);
+                          return (
+                            <CommandItem
+                              key={g.id}
+                              value={g.name}
+                              onSelect={() => {
+                                setCreateForm((f) => ({
+                                  ...f,
+                                  groupIds: selected
+                                    ? f.groupIds.filter((id) => id !== g.id)
+                                    : [...f.groupIds, g.id],
+                                }));
+                              }}>
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selected ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              {g.name}
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            {showCreateComponentField && (
+              <div className="grid gap-2">
+                <Label>
+                  Tên Hợp phần (nhiều — lưu vào user_roles.component_id)
+                </Label>
+                <Popover
+                  open={createComponentComboboxOpen}
+                  onOpenChange={setCreateComponentComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={createComponentComboboxOpen}
+                      className="w-full justify-between font-normal min-h-9 h-auto py-2 text-left">
+                      <span className="flex-1 min-w-0 break-words whitespace-normal mr-2">
+                        {(createForm.componentIds?.length ?? 0) > 0
+                          ? (createForm.componentIds ?? [])
+                              .map(
+                                (id) =>
+                                  componentsList.find((c) => c.id === id)?.name,
+                              )
+                              .filter(Boolean)
+                              .join(", ")
+                          : "Chọn hợp phần..."}
+                      </span>
+                      <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 flex-shrink-0" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start">
+                    <Command>
+                      <CommandInput placeholder="Tìm hợp phần..." />
+                      <CommandList>
+                        <CommandEmpty>Không tìm thấy hợp phần.</CommandEmpty>
+                        <CommandGroup>
+                          {componentsList.map((c) => {
+                            const selected = (
+                              createForm.componentIds ?? []
+                            ).includes(c.id);
+                            return (
+                              <CommandItem
+                                key={c.id}
+                                value={c.name}
+                                onSelect={() => {
+                                  setCreateForm((f) => ({
+                                    ...f,
+                                    componentIds: selected
+                                      ? (f.componentIds ?? []).filter(
+                                          (id) => id !== c.id,
+                                        )
+                                      : [...(f.componentIds ?? []), c.id],
+                                  }));
+                                }}>
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selected ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
+                                {c.name}
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="create-isActive"
+                checked={createForm.isActive}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, isActive: e.target.checked }))
+                }
+                className="rounded border-input"
+              />
+              <Label htmlFor="create-isActive">Tài khoản hoạt động</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              onClick={handleSubmitCreate}
+              disabled={
+                createUserMutation.isPending ||
+                !createForm.email?.trim() ||
+                !createForm.displayName?.trim()
+              }>
+              {createUserMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Đang tạo...
+                </>
+              ) : (
+                "Tạo người dùng"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={!!passwordDialog}
@@ -931,7 +1505,9 @@ export default function AdminUsersPage() {
               </div>
               {showComponentField && (
                 <div className="grid gap-2">
-                  <Label>Tên Hợp phần (nhiều — lưu vào user_roles.component_id)</Label>
+                  <Label>
+                    Tên Hợp phần (nhiều — lưu vào user_roles.component_id)
+                  </Label>
                   <Popover
                     open={componentComboboxOpen}
                     onOpenChange={setComponentComboboxOpen}>
@@ -946,7 +1522,8 @@ export default function AdminUsersPage() {
                             ? (editForm.componentIds ?? [])
                                 .map(
                                   (id) =>
-                                    componentsList.find((c) => c.id === id)?.name,
+                                    componentsList.find((c) => c.id === id)
+                                      ?.name,
                                 )
                                 .filter(Boolean)
                                 .join(", ")
@@ -964,7 +1541,9 @@ export default function AdminUsersPage() {
                           <CommandEmpty>Không tìm thấy hợp phần.</CommandEmpty>
                           <CommandGroup>
                             {componentsList.map((c) => {
-                              const selected = (editForm.componentIds ?? []).includes(c.id);
+                              const selected = (
+                                editForm.componentIds ?? []
+                              ).includes(c.id);
                               return (
                                 <CommandItem
                                   key={c.id}
@@ -973,7 +1552,9 @@ export default function AdminUsersPage() {
                                     setEditForm((f) => ({
                                       ...f,
                                       componentIds: selected
-                                        ? (f.componentIds ?? []).filter((id) => id !== c.id)
+                                        ? (f.componentIds ?? []).filter(
+                                            (id) => id !== c.id,
+                                          )
                                         : [...(f.componentIds ?? []), c.id],
                                     }));
                                   }}>
