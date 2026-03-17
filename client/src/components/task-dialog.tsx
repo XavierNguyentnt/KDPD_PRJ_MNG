@@ -1089,11 +1089,51 @@ export function TaskDialog({
     duplicateMode,
   ]);
 
+  const canEditExistingTask = useMemo(() => {
+    if (isNewTask) return true;
+    const uid = user?.id ?? null;
+    if (!uid) return false;
+    if ((effectiveTask as any)?.createdBy === uid) return true;
+
+    const group = String((effectiveTask as any)?.group ?? "").trim();
+    if (!group) return false;
+
+    const norm = (s: string) =>
+      s
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
+    const gk = norm(group);
+    if (!gk) return false;
+
+    const keys = new Set<string>();
+    for (const g of user?.groups ?? []) {
+      const name = typeof g?.name === "string" ? g.name : "";
+      const code = typeof (g as any)?.code === "string" ? (g as any).code : "";
+      const nk = norm(name);
+      const ck = norm(code);
+      if (nk) keys.add(nk);
+      if (ck) keys.add(ck);
+    }
+    const list = Array.from(keys);
+    if (!list.length) return false;
+
+    if (gk.includes("thietke")) return list.some((k) => k.includes("thietke"));
+    if (gk === "cntt") return list.some((k) => k.includes("cntt"));
+    if (gk.includes("bientap")) return list.some((k) => k.includes("bientap"));
+    if (gk.includes("thukyhopphan"))
+      return list.some((k) => k.includes("thukyhopphan"));
+
+    return list.some((k) => gk.includes(k) || k.includes(gk));
+  }, [isNewTask, user?.id, user?.groups, effectiveTask]);
+
   const canEditMetaRaw =
     role === UserRole.ADMIN ||
     role === UserRole.MANAGER ||
     isNewTask ||
-    mode === "edit";
+    mode === "edit" ||
+    canEditExistingTask;
   const canEditMeta = canEditMetaRaw && (isNewTask || isEditing);
   const isRedoTask =
     !!task?.title && /\(Làm lại lần\s+\d+\)\s*$/i.test(task.title);
@@ -1157,8 +1197,9 @@ export function TaskDialog({
   }
 
   const onSubmit = (data: FormData) => {
-    const dueErrMsgVi = "Hạn không nhỏ hơn ngày nhận.";
-    const dueErrMsgEn = "Due must be on or after received date.";
+    const dueErrMsgVi =
+      "Ngày hoàn thành dự kiến không được nhỏ hơn Ngày nhận công việc";
+    const dueErrMsgEn = "Due date cannot be earlier than received date.";
     const compErrMsgViFuture =
       "Ngày hoàn thành thực tế không được lớn hơn ngày hiện tại.";
     const compErrMsgViBefore =
@@ -2547,8 +2588,8 @@ export function TaskDialog({
                                   ) && (
                                     <p className="text-xs text-destructive">
                                       {language === "vi"
-                                        ? "Hạn không nhỏ hơn ngày nhận."
-                                        : "Due must be on or after received date."}
+                                        ? "Ngày hoàn thành dự kiến không được nhỏ hơn Ngày nhận công việc"
+                                        : "Due date cannot be earlier than received date."}
                                     </p>
                                   )}
                               </div>
@@ -2844,8 +2885,8 @@ export function TaskDialog({
                           ) && (
                             <p className="text-xs text-destructive">
                               {language === "vi"
-                                ? "Hạn không nhỏ hơn ngày nhận."
-                                : "Due must be on or after received date."}
+                                ? "Ngày hoàn thành dự kiến không được nhỏ hơn Ngày nhận công việc"
+                                : "Due date cannot be earlier than received date."}
                             </p>
                           )}
                       </div>
@@ -2964,8 +3005,8 @@ export function TaskDialog({
                             !isDueDateValid(slot.dueDate, slot.receiveDate) && (
                               <p className="text-xs text-destructive">
                                 {language === "vi"
-                                  ? "Hạn không nhỏ hơn ngày nhận."
-                                  : "Due must be on or after received date."}
+                                  ? "Ngày hoàn thành dự kiến không được nhỏ hơn Ngày nhận công việc"
+                                  : "Due date cannot be earlier than received date."}
                               </p>
                             )}
                         </div>
@@ -3144,8 +3185,8 @@ export function TaskDialog({
                         ) && (
                           <p className="text-xs text-destructive">
                             {language === "vi"
-                              ? "Hạn không nhỏ hơn ngày nhận."
-                              : "Due must be on or after received date."}
+                              ? "Ngày hoàn thành dự kiến không được nhỏ hơn Ngày nhận công việc"
+                              : "Due date cannot be earlier than received date."}
                           </p>
                         )}
                     </div>
@@ -3299,8 +3340,8 @@ export function TaskDialog({
                         ) && (
                           <p className="text-xs text-destructive">
                             {language === "vi"
-                              ? "Hạn không nhỏ hơn ngày nhận."
-                              : "Due must be on or after received date."}
+                              ? "Ngày hoàn thành dự kiến không được nhỏ hơn Ngày nhận công việc"
+                              : "Due date cannot be earlier than received date."}
                           </p>
                         )}
                     </div>
@@ -3456,8 +3497,8 @@ export function TaskDialog({
                         ) && (
                           <p className="text-xs text-destructive">
                             {language === "vi"
-                              ? "Hạn không nhỏ hơn ngày nhận."
-                              : "Due must be on or after received date."}
+                              ? "Ngày hoàn thành dự kiến không được nhỏ hơn Ngày nhận công việc"
+                              : "Due date cannot be earlier than received date."}
                           </p>
                         )}
                     </div>
