@@ -360,27 +360,65 @@ export function TaskDialog({
 
   // Get available groups from all tasks
   const availableGroups = useMemo(() => {
-    if (!allTasks)
-      return [
-        "Công việc chung",
-        "Biên tập",
-        "Thiết kế",
-        "CNTT",
-        "Quét trùng lặp",
-        "Thư ký hợp phần",
-      ];
-    const groups = new Set(allTasks.map((t) => t.group).filter(Boolean));
-    return Array.from(groups).length > 0
-      ? Array.from(groups)
-      : [
+    const base = !allTasks
+      ? [
           "Công việc chung",
           "Biên tập",
           "Thiết kế",
           "CNTT",
           "Quét trùng lặp",
           "Thư ký hợp phần",
-        ];
-  }, [allTasks]);
+        ]
+      : (() => {
+          const groups = new Set(allTasks.map((t) => t.group).filter(Boolean));
+          const list = Array.from(groups);
+          return list.length > 0
+            ? list
+            : [
+                "Công việc chung",
+                "Biên tập",
+                "Thiết kế",
+                "CNTT",
+                "Quét trùng lặp",
+                "Thư ký hợp phần",
+              ];
+        })();
+
+    if (!(role === UserRole.EMPLOYEE && isNewTask)) return base;
+
+    const norm = (s: string) =>
+      s
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
+    const userKeys = new Set<string>();
+    for (const g of user?.groups ?? []) {
+      const n = typeof g?.name === "string" ? g.name : "";
+      const c = typeof (g as any)?.code === "string" ? (g as any).code : "";
+      const nk = norm(n);
+      const ck = norm(c);
+      if (nk) userKeys.add(nk);
+      if (ck) userKeys.add(ck);
+    }
+
+    const always = new Set([norm("Công việc chung"), norm("CV chung")]);
+    const filtered = base.filter((g) => {
+      const k = norm(String(g));
+      if (!k) return false;
+      if (always.has(k)) return true;
+      return Array.from(userKeys).some((u) => k.includes(u) || u.includes(k));
+    });
+
+    const ensure = (val?: string) => {
+      const v = (val ?? "").trim();
+      if (!v) return;
+      if (!filtered.includes(v) && base.includes(v)) filtered.push(v);
+    };
+    ensure(defaultGroup);
+
+    return filtered.length > 0 ? filtered : base.filter((g) => always.has(norm(String(g))));
+  }, [allTasks, role, user?.groups, isNewTask, defaultGroup]);
 
   const getMaxBienTapRoundForWork = (
     workId?: string | null,
@@ -1037,7 +1075,11 @@ export function TaskDialog({
     duplicateMode,
   ]);
 
-  const canEditMetaRaw = role === UserRole.ADMIN || role === UserRole.MANAGER;
+  const canEditMetaRaw =
+    role === UserRole.ADMIN ||
+    role === UserRole.MANAGER ||
+    isNewTask ||
+    mode === "edit";
   const canEditMeta = canEditMetaRaw && (isNewTask || isEditing);
   const isRedoTask =
     !!task?.title && /\(Làm lại lần\s+\d+\)\s*$/i.test(task.title);

@@ -442,7 +442,9 @@ export default function CNTTPage() {
             <Badge variant="secondary" className="font-normal">
               {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
             </Badge>
-            {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
+            {(role === UserRole.ADMIN ||
+              role === UserRole.MANAGER ||
+              role === UserRole.EMPLOYEE) && (
               <Button
                 size="sm"
                 onClick={() => setIsCreateDialogOpen(true)}
@@ -493,11 +495,15 @@ export default function CNTTPage() {
               className="toggle-group-box w-full sm:w-auto">
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
                 <List className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">{t.dashboard.viewTable}</span>
+                <span className="hidden sm:inline">
+                  {t.dashboard.viewTable}
+                </span>
               </ToggleGroupItem>
               <ToggleGroupItem value="board" aria-label={t.dashboard.viewBoard}>
                 <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">{t.dashboard.viewBoard}</span>
+                <span className="hidden sm:inline">
+                  {t.dashboard.viewBoard}
+                </span>
               </ToggleGroupItem>
             </ToggleGroup>
             <Button

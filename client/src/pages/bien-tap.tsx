@@ -338,7 +338,9 @@ export default function BienTapPage() {
   const [deleteTaskTarget, setDeleteTaskTarget] =
     useState<TaskWithAssignmentDetails | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [createInitialValues, setCreateInitialValues] = useState<any | null>(null);
+  const [createInitialValues, setCreateInitialValues] = useState<any | null>(
+    null,
+  );
   const [createDuplicateMode, setCreateDuplicateMode] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
@@ -392,6 +394,7 @@ export default function BienTapPage() {
       if (uid) {
         list = list.filter(
           (t) =>
+            (t as any).createdBy === uid ||
             t.assigneeId === uid ||
             (Array.isArray(t.assignments)
               ? t.assignments.some((a: any) => a?.userId === uid)
@@ -559,7 +562,9 @@ export default function BienTapPage() {
                     }
                   />
                 </div>
-                {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
+                {(role === UserRole.ADMIN ||
+                  role === UserRole.MANAGER ||
+                  role === UserRole.EMPLOYEE) && (
                   <Button
                     size="sm"
                     onClick={() => setIsCreateDialogOpen(true)}
@@ -597,13 +602,17 @@ export default function BienTapPage() {
                     value="table"
                     aria-label={t.dashboard.viewTable}>
                     <List className="h-4 w-4 sm:mr-1.5" />
-                    <span className="hidden sm:inline">{t.dashboard.viewTable}</span>
+                    <span className="hidden sm:inline">
+                      {t.dashboard.viewTable}
+                    </span>
                   </ToggleGroupItem>
                   <ToggleGroupItem
                     value="board"
                     aria-label={t.dashboard.viewBoard}>
                     <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
-                    <span className="hidden sm:inline">{t.dashboard.viewBoard}</span>
+                    <span className="hidden sm:inline">
+                      {t.dashboard.viewBoard}
+                    </span>
                   </ToggleGroupItem>
                 </ToggleGroup>
                 <Button
@@ -672,14 +681,27 @@ export default function BienTapPage() {
                         task.workflow && typeof task.workflow === "string"
                           ? JSON.parse(task.workflow as any)
                           : (task as any).workflow;
-                      if (wf && Array.isArray(wf.rounds) && wf.rounds.length > 0) {
+                      if (
+                        wf &&
+                        Array.isArray(wf.rounds) &&
+                        wf.rounds.length > 0
+                      ) {
                         const current =
-                          wf.rounds.find((r: any) => r?.roundNumber === wf.currentRound) ||
-                          wf.rounds[0];
-                        const stages = Array.isArray(current?.stages) ? current.stages : [];
-                        const btv2 = stages.find((s: any) => s?.type === "btv2");
-                        const btv1 = stages.find((s: any) => s?.type === "btv1");
-                        const doc = stages.find((s: any) => s?.type === "doc_duyet");
+                          wf.rounds.find(
+                            (r: any) => r?.roundNumber === wf.currentRound,
+                          ) || wf.rounds[0];
+                        const stages = Array.isArray(current?.stages)
+                          ? current.stages
+                          : [];
+                        const btv2 = stages.find(
+                          (s: any) => s?.type === "btv2",
+                        );
+                        const btv1 = stages.find(
+                          (s: any) => s?.type === "btv1",
+                        );
+                        const doc = stages.find(
+                          (s: any) => s?.type === "doc_duyet",
+                        );
                         if (btv2) {
                           initial.btv2 = btv2.assignee || "";
                           initial.btv2ReceiveDate = "";

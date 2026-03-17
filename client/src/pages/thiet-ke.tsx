@@ -307,7 +307,9 @@ export default function ThietKePage() {
     useState<TaskWithAssignmentDetails | null>(null);
   const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [createInitialValues, setCreateInitialValues] = useState<any | null>(null);
+  const [createInitialValues, setCreateInitialValues] = useState<any | null>(
+    null,
+  );
   const [createDuplicateMode, setCreateDuplicateMode] = useState(false);
   const deleteConfirm = useConfirmDialog<TaskWithAssignmentDetails>();
 
@@ -438,7 +440,9 @@ export default function ThietKePage() {
             <Badge variant="secondary" className="font-normal">
               {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
             </Badge>
-            {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
+            {(role === UserRole.ADMIN ||
+              role === UserRole.MANAGER ||
+              role === UserRole.EMPLOYEE) && (
               <Button
                 size="sm"
                 onClick={() => setIsCreateDialogOpen(true)}
@@ -489,11 +493,15 @@ export default function ThietKePage() {
               className="toggle-group-box w-full sm:w-auto">
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
                 <List className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">{t.dashboard.viewTable}</span>
+                <span className="hidden sm:inline">
+                  {t.dashboard.viewTable}
+                </span>
               </ToggleGroupItem>
               <ToggleGroupItem value="board" aria-label={t.dashboard.viewBoard}>
                 <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">{t.dashboard.viewBoard}</span>
+                <span className="hidden sm:inline">
+                  {t.dashboard.viewBoard}
+                </span>
               </ToggleGroupItem>
             </ToggleGroup>
             <Button
@@ -545,8 +553,12 @@ export default function ThietKePage() {
                   group: "Thiết kế",
                   relatedWorkId: (task as any).relatedWorkId ?? null,
                 };
-                const assignments = Array.isArray((task as any).assignments) ? (task as any).assignments : [];
-                const ktv = assignments.find((a: any) => a?.stageType === "ktv_chinh");
+                const assignments = Array.isArray((task as any).assignments)
+                  ? (task as any).assignments
+                  : [];
+                const ktv = assignments.find(
+                  (a: any) => a?.stageType === "ktv_chinh",
+                );
                 if (ktv) {
                   initial.__thietKeKtvChinh = {
                     displayName: ktv.displayName ?? "",
@@ -556,7 +568,9 @@ export default function ThietKePage() {
                     completeDate: "",
                   };
                 }
-                const troLy = assignments.filter((a: any) => String(a?.stageType || "").startsWith("tro_ly_"));
+                const troLy = assignments.filter((a: any) =>
+                  String(a?.stageType || "").startsWith("tro_ly_"),
+                );
                 if (troLy.length > 0) {
                   initial.__thietKeTroLyList = troLy.map((a: any) => ({
                     displayName: a.displayName ?? "",

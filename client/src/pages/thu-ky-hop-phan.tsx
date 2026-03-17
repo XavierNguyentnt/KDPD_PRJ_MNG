@@ -1027,9 +1027,22 @@ export default function ThuKyHopPhanPage() {
       );
     }
     if (role === UserRole.EMPLOYEE) {
-      list = list.filter((t) =>
-        t.assignee?.includes((user?.displayName ?? "").split(" ")[0]),
-      );
+      const uid = user?.id ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            (t as any).createdBy === uid ||
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false) ||
+            t.assignee?.includes((user?.displayName ?? "").split(" ")[0]),
+        );
+      } else {
+        list = list.filter((t) =>
+          t.assignee?.includes((user?.displayName ?? "").split(" ")[0]),
+        );
+      }
     }
     return list;
   }, [
@@ -1040,6 +1053,7 @@ export default function ThuKyHopPhanPage() {
     pcScoped,
     role,
     user?.displayName,
+    user?.id,
   ]);
 
   const taskYearOptions = useMemo(() => {
@@ -3315,7 +3329,9 @@ export default function ThuKyHopPhanPage() {
                     {t.dashboard.viewBoard}
                   </ToggleGroupItem>
                 </ToggleGroup>
-                {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
+                {(role === UserRole.ADMIN ||
+                  role === UserRole.MANAGER ||
+                  role === UserRole.EMPLOYEE) && (
                   <Button size="sm" onClick={() => setIsCreateTaskOpen(true)}>
                     <Plus className="w-4 h-4 mr-2" />
                     Thêm công việc

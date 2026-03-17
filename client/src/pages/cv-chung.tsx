@@ -310,6 +310,7 @@ export default function CVChungPage() {
       if (uid) {
         list = list.filter(
           (t) =>
+            (t as any).createdBy === uid ||
             t.assigneeId === uid ||
             (Array.isArray(t.assignments)
               ? t.assignments.some((a: any) => a?.userId === uid)
@@ -346,6 +347,7 @@ export default function CVChungPage() {
       if (uid) {
         list = list.filter(
           (t) =>
+            (t as any).createdBy === uid ||
             t.assigneeId === uid ||
             (Array.isArray(t.assignments)
               ? t.assignments.some((a: any) => a?.userId === uid)
@@ -486,10 +488,14 @@ export default function CVChungPage() {
               </span>
               <Switch
                 checked={includeArchivedForList}
-                onCheckedChange={(val) => setIncludeArchivedForList(Boolean(val))}
+                onCheckedChange={(val) =>
+                  setIncludeArchivedForList(Boolean(val))
+                }
               />
             </div>
-            {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
+            {(role === UserRole.ADMIN ||
+              role === UserRole.MANAGER ||
+              role === UserRole.EMPLOYEE) && (
               <Button
                 size="sm"
                 onClick={() => setIsCreateDialogOpen(true)}
@@ -525,11 +531,15 @@ export default function CVChungPage() {
               className="toggle-group-box w-full sm:w-auto">
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
                 <List className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">{t.dashboard.viewTable}</span>
+                <span className="hidden sm:inline">
+                  {t.dashboard.viewTable}
+                </span>
               </ToggleGroupItem>
               <ToggleGroupItem value="board" aria-label={t.dashboard.viewBoard}>
                 <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">{t.dashboard.viewBoard}</span>
+                <span className="hidden sm:inline">
+                  {t.dashboard.viewBoard}
+                </span>
               </ToggleGroupItem>
             </ToggleGroup>
             <Button

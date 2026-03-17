@@ -56,6 +56,7 @@ export function useTaskListControls(params: {
       if (uid) {
         list = list.filter(
           (t) =>
+            (t as any).createdBy === uid ||
             t.assigneeId === uid ||
             (Array.isArray(t.assignments)
               ? t.assignments.some((a: any) => a?.userId === uid)
@@ -96,6 +97,7 @@ export function useTaskListControls(params: {
       if (uid) {
         list = list.filter(
           (t) =>
+            (t as any).createdBy === uid ||
             t.assigneeId === uid ||
             (Array.isArray(t.assignments)
               ? t.assignments.some((a: any) => a?.userId === uid)

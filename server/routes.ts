@@ -1003,6 +1003,48 @@ export async function registerRoutes(
         if (dateError) return res.status(400).json({ message: dateError });
       }
 
+      const reqUser = req.user as UserWithRolesAndGroups;
+      const userRoleNames = Array.isArray(reqUser?.roles)
+        ? reqUser.roles.map((r) => r.name)
+        : [];
+      const isEmployee = userRoleNames.includes(UserRole.EMPLOYEE);
+      if (isEmployee) {
+        const group = (input.group ?? "").trim();
+        const norm = (s: string) =>
+          s
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "");
+        const groupKey = norm(group);
+        const cvChungKeys = new Set([norm("Công việc chung"), norm("CV chung")]);
+        if (!groupKey) {
+          return res.status(400).json({
+            message: "Nhân viên phải chọn nhóm công việc khi tạo công việc mới.",
+          });
+        }
+        if (!cvChungKeys.has(groupKey)) {
+          const userGroupKeys = new Set<string>();
+          for (const g of reqUser?.groups ?? []) {
+            const n = typeof g?.name === "string" ? g.name : "";
+            const c = typeof g?.code === "string" ? g.code : "";
+            const nk = norm(n);
+            const ck = norm(c);
+            if (nk) userGroupKeys.add(nk);
+            if (ck) userGroupKeys.add(ck);
+          }
+          const ok = Array.from(userGroupKeys).some(
+            (k) => groupKey.includes(k) || k.includes(groupKey),
+          );
+          if (!ok) {
+            return res.status(403).json({
+              message:
+                "Bạn không có quyền tạo công việc cho nhóm này. Vui lòng chọn nhóm thuộc quyền của bạn.",
+            });
+          }
+        }
+      }
+
       const now = new Date();
       const body = req.body as Record<string, unknown>;
       const notesValue =

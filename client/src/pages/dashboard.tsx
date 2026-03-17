@@ -138,6 +138,7 @@ export default function Dashboard() {
       if (uid) {
         list = list.filter(
           (t) =>
+            (t as any).createdBy === uid ||
             t.assigneeId === uid ||
             (Array.isArray(t.assignments)
               ? t.assignments.some((a: any) => a?.userId === uid)
@@ -175,6 +176,7 @@ export default function Dashboard() {
       if (uid) {
         filtered = filtered.filter(
           (t) =>
+            (t as any).createdBy === uid ||
             t.assigneeId === uid ||
             (Array.isArray(t.assignments)
               ? t.assignments.some((a: any) => a?.userId === uid)
@@ -601,7 +603,9 @@ export default function Dashboard() {
                 }
               />
             </div>
-            {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
+            {(role === UserRole.ADMIN ||
+              role === UserRole.MANAGER ||
+              role === UserRole.EMPLOYEE) && (
               <Button
                 size="sm"
                 onClick={() => setIsCreateDialogOpen(true)}
