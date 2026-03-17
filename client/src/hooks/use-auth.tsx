@@ -15,7 +15,9 @@ export interface AuthUser {
   firstName?: string | null;
   lastName?: string | null;
   department?: string | null;
+  avatarPath?: string | null;
   isActive: boolean;
+  updatedAt?: string;
   roles?: { id: string; code: string; name: string }[];
   groups?: { id: string; code: string; name: string }[];
   /** Chi tiết (roleId, componentId) từ user_roles — dùng phân quyền Thư ký hợp phần theo hợp phần. */
@@ -29,6 +31,7 @@ interface AuthContextType {
   setRole: (role: UserRoleType) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshMe: () => Promise<void>;
   error: string | null;
   clearError: () => void;
 }
@@ -82,6 +85,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  async function refreshMe() {
+    const res = await fetch("/api/auth/me", { credentials: "include" });
+    if (!res.ok) {
+      setUser(null);
+      return;
+    }
+    const data = await res.json().catch(() => null);
+    setUser(data ?? null);
+  }
+
   async function login(email: string, password: string) {
     setError(null);
     const res = await fetch("/api/auth/login", {
@@ -114,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole,
     login,
     logout,
+    refreshMe,
     error,
     clearError: () => setError(null),
   };

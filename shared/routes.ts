@@ -243,6 +243,23 @@ export const api = {
         200: z.array(z.custom<typeof users.$inferSelect>()),
       },
     },
+    uploadAvatar: {
+      method: "POST" as const,
+      path: "/api/users/me/avatar",
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.validation,
+        401: errorSchemas.notFound,
+      },
+    },
+    avatar: {
+      method: "GET" as const,
+      path: "/api/users/:id/avatar",
+      responses: {
+        200: z.any(),
+        404: errorSchemas.notFound,
+      },
+    },
     get: {
       method: "GET" as const,
       path: "/api/users/:id",

@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import bcrypt from "bcrypt";
+import path from "path";
+import { mkdir, unlink, writeFile } from "fs/promises";
+import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
@@ -2428,6 +2431,13 @@ export async function registerRoutes(
     }
   };
 
+  const uploadsDir = path.resolve(process.cwd(), "uploads");
+  const avatarsDir = path.join(uploadsDir, "avatars");
+  const avatarUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 },
+  });
+
   app.get(api.users.list.path, requireAuth, async (_req, res) => {
     try {
       requireDb();
@@ -2443,6 +2453,44 @@ export async function registerRoutes(
       console.error("Error fetching users:", err);
       res.status(500).json({
         message: err instanceof Error ? err.message : "Failed to fetch users",
+      });
+    }
+  });
+
+  app.get(api.users.avatar.path, requireAuth, async (req, res) => {
+    try {
+      requireDb();
+      const id = Array.isArray(req.params.id)
+        ? req.params.id[0]
+        : req.params.id;
+      const user = await dbStorage.getUserById(id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      if (!user.avatarPath) {
+        return res.status(404).json({ message: "Avatar not found" });
+      }
+      const fileName = path.basename(String(user.avatarPath));
+      const abs = path.join(avatarsDir, fileName);
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      return res.sendFile(abs, (err) => {
+        if (err) {
+          if (String((err as any)?.code || "").toUpperCase() === "ENOENT") {
+            return res.status(404).json({ message: "Avatar not found" });
+          }
+          return res.status(500).json({
+            message:
+              err instanceof Error ? err.message : "Failed to read avatar",
+          });
+        }
+      });
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message.includes("Database not configured")
+      ) {
+        return res.status(503).json({ message: err.message });
+      }
+      return res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed to fetch avatar",
       });
     }
   });
@@ -2468,6 +2516,76 @@ export async function registerRoutes(
       });
     }
   });
+
+  app.post(
+    api.users.uploadAvatar.path,
+    requireAuth,
+    (req, res, next) => {
+      avatarUpload.single("file")(req, res, (err) => {
+        if (err) {
+          return res.status(400).json({
+            message: err instanceof Error ? err.message : "File upload error",
+          });
+        }
+        next();
+      });
+    },
+    async (req, res) => {
+      try {
+        requireDb();
+        const userId = (req.user as User).id;
+        const file = (req as any).file as
+          | undefined
+          | { buffer: Buffer; mimetype: string };
+        if (!file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+        const mime = String(file.mimetype || "")
+          .toLowerCase()
+          .trim();
+        const extByMime: Record<string, string> = {
+          "image/jpeg": ".jpg",
+          "image/jpg": ".jpg",
+          "image/png": ".png",
+          "image/webp": ".webp",
+        };
+        const ext = extByMime[mime];
+        if (!ext) {
+          return res.status(400).json({
+            message: "Chỉ hỗ trợ ảnh JPG/PNG/WEBP",
+          });
+        }
+
+        await mkdir(avatarsDir, { recursive: true });
+        const existing = await dbStorage.getUserById(userId);
+        if (existing?.avatarPath) {
+          const oldFileName = path.basename(String(existing.avatarPath));
+          await unlink(path.join(avatarsDir, oldFileName)).catch(() => {});
+        }
+        const fileName = `${userId}-${Date.now()}-${randomUUID()}${ext}`;
+        await writeFile(path.join(avatarsDir, fileName), file.buffer);
+        await dbStorage.updateUser(userId, {
+          avatarPath: `avatars/${fileName}`,
+        });
+
+        const updated = await dbStorage.getUserByIdWithRolesAndGroups(userId);
+        if (!updated)
+          return res.status(404).json({ message: "User not found" });
+        return res.json(sanitizeUser(updated));
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.message.includes("Database not configured")
+        ) {
+          return res.status(503).json({ message: err.message });
+        }
+        return res.status(500).json({
+          message:
+            err instanceof Error ? err.message : "Failed to upload avatar",
+        });
+      }
+    },
+  );
 
   app.post(
     api.users.create.path,

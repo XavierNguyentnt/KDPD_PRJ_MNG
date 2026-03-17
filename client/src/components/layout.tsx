@@ -71,7 +71,7 @@ import { formatDistanceToNow } from "date-fns";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { role, user, logout } = useAuth();
+  const { role, user, logout, refreshMe } = useAuth();
   const { toast } = useToast();
   const displayName = user?.displayName ?? "User";
   const department = user?.department ?? "";
@@ -110,6 +110,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [changingPassword, setChangingPassword] = useState(false);
   const [changePasswordMode, setChangePasswordMode] = useState(false);
   const [verifiedOldPassword, setVerifiedOldPassword] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const currentPasswordNameRef = useRef(
     `cpw-${Math.random().toString(36).slice(2)}`,
   );
@@ -182,8 +185,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setNewPassword("");
       setConfirmPassword("");
       setHasFocusedCurrent(false);
+      setAvatarFile(null);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
     }
   }, [settingsOpen]);
+
+  const avatarSrc =
+    user?.avatarPath && user?.id
+      ? `${api.users.avatar.path.replace(":id", user.id)}?v=${encodeURIComponent(String(user.updatedAt ?? ""))}`
+      : `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`;
 
   const normalizeGroupName = (g?: string | null) => {
     const s = (g ?? "").trim();
@@ -692,7 +702,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   className="gap-2 pl-2 pr-4 h-auto py-1.5 hover:bg-muted/50 rounded-full">
                   <Avatar className="w-8 h-8 border border-border">
                     <AvatarImage
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`}
+                      src={avatarSrc}
                     />
                     <AvatarFallback>
                       {displayName.slice(0, 2).toUpperCase()}
@@ -883,6 +893,61 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-14 w-14 border border-border">
+                <AvatarImage src={avatarSrc} />
+                <AvatarFallback>
+                  {displayName.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 space-y-2">
+                <Input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    setAvatarFile(f);
+                  }}
+                />
+                <Button
+                  className="w-full"
+                  disabled={!avatarFile || uploadingAvatar}
+                  onClick={async () => {
+                    if (!avatarFile) return;
+                    try {
+                      setUploadingAvatar(true);
+                      const form = new FormData();
+                      form.append("file", avatarFile);
+                      const res = await fetch(api.users.uploadAvatar.path, {
+                        method: api.users.uploadAvatar.method,
+                        credentials: "include",
+                        body: form,
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) {
+                        toast({
+                          title: language === "vi" ? "Tải ảnh thất bại" : "Upload failed",
+                          description: data.message ?? "",
+                          variant: "destructive",
+                          duration: 7000,
+                        });
+                        return;
+                      }
+                      await refreshMe();
+                      setAvatarFile(null);
+                      if (avatarInputRef.current) avatarInputRef.current.value = "";
+                      toast({
+                        title: language === "vi" ? "Đã cập nhật avatar" : "Avatar updated",
+                      });
+                    } finally {
+                      setUploadingAvatar(false);
+                    }
+                  }}>
+                  {language === "vi" ? "Cập nhật avatar" : "Update avatar"}
+                </Button>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="font-medium">Email</div>
               <div className="text-muted-foreground">{user?.email}</div>
