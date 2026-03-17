@@ -2,14 +2,14 @@
 
 ## 1) Truy cập hệ thống
 
-- Mở trình duyệt và truy cập địa chỉ hệ thống do Admin cung cấp (mặc định môi trường dev: `http://localhost:5000`).
+- Mở trình duyệt và truy cập địa chỉ http://task.kdpd.local.
 - Màn hình **Đăng nhập** hiển thị 2 trường:
   - **Email**
   - **Mật khẩu**
 
 ## 2) Đăng nhập
 
-1. Nhập **Email** tài khoản.
+1. Nhập **Email** tài khoản (email vnu.edu.vn do Viện Trần Nhân Tông cung cấp).
 2. Nhập **Mật khẩu**.
 3. Bấm **Đăng nhập**.
 4. Nếu hợp lệ, hệ thống chuyển vào **Dashboard**.
@@ -38,4 +38,3 @@
 
 - Nguyên nhân: tài khoản “Thư ký hợp phần” chưa được gán **Hợp phần** (component) phụ trách.
 - Cách xử lý: liên hệ Admin để gán hợp phần trong trang **Quản lý người dùng**.
-

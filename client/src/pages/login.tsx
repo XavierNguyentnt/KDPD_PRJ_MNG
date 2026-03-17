@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function LoginPage() {
@@ -43,7 +49,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@kdpd.local"
+                placeholder="abc@vnu.edu.vn"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -56,6 +62,7 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
+                placeholder="**********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
