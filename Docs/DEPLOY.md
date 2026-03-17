@@ -585,6 +585,13 @@ export DATABASE_URL='postgresql://kdpd_user:CHANGE_ME_STRONG_PASSWORD@localhost:
 npm run db:push
 ```
 
+Nếu cập nhật tính năng Thông báo (đánh dấu quan trọng), cần thêm cột `is_important`:
+
+```sql
+ALTER TABLE notifications
+  ADD COLUMN IF NOT EXISTS is_important boolean NOT NULL DEFAULT false;
+```
+
 ### 10.5 Cách kết nối và đồng bộ trong UI
 
 1. Mở màn **Lịch** → tab **Đồng bộ**

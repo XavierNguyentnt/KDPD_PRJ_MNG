@@ -349,10 +349,12 @@ export const googleCalendarAccounts = pgTable("google_calendar_accounts", {
     .defaultNow(),
 });
 
-export const insertGoogleCalendarAccountSchema =
-  createInsertSchema(googleCalendarAccounts);
-export const selectGoogleCalendarAccountSchema =
-  createSelectSchema(googleCalendarAccounts);
+export const insertGoogleCalendarAccountSchema = createInsertSchema(
+  googleCalendarAccounts,
+);
+export const selectGoogleCalendarAccountSchema = createSelectSchema(
+  googleCalendarAccounts,
+);
 export type GoogleCalendarAccount = typeof googleCalendarAccounts.$inferSelect;
 export type InsertGoogleCalendarAccount = z.infer<
   typeof insertGoogleCalendarAccountSchema
@@ -409,6 +411,7 @@ export const notifications = pgTable("notifications", {
   ),
   title: text("title").notNull(),
   message: text("message").notNull(),
+  isImportant: boolean("is_important").notNull().default(false),
   isRead: boolean("is_read").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

@@ -1,5 +1,6 @@
-import { eq, asc, inArray, and, desc, ne, isNull } from "drizzle-orm";
+import { eq, asc, inArray, and, desc, ne, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
+import { pool } from "./db";
 import {
   users,
   contracts,
@@ -1220,19 +1221,44 @@ export async function getNotificationsByUserId(
   options?: { unreadOnly?: boolean; limit?: number },
 ): Promise<Notification[]> {
   const unreadOnly = options?.unreadOnly ?? false;
-  let rows = await requireDb()
-    .select()
-    .from(notifications)
-    .where(
-      unreadOnly
-        ? and(eq(notifications.userId, userId), eq(notifications.isRead, false))
-        : eq(notifications.userId, userId),
-    )
-    .orderBy(desc(notifications.createdAt));
-  if (options?.limit && rows.length > options.limit) {
-    rows = rows.slice(0, options.limit);
+  const limit = options?.limit ?? undefined;
+
+  try {
+    const q = requireDb()
+      .select()
+      .from(notifications)
+      .where(
+        unreadOnly
+          ? and(
+              eq(notifications.userId, userId),
+              eq(notifications.isRead, false),
+            )
+          : eq(notifications.userId, userId),
+      )
+      .orderBy(desc(notifications.createdAt));
+    return limit && limit > 0 ? await q.limit(limit) : await q;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err ?? "");
+    const missingIsImportant =
+      msg.toLowerCase().includes("is_important") &&
+      msg.toLowerCase().includes("does not exist");
+    if (!missingIsImportant || !pool) throw err;
+
+    const baseSelect =
+      'SELECT id, user_id AS "userId", type, task_id AS "taskId", task_assignment_id AS "taskAssignmentId", title, message, %IMPORTANT% AS "isImportant", is_read AS "isRead", created_at AS "createdAt", read_at AS "readAt" FROM notifications';
+    const where = unreadOnly
+      ? " WHERE user_id = $1 AND is_read = false"
+      : " WHERE user_id = $1";
+    const order = " ORDER BY created_at DESC";
+    const lim = limit && limit > 0 ? " LIMIT $2" : "";
+    const sqlText = (baseSelect + where + order + lim).replace(
+      "%IMPORTANT%",
+      missingIsImportant ? "false" : "COALESCE(is_important, false)",
+    );
+    const params = limit && limit > 0 ? [userId, limit] : [userId];
+    const r = await pool.query(sqlText, params);
+    return r.rows as Notification[];
   }
-  return rows;
 }
 
 export async function markNotificationAsRead(
@@ -1252,16 +1278,73 @@ export async function markNotificationAsRead(
   return rows[0];
 }
 
+export async function markNotificationAsUnread(
+  userId: string,
+  notificationId: string,
+): Promise<Notification | undefined> {
+  const rows = await requireDb()
+    .update(notifications)
+    .set({ isRead: false, readAt: null })
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        eq(notifications.userId, userId),
+      ),
+    )
+    .returning();
+  return rows[0];
+}
+
+export async function setNotificationImportant(
+  userId: string,
+  notificationId: string,
+  isImportant: boolean,
+): Promise<Notification | undefined> {
+  const rows = await requireDb()
+    .update(notifications)
+    .set({ isImportant })
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        eq(notifications.userId, userId),
+      ),
+    )
+    .returning();
+  return rows[0];
+}
+
+export async function markAllNotificationsAsRead(
+  userId: string,
+): Promise<number> {
+  if (pool) {
+    const r = await pool.query(
+      "UPDATE notifications SET is_read = true, read_at = NOW() WHERE user_id = $1 AND is_read = false",
+      [userId],
+    );
+    return r.rowCount ?? 0;
+  }
+  const rows = await requireDb()
+    .update(notifications)
+    .set({ isRead: true, readAt: new Date() })
+    .where(
+      and(eq(notifications.userId, userId), eq(notifications.isRead, false)),
+    )
+    .returning({ id: notifications.id });
+  return rows.length;
+}
+
 export async function getUnreadNotificationCount(
   userId: string,
 ): Promise<number> {
   const rows = await requireDb()
-    .select()
+    .select({ count: sql<number>`count(*)` })
     .from(notifications)
     .where(
       and(eq(notifications.userId, userId), eq(notifications.isRead, false)),
     );
-  return rows.length;
+  const raw = (rows[0] as any)?.count ?? 0;
+  const n = typeof raw === "number" ? raw : Number.parseInt(String(raw), 10);
+  return Number.isFinite(n) ? n : 0;
 }
 
 export async function getNotificationByAssignmentType(

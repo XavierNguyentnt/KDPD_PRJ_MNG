@@ -22,6 +22,8 @@ import {
   Palette,
   Code,
   Plus,
+  Star,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -31,6 +33,9 @@ import {
   useNotifications,
   useUnreadNotificationCount,
   useMarkNotificationRead,
+  useMarkNotificationUnread,
+  useSetNotificationImportant,
+  useMarkAllNotificationsRead,
 } from "@/hooks/use-notifications";
 import {
   DropdownMenu,
@@ -82,6 +87,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
   const { data: unreadCount } = useUnreadNotificationCount();
   const { mutate: markNotificationRead } = useMarkNotificationRead();
+  const { mutate: markNotificationUnread } = useMarkNotificationUnread();
+  const { mutate: setNotificationImportant } = useSetNotificationImportant();
+  const { mutate: markAllNotificationsRead, isPending: isMarkingAllRead } =
+    useMarkAllNotificationsRead();
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const saved = localStorage.getItem("theme");
     return saved === "dark" ? "dark" : "light";
@@ -291,7 +300,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       list = list.filter((n) => n.isRead);
     if (notificationGroupFilter !== "all")
       list = list.filter((n) => n.group === notificationGroupFilter);
-    return list;
+    return [...list].sort((a, b) => {
+      const ai = (a as any).isImportant ? 1 : 0;
+      const bi = (b as any).isImportant ? 1 : 0;
+      if (ai !== bi) return bi - ai;
+      const at = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+      const bt = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+      return bt - at;
+    });
   }, [notificationList, notificationStatusFilter, notificationGroupFilter]);
 
   const isThuKyHopPhan = user?.roles?.some(
@@ -799,6 +815,42 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </SelectContent>
               </Select>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={(unreadCount?.count ?? 0) === 0 || isMarkingAllRead}
+              onClick={() => {
+                markAllNotificationsRead(undefined, {
+                  onSuccess: (r) => {
+                    toast({
+                      title:
+                        language === "vi"
+                          ? "Đã đánh dấu tất cả là đã đọc"
+                          : "Marked all as read",
+                      description:
+                        language === "vi"
+                          ? `Đã cập nhật ${r.updated} thông báo.`
+                          : `Updated ${r.updated} notifications.`,
+                    });
+                  },
+                  onError: (err) => {
+                    toast({
+                      title: language === "vi" ? "Thao tác thất bại" : "Failed",
+                      description:
+                        err instanceof Error ? err.message : "Failed",
+                      variant: "destructive",
+                    });
+                  },
+                });
+              }}>
+              {language === "vi"
+                ? isMarkingAllRead
+                  ? "Đang xử lý..."
+                  : "Đánh dấu tất cả đã đọc"
+                : isMarkingAllRead
+                  ? "Working..."
+                  : "Mark all read"}
+            </Button>
           </div>
 
           <div className="mt-4 max-h-[420px] overflow-auto border rounded-lg">
@@ -828,9 +880,70 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           <p className="text-sm font-medium truncate">
                             {n.title}
                           </p>
-                          <Badge variant="secondary" className="text-[10px]">
-                            {n.group}
-                          </Badge>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              className={`h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-muted/60 ${(n as any).isImportant ? "text-amber-600" : "text-muted-foreground"}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNotificationImportant({
+                                  id: n.id,
+                                  isImportant: !(
+                                    (n as any).isImportant ?? false
+                                  ),
+                                });
+                              }}
+                              aria-label={
+                                language === "vi"
+                                  ? "Đánh dấu quan trọng"
+                                  : "Mark important"
+                              }>
+                              <Star
+                                className={`h-4 w-4 ${(n as any).isImportant ? "fill-current" : ""}`}
+                              />
+                            </button>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-muted/60 text-muted-foreground"
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={
+                                    language === "vi" ? "Tùy chọn" : "More"
+                                  }>
+                                  <MoreVertical className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {n.isRead ? (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      markNotificationUnread(n.id);
+                                    }}>
+                                    {language === "vi"
+                                      ? "Đánh dấu là chưa đọc"
+                                      : "Mark as unread"}
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      markNotificationRead(n.id);
+                                    }}>
+                                    {language === "vi"
+                                      ? "Đánh dấu là đã đọc"
+                                      : "Mark as read"}
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            <Badge variant="secondary" className="text-[10px]">
+                              {n.group}
+                            </Badge>
+                          </div>
                         </div>
                         <div
                           className="text-xs text-muted-foreground"

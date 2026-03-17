@@ -233,6 +233,30 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    markUnread: {
+      method: "PATCH" as const,
+      path: "/api/notifications/:id/unread",
+      responses: {
+        200: z.custom<typeof notifications.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    setImportant: {
+      method: "PATCH" as const,
+      path: "/api/notifications/:id/important",
+      input: z.object({ isImportant: z.boolean() }),
+      responses: {
+        200: z.custom<typeof notifications.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    markAllRead: {
+      method: "POST" as const,
+      path: "/api/notifications/mark-all-read",
+      responses: {
+        200: z.object({ updated: z.number() }),
+      },
+    },
   },
 
   users: {

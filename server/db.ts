@@ -48,4 +48,15 @@ export async function ensureDbExtensions(): Promise<void> {
   } catch (error) {
     console.warn("Failed to ensure pgcrypto extension (optional):", error);
   }
+
+  try {
+    await pool.query(
+      "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_important boolean NOT NULL DEFAULT false",
+    );
+  } catch (error) {
+    console.warn(
+      "Failed to ensure notifications.is_important column (optional):",
+      error,
+    );
+  }
 }
