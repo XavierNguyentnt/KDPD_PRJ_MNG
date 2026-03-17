@@ -137,6 +137,18 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
+  const TASKS_LIST_CACHE_TTL_MS = Math.max(
+    0,
+    Number.parseInt(process.env.TASKS_LIST_CACHE_TTL_MS || "5000", 10) || 0,
+  );
+  const tasksListCache = new Map<
+    string,
+    { expiresAt: number; value: unknown }
+  >();
+  const invalidateTasksListCache = () => {
+    tasksListCache.clear();
+  };
+
   // ---------- Auth (public login; me/logout require auth) ----------
   const loginRateLimit = rateLimit({ windowMs: 60_000, max: 10 });
   app.post(api.auth.login.path, loginRateLimit, (req, res, next) => {
@@ -290,14 +302,28 @@ export async function registerRoutes(
   // ---------- Tasks (require auth) ----------
   app.get(api.tasks.list.path, requireAuth, async (req, res) => {
     try {
-      const all = await storage.getTasks();
       const includeArchived =
         typeof req.query.includeArchived !== "undefined" &&
         (req.query.includeArchived === "1" ||
           req.query.includeArchived === "true");
-      const tasks = includeArchived
-        ? all
-        : all.filter((t) => String(t.status) !== "Archived");
+      const cacheKey = includeArchived
+        ? "includeArchived=1"
+        : "includeArchived=0";
+      if (TASKS_LIST_CACHE_TTL_MS > 0) {
+        const hit = tasksListCache.get(cacheKey);
+        if (hit && hit.expiresAt > Date.now()) {
+          return res.json(hit.value);
+        }
+      }
+
+      const tasks =
+        db && pool
+          ? await dbStorage.getTasksFromDbFiltered({ includeArchived })
+          : includeArchived
+            ? await storage.getTasks()
+            : (await storage.getTasks()).filter(
+                (t) => String(t.status) !== "Archived",
+              );
       if (db) {
         const taskIds = tasks.map((t) => t.id);
         const assignments =
@@ -376,7 +402,19 @@ export async function registerRoutes(
                 : undefined,
           } as TaskWithAssignmentDetails;
         });
+        if (TASKS_LIST_CACHE_TTL_MS > 0) {
+          tasksListCache.set(cacheKey, {
+            expiresAt: Date.now() + TASKS_LIST_CACHE_TTL_MS,
+            value: result,
+          });
+        }
         return res.json(result);
+      }
+      if (TASKS_LIST_CACHE_TTL_MS > 0) {
+        tasksListCache.set(cacheKey, {
+          expiresAt: Date.now() + TASKS_LIST_CACHE_TTL_MS,
+          value: tasks,
+        });
       }
       res.json(tasks);
     } catch (error) {
@@ -432,6 +470,7 @@ export async function registerRoutes(
         ).length + 1;
       const newTitle = `${baseTitle} (Làm lại lần ${redoCount})`;
       await storage.updateTask(id, { status: "Archived" });
+      invalidateTasksListCache();
       const now = new Date();
       const newTask = await storage.createTask({
         title: newTitle,
@@ -617,6 +656,7 @@ export async function registerRoutes(
           .map((x) => `${x.userId}|${x.stageType}|${x.roundNumber ?? 1}`),
       );
       const task = await storage.updateTask(id, input);
+      invalidateTasksListCache();
 
       if (db && assignmentsInput !== undefined) {
         const inputKeys = new Set(
@@ -975,6 +1015,7 @@ export async function registerRoutes(
       };
 
       const task = await storage.createTask(taskData);
+      invalidateTasksListCache();
 
       if (db && assignmentsInput && assignmentsInput.length > 0) {
         for (const a of assignmentsInput) {
@@ -1110,6 +1151,7 @@ export async function registerRoutes(
         });
       }
       await storage.deleteTask(id);
+      invalidateTasksListCache();
       res.json({ message: "Task deleted successfully" });
     } catch (err) {
       if (err instanceof Error && err.message.includes("not found")) {

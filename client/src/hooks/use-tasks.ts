@@ -24,8 +24,13 @@ export function useTasks(options?: { includeArchived?: boolean }) {
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return api.tasks.list.responses[200].parse(await res.json());
     },
-    // Refresh every minute to simulate live updates from Sheet
-    refetchInterval: 60000,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+    refetchIntervalInBackground: false,
+    refetchInterval: () => {
+      if (typeof document === "undefined") return 60000;
+      return document.visibilityState === "hidden" ? false : 60000;
+    },
   });
 }
 

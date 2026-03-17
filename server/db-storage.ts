@@ -362,6 +362,16 @@ export async function getTasksFromDb(): Promise<Task[]> {
   return rows;
 }
 
+export async function getTasksFromDbFiltered(params: {
+  includeArchived: boolean;
+}): Promise<Task[]> {
+  const q = requireDb().select().from(tasks);
+  const rows = params.includeArchived
+    ? await q.orderBy(asc(tasks.createdAt))
+    : await q.where(ne(tasks.status, "Archived")).orderBy(asc(tasks.createdAt));
+  return rows;
+}
+
 export async function getTaskFromDbById(id: string): Promise<Task | undefined> {
   const rows = await requireDb()
     .select()
