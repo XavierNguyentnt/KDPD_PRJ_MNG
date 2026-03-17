@@ -354,7 +354,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       ? [{ href: "/thu-ky-hop-phan", label: "Thư ký hợp phần", icon: FileText }]
       : []),
     { href: "/team", label: "Team", icon: Users },
-    ...(role === UserRole.ADMIN || role === UserRole.MANAGER
+    ...(role === UserRole.ADMIN
       ? [{ href: "/admin/users", label: "Quản lý người dùng", icon: UserCog }]
       : []),
   ];
@@ -701,9 +701,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   variant="ghost"
                   className="gap-2 pl-2 pr-4 h-auto py-1.5 hover:bg-muted/50 rounded-full">
                   <Avatar className="w-8 h-8 border border-border">
-                    <AvatarImage
-                      src={avatarSrc}
-                    />
+                    <AvatarImage src={avatarSrc} />
                     <AvatarFallback>
                       {displayName.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
@@ -927,7 +925,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       const data = await res.json().catch(() => ({}));
                       if (!res.ok) {
                         toast({
-                          title: language === "vi" ? "Tải ảnh thất bại" : "Upload failed",
+                          title:
+                            language === "vi"
+                              ? "Tải ảnh thất bại"
+                              : "Upload failed",
                           description: data.message ?? "",
                           variant: "destructive",
                           duration: 7000,
@@ -936,9 +937,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       }
                       await refreshMe();
                       setAvatarFile(null);
-                      if (avatarInputRef.current) avatarInputRef.current.value = "";
+                      if (avatarInputRef.current)
+                        avatarInputRef.current.value = "";
                       toast({
-                        title: language === "vi" ? "Đã cập nhật avatar" : "Avatar updated",
+                        title:
+                          language === "vi"
+                            ? "Đã cập nhật avatar"
+                            : "Avatar updated",
                       });
                     } finally {
                       setUploadingAvatar(false);

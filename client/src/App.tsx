@@ -137,6 +137,17 @@ function GuardedCNTTPage() {
   return <CNTTPage />;
 }
 
+function GuardedAdminUsersPage() {
+  const { role } = useAuth();
+  const [_, navigate] = useLocation();
+  const allowed = role === UserRole.ADMIN;
+  if (!allowed) {
+    navigate("/");
+    return null;
+  }
+  return <AdminUsersPage />;
+}
+
 function Router() {
   return (
     <Layout>
@@ -155,7 +166,7 @@ function Router() {
         <Route path="/thu-ky-hop-phan" component={ThuKyHopPhanPage} />
         <Route path="/thu-ky-hop-phan/:sub" component={ThuKyHopPhanPage} />
         <Route path="/team" component={Team} />
-        <Route path="/admin/users" component={AdminUsersPage} />
+        <Route path="/admin/users" component={GuardedAdminUsersPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

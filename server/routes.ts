@@ -2590,7 +2590,7 @@ export async function registerRoutes(
   app.post(
     api.users.create.path,
     requireAuth,
-    requireRole(UserRole.ADMIN, UserRole.MANAGER),
+    requireRole(UserRole.ADMIN),
     async (req, res) => {
       try {
         requireDb();
@@ -2639,7 +2639,7 @@ export async function registerRoutes(
   app.patch(
     api.users.update.path,
     requireAuth,
-    requireRole(UserRole.ADMIN, UserRole.MANAGER),
+    requireRole(UserRole.ADMIN),
     async (req, res) => {
       try {
         requireDb();
@@ -2707,7 +2707,7 @@ export async function registerRoutes(
   app.patch(
     "/api/users/:id/password",
     requireAuth,
-    requireRole(UserRole.ADMIN, UserRole.MANAGER),
+    requireRole(UserRole.ADMIN),
     async (req, res) => {
       try {
         requireDb();
@@ -2749,7 +2749,7 @@ export async function registerRoutes(
   app.delete(
     api.users.delete.path,
     requireAuth,
-    requireRole(UserRole.ADMIN, UserRole.MANAGER),
+    requireRole(UserRole.ADMIN),
     async (req, res) => {
       try {
         requireDb();

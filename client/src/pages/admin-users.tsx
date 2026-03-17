@@ -515,7 +515,7 @@ export default function AdminUsersPage() {
     });
   };
 
-  const isAdminOrManager = role === "Admin" || role === "Manager";
+  const isAdminOrManager = role === "Admin";
 
   if (!isAdminOrManager) {
     return (
@@ -523,7 +523,7 @@ export default function AdminUsersPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-muted-foreground">
-              Bạn cần quyền Admin hoặc Manager để truy cập trang này.
+              Bạn cần quyền Admin để truy cập trang này.
             </p>
           </CardContent>
         </Card>
