@@ -26,8 +26,8 @@ export function useTaskListControls(params: {
     getDefaultTaskFilters,
   );
   const [groupFilter, setGroupFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<TaskSortColumn | null>("receivedDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
 
   const availableGroups = useMemo(() => {
@@ -44,6 +44,43 @@ export function useTaskListControls(params: {
     );
     return Array.from(groups).sort();
   }, [tasks, includedGroups]);
+
+  const availableYears = useMemo(() => {
+    if (!tasks) return [];
+    let list = tasks.slice();
+    if (includedGroups && includedGroups.length > 0) {
+      list = list.filter((t) => includedGroups.includes(t.group || ""));
+    }
+    if (role === UserRole.EMPLOYEE) {
+      const uid = userId ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else if (userDisplayName) {
+        const exact = (userDisplayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
+    }
+
+    const years = new Set<string>();
+    for (const t of list) {
+      const r = (t as any).receivedAt ?? null;
+      const s =
+        typeof r === "string"
+          ? r.slice(0, 10)
+          : r instanceof Date
+            ? r.toISOString().slice(0, 10)
+            : "";
+      const y = s ? s.slice(0, 4) : "";
+      if (y) years.add(y);
+    }
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [tasks, includedGroups, role, userId, userDisplayName]);
 
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
@@ -117,5 +154,6 @@ export function useTaskListControls(params: {
     setViewMode,
     filteredTasks,
     availableGroups,
+    availableYears,
   };
 }

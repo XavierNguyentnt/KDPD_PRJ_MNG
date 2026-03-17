@@ -329,8 +329,8 @@ export default function BienTapPage() {
   const [filters, setFilters] = useState<TaskFilterState>(
     getDefaultTaskFilters,
   );
-  const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<TaskSortColumn | null>("receivedDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedTask, setSelectedTask] =
     useState<TaskWithAssignmentDetails | null>(null);
   const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
@@ -405,6 +405,22 @@ export default function BienTapPage() {
     return list;
   }, [datasetForList, role, user?.displayName]);
 
+  const yearOptions = useMemo(() => {
+    const years = new Set<string>();
+    for (const t of bienTapTasksScoped) {
+      const r = (t as any).receivedAt ?? null;
+      const s =
+        typeof r === "string"
+          ? r.slice(0, 10)
+          : r instanceof Date
+            ? r.toISOString().slice(0, 10)
+            : "";
+      const y = s ? s.slice(0, 4) : "";
+      if (y) years.add(y);
+    }
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [bienTapTasksScoped]);
+
   const filteredTasks = useMemo(() => {
     let list = bienTapTasksScoped;
     if (search.trim()) {
@@ -418,7 +434,6 @@ export default function BienTapPage() {
       );
     }
     list = applyTaskFilters(list, filters, works);
-    return sortTasks(list, sortBy, sortDir);
     return sortTasks(list, sortBy, sortDir);
   }, [bienTapTasksScoped, search, filters, works, sortBy, sortDir]);
 
@@ -617,6 +632,7 @@ export default function BienTapPage() {
                   setFilters((prev) => ({ ...prev, ...f }))
                 }
                 stages={stages}
+                yearOptions={yearOptions}
                 showVoteFilter={true}
                 showRoundTypeFilter={true}
                 roundTypeOptions={roundTypeOptions}

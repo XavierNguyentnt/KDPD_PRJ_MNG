@@ -66,12 +66,14 @@ export interface Translations {
     stage: string;
     status: string;
     vote: string;
+    year: string;
     dateFrom: string;
     dateTo: string;
     allStaff: string;
     allComponents: string;
     allStages: string;
     allVotes: string;
+    allYears: string;
     roundType?: string;
     allRoundTypes?: string;
   };
@@ -216,12 +218,14 @@ const translations: Record<Language, Translations> = {
       stage: "Giai đoạn",
       status: "Trạng thái",
       vote: "Đánh giá",
+      year: "Năm nhận việc",
       dateFrom: "Từ ngày",
       dateTo: "Đến ngày",
       allStaff: "Tất cả nhân sự",
       allComponents: "Tất cả hợp phần",
       allStages: "Tất cả giai đoạn",
       allVotes: "Tất cả đánh giá",
+      allYears: "Tất cả năm",
       roundType: "Loại bông",
       allRoundTypes: "Tất cả loại bông",
     },
@@ -354,12 +358,14 @@ const translations: Record<Language, Translations> = {
       stage: "Stage",
       status: "Status",
       vote: "Evaluation",
+      year: "Received year",
       dateFrom: "From date",
       dateTo: "To date",
       allStaff: "All staff",
       allComponents: "All components",
       allStages: "All stages",
       allVotes: "All evaluations",
+      allYears: "All years",
       roundType: "Round Type",
       allRoundTypes: "All round types",
     },

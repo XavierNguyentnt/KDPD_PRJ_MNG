@@ -270,8 +270,8 @@ export default function CVChungPage() {
   const [filters, setFilters] = useState<TaskFilterState>(
     getDefaultTaskFilters,
   );
-  const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<TaskSortColumn | null>("receivedDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedTask, setSelectedTask] = useState<TTask | null>(null);
   const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
   const [deleteTaskConfirmOpen, setDeleteTaskConfirmOpen] = useState(false);
@@ -299,6 +299,41 @@ export default function CVChungPage() {
   // Filter tasks for "Công việc chung" group only (DB có thể lưu "CV chung" hoặc "Công việc chung")
   const CV_CHUNG_GROUP_NAMES = ["Công việc chung", "CV chung"];
   const datasetForList = includeArchivedForList ? tasksAll : tasks;
+
+  const yearOptions = useMemo(() => {
+    if (!datasetForList) return [];
+    let list = datasetForList.filter(
+      (t) => t.group && CV_CHUNG_GROUP_NAMES.includes(t.group),
+    );
+    if (role === UserRole.EMPLOYEE) {
+      const uid = user?.id ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else {
+        const exact = (user?.displayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
+    }
+    const years = new Set<string>();
+    for (const t of list) {
+      const r = (t as any).receivedAt ?? null;
+      const s =
+        typeof r === "string"
+          ? r.slice(0, 10)
+          : r instanceof Date
+            ? r.toISOString().slice(0, 10)
+            : "";
+      const y = s ? s.slice(0, 4) : "";
+      if (y) years.add(y);
+    }
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [datasetForList, role, user?.id, user?.displayName]);
 
   const filteredTasks = useMemo(() => {
     if (!datasetForList) return [];
@@ -513,6 +548,7 @@ export default function CVChungPage() {
             filters={filters}
             onFiltersChange={(f) => setFilters((prev) => ({ ...prev, ...f }))}
             stages={stages}
+            yearOptions={yearOptions}
             showVoteFilter={true}
           />
         </div>

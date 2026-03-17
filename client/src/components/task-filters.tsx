@@ -19,6 +19,7 @@ export interface TaskFilterState {
   stage: string;
   status: string;
   vote: string;
+  receivedYear: string;
   dateFrom: string;
   dateTo: string;
   roundType: string;
@@ -30,6 +31,7 @@ const DEFAULT_FILTERS: TaskFilterState = {
   stage: "all",
   status: "all",
   vote: "all",
+  receivedYear: "all",
   dateFrom: "",
   dateTo: "",
   roundType: "all",
@@ -47,6 +49,7 @@ export function applyTaskFilters<
     vote?: string | null;
     relatedWorkId?: string | null;
     dueDate?: string | Date | null;
+    receivedAt?: string | Date | null;
     assigneeId?: string | null;
     assignments?: { userId: string }[];
     workflow?: any;
@@ -113,6 +116,20 @@ export function applyTaskFilters<
     });
   }
 
+  if (filters.receivedYear && filters.receivedYear !== "all") {
+    const y = String(filters.receivedYear).trim();
+    list = list.filter((t) => {
+      const r = (t as any).receivedAt ?? null;
+      const s =
+        typeof r === "string"
+          ? r.slice(0, 10)
+          : r instanceof Date
+            ? r.toISOString().slice(0, 10)
+            : "";
+      return s ? s.slice(0, 4) === y : false;
+    });
+  }
+
   if (filters.dateFrom) {
     const from = filters.dateFrom.slice(0, 10);
     list = list.filter((t) => {
@@ -147,6 +164,7 @@ interface TaskFiltersProps {
   onFiltersChange: (f: Partial<TaskFilterState>) => void;
   /** Unique stages from works (e.g. stage display values) */
   stages: string[];
+  yearOptions?: string[];
   showVoteFilter?: boolean;
   showRoundTypeFilter?: boolean;
   roundTypeOptions?: string[];
@@ -158,6 +176,7 @@ export function TaskFilters({
   filters,
   onFiltersChange,
   stages,
+  yearOptions = [],
   showVoteFilter = true,
   showRoundTypeFilter = false,
   roundTypeOptions = [],
@@ -253,6 +272,33 @@ export function TaskFilters({
             <SelectItem value="Completed">{t.status.completed}</SelectItem>
             <SelectItem value="Pending">{t.status.pending}</SelectItem>
             <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1 w-full sm:w-auto">
+        <Label className="text-xs text-muted-foreground">
+          {t.filter.year ?? (language === "vi" ? "Năm nhận việc" : "Received year")}
+        </Label>
+        <Select
+          value={filters.receivedYear}
+          onValueChange={(v) => onFiltersChange({ receivedYear: v })}>
+          <SelectTrigger className="w-full sm:w-[140px] h-9 bg-background">
+            <SelectValue
+              placeholder={
+                t.filter.allYears ?? (language === "vi" ? "Tất cả năm" : "All years")
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">
+              {t.filter.allYears ?? (language === "vi" ? "Tất cả năm" : "All years")}
+            </SelectItem>
+            {yearOptions.map((y) => (
+              <SelectItem key={y} value={y}>
+                {y}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

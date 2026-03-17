@@ -294,6 +294,7 @@ export default function CNTTPage() {
     setViewMode,
     filteredTasks,
     availableGroups,
+    availableYears,
   } = useTaskListControls({
     tasks,
     role,
@@ -515,6 +516,7 @@ export default function CNTTPage() {
             filters={filters}
             onFiltersChange={(f) => setFilters((prev) => ({ ...prev, ...f }))}
             stages={stages}
+            yearOptions={availableYears}
             showVoteFilter={true}
           />
         </div>

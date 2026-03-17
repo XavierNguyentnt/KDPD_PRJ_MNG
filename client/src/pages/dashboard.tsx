@@ -65,9 +65,10 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
+  const [receivedYearFilter, setReceivedYearFilter] = useState("all");
   const [badgeFilter, setBadgeFilter] = useState<DashboardBadgeFilter>(null);
-  const [sortBy, setSortBy] = useState<TaskSortColumn | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<TaskSortColumn | null>("receivedDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedTask, setSelectedTask] =
     useState<TaskWithAssignmentDetails | null>(null);
@@ -129,6 +130,42 @@ export default function Dashboard() {
     return Array.from(groups).sort();
   }, [datasetForList]);
 
+  const availableYears = useMemo(() => {
+    if (!tasksAll) return [];
+    let list: TaskWithAssignmentDetails[] = tasksAll;
+    if (role === UserRole.EMPLOYEE) {
+      const uid = user?.id ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else {
+        const exact = (user?.displayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
+    }
+    if (groupFilter !== "all") {
+      list = list.filter((t) => t.group === groupFilter);
+    }
+    const years = new Set<string>();
+    for (const t of list) {
+      const r = (t as any).receivedAt ?? null;
+      const s =
+        typeof r === "string"
+          ? r.slice(0, 10)
+          : r instanceof Date
+            ? r.toISOString().slice(0, 10)
+            : "";
+      const y = s ? s.slice(0, 4) : "";
+      if (y) years.add(y);
+    }
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [tasksAll, role, user?.id, user?.displayName, groupFilter]);
+
   // Base filtered list (role, search, group, status) — dùng cho thống kê dashboard
   const baseFilteredTasks = useMemo(() => {
     if (!datasetForList) return [];
@@ -150,6 +187,19 @@ export default function Dashboard() {
     }
     if (groupFilter !== "all") {
       filtered = filtered.filter((t) => t.group === groupFilter);
+    }
+    if (receivedYearFilter !== "all") {
+      const y = String(receivedYearFilter).trim();
+      filtered = filtered.filter((t) => {
+        const r = (t as any).receivedAt ?? null;
+        const s =
+          typeof r === "string"
+            ? r.slice(0, 10)
+            : r instanceof Date
+              ? r.toISOString().slice(0, 10)
+              : "";
+        return s ? s.slice(0, 4) === y : false;
+      });
     }
     if (search.trim()) {
       const lower = normalizeSearch(search.trim());
@@ -211,7 +261,15 @@ export default function Dashboard() {
       filtered = filtered.filter((t) => t.status === statusFilter);
     }
     return filtered;
-  }, [tasksAll, role, search, statusFilter, groupFilter, user?.displayName]);
+  }, [
+    datasetForList,
+    role,
+    search,
+    statusFilter,
+    groupFilter,
+    receivedYearFilter,
+    user?.displayName,
+  ]);
 
   // Danh sách task sau khi áp dụng badge filter + sắp xếp (hiển thị trong bảng)
   const filteredTasks = useMemo(() => {
@@ -588,6 +646,31 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
 
+            <Select
+              value={receivedYearFilter}
+              onValueChange={setReceivedYearFilter}>
+              <SelectTrigger className="w-full sm:w-[140px] bg-background">
+                <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                <SelectValue
+                  placeholder={
+                    (t.filter as any)?.year ??
+                    (language === "vi" ? "Năm nhận việc" : "Received year")
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  {(t.filter as any)?.allYears ??
+                    (language === "vi" ? "Tất cả năm" : "All years")}
+                </SelectItem>
+                {availableYears.map((y) => (
+                  <SelectItem key={y} value={y}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[140px] bg-background">
                 <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
@@ -618,11 +701,15 @@ export default function Dashboard() {
               className="border rounded-md bg-background w-full sm:w-auto">
               <ToggleGroupItem value="table" aria-label={t.dashboard.viewTable}>
                 <List className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">{t.dashboard.viewTable}</span>
+                <span className="hidden sm:inline">
+                  {t.dashboard.viewTable}
+                </span>
               </ToggleGroupItem>
               <ToggleGroupItem value="board" aria-label={t.dashboard.viewBoard}>
                 <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">{t.dashboard.viewBoard}</span>
+                <span className="hidden sm:inline">
+                  {t.dashboard.viewBoard}
+                </span>
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="calendar"

@@ -786,8 +786,10 @@ export default function ThuKyHopPhanPage() {
   const [taskFilters, setTaskFilters] = useState<TaskFilterState>(
     getDefaultTaskFilters,
   );
-  const [taskSortBy, setTaskSortBy] = useState<TaskSortColumn | null>(null);
-  const [taskSortDir, setTaskSortDir] = useState<"asc" | "desc">("asc");
+  const [taskSortBy, setTaskSortBy] = useState<TaskSortColumn | null>(
+    "receivedDate",
+  );
+  const [taskSortDir, setTaskSortDir] = useState<"asc" | "desc">("desc");
   const [worksSearch, setWorksSearch] = useState("");
   const [worksComponentFilter, setWorksComponentFilter] =
     useState<string>("all");
@@ -1008,11 +1010,9 @@ export default function ThuKyHopPhanPage() {
     setPcPage(1);
   }, [pcComponentFilter, pcStageFilter, pcSearch]);
 
-  const filteredTasks = useMemo(() => {
+  const tasksScoped = useMemo(() => {
     if (!tasks) return [];
-    // Filter tasks for "Thư ký hợp phần" group only (similar to Biên tập, CNTT, etc.)
     let list = tasks.filter((t) => t.group === "Thư ký hợp phần");
-    // Thư ký hợp phần: chỉ hiển thị task thuộc work/contract của hợp phần được gán.
     if (allowedComponentIds.length > 0) {
       const allowedWorkIds = new Set(worksScoped.map((w) => w.id));
       const allowedTcIds = new Set(tcScoped.map((c) => c.id));
@@ -1031,6 +1031,35 @@ export default function ThuKyHopPhanPage() {
         t.assignee?.includes((user?.displayName ?? "").split(" ")[0]),
       );
     }
+    return list;
+  }, [
+    tasks,
+    allowedComponentIds,
+    worksScoped,
+    tcScoped,
+    pcScoped,
+    role,
+    user?.displayName,
+  ]);
+
+  const taskYearOptions = useMemo(() => {
+    const years = new Set<string>();
+    for (const t of tasksScoped) {
+      const r = (t as any).receivedAt ?? null;
+      const s =
+        typeof r === "string"
+          ? r.slice(0, 10)
+          : r instanceof Date
+            ? r.toISOString().slice(0, 10)
+            : "";
+      const y = s ? s.slice(0, 4) : "";
+      if (y) years.add(y);
+    }
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [tasksScoped]);
+
+  const filteredTasks = useMemo(() => {
+    let list = tasksScoped;
     if (tasksSearch.trim()) {
       const q = normalizeSearch(tasksSearch.trim());
       list = list.filter(
@@ -1044,15 +1073,10 @@ export default function ThuKyHopPhanPage() {
     list = applyTaskFilters(list, taskFilters, worksScoped);
     return sortTasks(list, taskSortBy, taskSortDir);
   }, [
-    tasks,
-    role,
-    user?.displayName,
+    tasksScoped,
     tasksSearch,
     taskFilters,
     worksScoped,
-    tcScoped,
-    pcScoped,
-    allowedComponentIds,
     taskSortBy,
     taskSortDir,
   ]);
@@ -3221,10 +3245,14 @@ export default function ThuKyHopPhanPage() {
           <TabsTrigger value="works" className="shrink-0 whitespace-nowrap">
             Danh mục tác phẩm
           </TabsTrigger>
-          <TabsTrigger value="translation" className="shrink-0 whitespace-nowrap">
+          <TabsTrigger
+            value="translation"
+            className="shrink-0 whitespace-nowrap">
             Hợp đồng dịch thuật
           </TabsTrigger>
-          <TabsTrigger value="proofreading" className="shrink-0 whitespace-nowrap">
+          <TabsTrigger
+            value="proofreading"
+            className="shrink-0 whitespace-nowrap">
             Hợp đồng hiệu đính
           </TabsTrigger>
         </TabsList>
@@ -3304,6 +3332,7 @@ export default function ThuKyHopPhanPage() {
                   setTaskFilters((prev) => ({ ...prev, ...f }))
                 }
                 stages={taskStages}
+                yearOptions={taskYearOptions}
                 showVoteFilter={true}
               />
             </div>

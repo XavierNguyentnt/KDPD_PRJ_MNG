@@ -294,6 +294,7 @@ export default function ThietKePage() {
     setViewMode,
     filteredTasks,
     availableGroups,
+    availableYears,
   } = useTaskListControls({
     tasks,
     role,
@@ -511,6 +512,7 @@ export default function ThietKePage() {
             filters={filters}
             onFiltersChange={(f) => setFilters((prev) => ({ ...prev, ...f }))}
             stages={stages}
+            yearOptions={availableYears}
             showVoteFilter={true}
           />
         </div>
