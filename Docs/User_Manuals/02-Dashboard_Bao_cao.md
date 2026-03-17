@@ -53,6 +53,12 @@ Trong khối danh sách công việc, bạn có thể dùng:
 - **Bảng Kanban**: kéo thả theo cột trạng thái (tuỳ thiết kế từng nhóm; nếu có).
 - **Lịch**: xem công việc theo lịch (dựa trên ngày hạn/đầu mốc thời gian).
 
+Khi chọn chế độ **Lịch**, bạn có thể:
+
+- Chuyển **Tháng/Tuần/Ngày** và đổi cách hiển thị theo **Theo hạn / Ngày nhận**.
+- Mở khối **Google Calendar** để **Nhúng** lịch, **Mở** Google Calendar nhanh, hoặc **Đồng bộ** công việc lên Google Calendar.
+- Xem hướng dẫn chi tiết tại [11-Google_Calendar.md](./11-Google_Calendar.md).
+
 ### 3.3) Sắp xếp
 
 Ở chế độ **Bảng**, bấm vào **tiêu đề cột** để sắp xếp tăng/giảm.
@@ -82,4 +88,3 @@ Một số cột thường dùng:
 - Muốn xem “tiến độ theo nhân sự”: dùng badge nhân sự (Filter by staff) và kết hợp status = In Progress.
 - Muốn rà soát công việc quá hạn: lọc status = In Progress và bấm badge “Quá hạn” (nếu có).
 - Muốn chỉ xem công việc “không hoàn thành”: lọc theo badge “Không hoàn thành” hoặc theo bộ lọc “Đánh giá” ở từng trang nhóm.
-

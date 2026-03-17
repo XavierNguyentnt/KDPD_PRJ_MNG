@@ -21,6 +21,7 @@ Tài liệu này hướng dẫn thao tác sử dụng cho người dùng cuối,
 - [08-Thong_bao.md](./08-Thong_bao.md) – Thông báo: quan trọng/đã đọc/chưa đọc, lọc và thao tác nhanh
 - [09-Tai_khoan_Cai_dat.md](./09-Tai_khoan_Cai_dat.md) – Tài khoản cá nhân: avatar, đổi mật khẩu, ngôn ngữ, giao diện
 - [10-Quan_tri_Nguoi_dung.md](./10-Quan_tri_Nguoi_dung.md) – Quản trị người dùng (chỉ Admin)
+- [11-Google_Calendar.md](./11-Google_Calendar.md) – Đồng bộ & nhúng Google Calendar
 
 ## Thuật ngữ và quy ước chung
 
