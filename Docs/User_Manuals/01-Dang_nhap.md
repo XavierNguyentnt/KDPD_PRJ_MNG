@@ -10,7 +10,7 @@
 ## 2) Đăng nhập
 
 1. Nhập **Email** tài khoản (email vnu.edu.vn do Viện Trần Nhân Tông cung cấp).
-2. Nhập **Mật khẩu**.
+2. Nhập **Mật khẩu** (Nhập mật khẩu mặc định do Admin cung cấp cho lần đăng nhập đầu tiên. Vui lòng đổi mật khẩu sau lần đăng nhập này).
 3. Bấm **Đăng nhập**.
 4. Nếu hợp lệ, hệ thống chuyển vào **Dashboard**.
 
