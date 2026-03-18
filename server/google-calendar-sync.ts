@@ -274,6 +274,127 @@ export function createOAuthState(): string {
   return crypto.randomBytes(16).toString("hex");
 }
 
+type GcalOAuthStatePayload = {
+  u: string;
+  r: string;
+  o: string;
+  t: number;
+  n: string;
+};
+
+function b64UrlEncode(input: Buffer | string): string {
+  const b = Buffer.isBuffer(input) ? input : Buffer.from(input, "utf8");
+  return b
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+function b64UrlDecodeToString(input: string): string {
+  const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+  const pad =
+    normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  return Buffer.from(normalized + pad, "base64").toString("utf8");
+}
+
+function getOAuthStateSecret(): string {
+  return (
+    process.env.GOOGLE_OAUTH_STATE_SECRET ||
+    process.env.SESSION_SECRET ||
+    "kdpd-oauth-state-secret-change-in-production"
+  );
+}
+
+export function createGoogleCalendarOAuthState(params: {
+  userId: string;
+  returnTo: string;
+  appOrigin: string;
+}): string {
+  const secret = getOAuthStateSecret();
+  const payload: GcalOAuthStatePayload = {
+    u: String(params.userId || "").trim(),
+    r: String(params.returnTo || "/").trim(),
+    o: String(params.appOrigin || "")
+      .trim()
+      .replace(/\/+$/, ""),
+    t: Date.now(),
+    n: crypto.randomBytes(16).toString("hex"),
+  };
+  const json = JSON.stringify(payload);
+  const data = b64UrlEncode(json);
+  const sig = crypto.createHmac("sha256", secret).update(data).digest();
+  return `${data}.${b64UrlEncode(sig)}`;
+}
+
+export function parseGoogleCalendarOAuthState(state: string): {
+  userId: string;
+  returnTo: string;
+  appOrigin: string;
+} | null {
+  const raw = String(state || "").trim();
+  const parts = raw.split(".");
+  if (parts.length !== 2) return null;
+  const [data, sigB64] = parts;
+  if (!data || !sigB64) return null;
+
+  const secret = getOAuthStateSecret();
+  const expected = crypto.createHmac("sha256", secret).update(data).digest();
+  const providedRaw = (() => {
+    try {
+      const normalized = sigB64.replace(/-/g, "+").replace(/_/g, "/");
+      const pad =
+        normalized.length % 4 === 0
+          ? ""
+          : "=".repeat(4 - (normalized.length % 4));
+      return Buffer.from(normalized + pad, "base64");
+    } catch {
+      return Buffer.alloc(0);
+    }
+  })();
+  if (
+    providedRaw.length !== expected.length ||
+    !crypto.timingSafeEqual(providedRaw, expected)
+  ) {
+    return null;
+  }
+
+  let payload: GcalOAuthStatePayload | null = null;
+  try {
+    payload = JSON.parse(b64UrlDecodeToString(data)) as GcalOAuthStatePayload;
+  } catch {
+    payload = null;
+  }
+  if (!payload) return null;
+  if (typeof payload.u !== "string" || !payload.u.trim()) return null;
+  if (typeof payload.r !== "string") return null;
+  if (typeof payload.o !== "string") return null;
+  if (typeof payload.t !== "number") return null;
+  const age = Date.now() - payload.t;
+  if (!Number.isFinite(age) || age < 0 || age > 20 * 60 * 1000) return null;
+
+  const returnToRaw = payload.r.trim() || "/";
+  const returnTo =
+    returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")
+      ? returnToRaw
+      : "/";
+
+  const originRaw = payload.o.trim().replace(/\/+$/, "");
+  let appOrigin = "";
+  if (originRaw) {
+    try {
+      const u = new URL(originRaw);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        appOrigin = `${u.protocol}//${u.host}`;
+      }
+    } catch {
+      appOrigin = "";
+    }
+  }
+
+  return { userId: payload.u.trim(), returnTo, appOrigin };
+}
+
 export async function connectGoogleCalendarWithCode(params: {
   userId: string;
   code: string;

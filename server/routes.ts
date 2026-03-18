@@ -25,7 +25,8 @@ import { getPublicKey as getPushPublicKey, sendWebPushToUser } from "./push";
 import {
   buildGoogleCalendarAuthUrl,
   connectGoogleCalendarWithCode,
-  createOAuthState,
+  createGoogleCalendarOAuthState,
+  parseGoogleCalendarOAuthState,
   deleteGoogleCalendarEventsForAssignmentIds,
   disconnectGoogleCalendar,
   getGoogleCalendarSyncStatus,
@@ -1017,10 +1018,14 @@ export async function registerRoutes(
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "");
         const groupKey = norm(group);
-        const cvChungKeys = new Set([norm("Công việc chung"), norm("CV chung")]);
+        const cvChungKeys = new Set([
+          norm("Công việc chung"),
+          norm("CV chung"),
+        ]);
         if (!groupKey) {
           return res.status(400).json({
-            message: "Nhân viên phải chọn nhóm công việc khi tạo công việc mới.",
+            message:
+              "Nhân viên phải chọn nhóm công việc khi tạo công việc mới.",
           });
         }
         if (!cvChungKeys.has(groupKey)) {
@@ -1352,26 +1357,32 @@ export async function registerRoutes(
     }
   });
 
-  app.patch(api.notifications.markUnread.path, requireAuth, async (req, res) => {
-    try {
-      if (!db)
-        return res.status(503).json({ message: "Database not configured" });
-      const userId = (req.user as UserWithRolesAndGroups).id;
-      const id = Array.isArray(req.params.id)
-        ? req.params.id[0]
-        : req.params.id;
-      const updated = await dbStorage.markNotificationAsUnread(userId, id);
-      if (!updated)
-        return res.status(404).json({ message: "Notification not found" });
-      res.json(updated);
-    } catch (err) {
-      console.error("Error marking notification as unread:", err);
-      res.status(500).json({
-        message:
-          err instanceof Error ? err.message : "Failed to update notification",
-      });
-    }
-  });
+  app.patch(
+    api.notifications.markUnread.path,
+    requireAuth,
+    async (req, res) => {
+      try {
+        if (!db)
+          return res.status(503).json({ message: "Database not configured" });
+        const userId = (req.user as UserWithRolesAndGroups).id;
+        const id = Array.isArray(req.params.id)
+          ? req.params.id[0]
+          : req.params.id;
+        const updated = await dbStorage.markNotificationAsUnread(userId, id);
+        if (!updated)
+          return res.status(404).json({ message: "Notification not found" });
+        res.json(updated);
+      } catch (err) {
+        console.error("Error marking notification as unread:", err);
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to update notification",
+        });
+      }
+    },
+  );
 
   app.patch(
     api.notifications.setImportant.path,
@@ -1406,21 +1417,27 @@ export async function registerRoutes(
     },
   );
 
-  app.post(api.notifications.markAllRead.path, requireAuth, async (req, res) => {
-    try {
-      if (!db)
-        return res.status(503).json({ message: "Database not configured" });
-      const userId = (req.user as UserWithRolesAndGroups).id;
-      const updated = await dbStorage.markAllNotificationsAsRead(userId);
-      res.json({ updated });
-    } catch (err) {
-      console.error("Error marking all notifications as read:", err);
-      res.status(500).json({
-        message:
-          err instanceof Error ? err.message : "Failed to update notifications",
-      });
-    }
-  });
+  app.post(
+    api.notifications.markAllRead.path,
+    requireAuth,
+    async (req, res) => {
+      try {
+        if (!db)
+          return res.status(503).json({ message: "Database not configured" });
+        const userId = (req.user as UserWithRolesAndGroups).id;
+        const updated = await dbStorage.markAllNotificationsAsRead(userId);
+        res.json({ updated });
+      } catch (err) {
+        console.error("Error marking all notifications as read:", err);
+        res.status(500).json({
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to update notifications",
+        });
+      }
+    },
+  );
 
   // ---------- Works & Translation/Proofreading contracts (Work–Contract taxonomy) ----------
   app.get(api.works.list.path, requireAuth, async (_req, res) => {
@@ -4458,15 +4475,22 @@ export async function registerRoutes(
           "Google Calendar chưa được cấu hình. Thiếu: " + missing.join(", "),
       });
     }
-    const state = createOAuthState();
     const returnToRaw =
       typeof req.query.returnTo === "string" ? req.query.returnTo : "/";
     const returnTo =
       returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")
         ? returnToRaw
         : "/";
-    (req.session as any).gcalOAuthState = state;
-    (req.session as any).gcalReturnTo = returnTo;
+    const host = String(req.get("host") || "").trim();
+    const appOrigin = host
+      ? `${req.protocol}://${host}`.replace(/\/+$/, "")
+      : "";
+    const userId = (req.user as UserWithRolesAndGroups).id;
+    const state = createGoogleCalendarOAuthState({
+      userId,
+      returnTo,
+      appOrigin,
+    });
     const url = buildGoogleCalendarAuthUrl({ state });
     if (!url) {
       return res.status(503).json({
@@ -4477,38 +4501,32 @@ export async function registerRoutes(
     return res.redirect(url);
   });
 
-  app.get(
-    "/api/google-calendar/oauth2/callback",
-    requireAuth,
-    async (req, res) => {
-      try {
-        const code = typeof req.query.code === "string" ? req.query.code : "";
-        const state =
-          typeof req.query.state === "string" ? req.query.state : "";
-        const expected = String((req.session as any).gcalOAuthState ?? "");
-        if (!code || !state || !expected || state !== expected) {
-          return res.status(400).json({ message: "Invalid OAuth state/code" });
-        }
-        const userId = (req.user as UserWithRolesAndGroups).id;
-        await connectGoogleCalendarWithCode({ userId, code });
-        const returnTo = String((req.session as any).gcalReturnTo ?? "/");
-        (req.session as any).gcalOAuthState = null;
-        (req.session as any).gcalReturnTo = null;
-        const safeReturnTo =
-          returnTo.startsWith("/") && !returnTo.startsWith("//")
-            ? returnTo
-            : "/";
-        const url = safeReturnTo.includes("?")
-          ? `${safeReturnTo}&gcal=connected`
-          : `${safeReturnTo}?gcal=connected`;
-        return res.redirect(url);
-      } catch (err) {
-        return res.status(500).json({
-          message: err instanceof Error ? err.message : "OAuth callback failed",
-        });
+  app.get("/api/google-calendar/oauth2/callback", async (req, res) => {
+    try {
+      const code = typeof req.query.code === "string" ? req.query.code : "";
+      const state = typeof req.query.state === "string" ? req.query.state : "";
+      const parsed = state ? parseGoogleCalendarOAuthState(state) : null;
+      if (!code || !parsed) {
+        return res.status(400).json({ message: "Invalid OAuth state/code" });
       }
-    },
-  );
+      await connectGoogleCalendarWithCode({ userId: parsed.userId, code });
+      const safeReturnTo =
+        parsed.returnTo.startsWith("/") && !parsed.returnTo.startsWith("//")
+          ? parsed.returnTo
+          : "/";
+      const withFlag = safeReturnTo.includes("?")
+        ? `${safeReturnTo}&gcal=connected`
+        : `${safeReturnTo}?gcal=connected`;
+      const dest = parsed.appOrigin
+        ? `${parsed.appOrigin}${withFlag}`
+        : withFlag;
+      return res.redirect(dest);
+    } catch (err) {
+      return res.status(500).json({
+        message: err instanceof Error ? err.message : "OAuth callback failed",
+      });
+    }
+  });
 
   app.post("/api/google-calendar/settings", requireAuth, async (req, res) => {
     try {
