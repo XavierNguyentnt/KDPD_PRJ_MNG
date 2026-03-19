@@ -5,22 +5,47 @@ import { useUsers } from "@/hooks/use-works-and-components";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
+import { api } from "@shared/routes";
+
+function normalizeDisplayName(s: string) {
+  return s.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
 
 export default function Team() {
   const { language } = useI18n();
   const { data: tasks, isLoading } = useTasks();
   const { data: users } = useUsers();
 
+  const userByNormalizedName = useMemo(() => {
+    const map = new Map<
+      string,
+      { id: string; avatarPath: string | null; updatedAt: unknown }
+    >();
+    for (const u of (users ?? []) as any[]) {
+      const id = typeof u?.id === "string" ? u.id : "";
+      const displayName =
+        typeof u?.displayName === "string" ? u.displayName : "";
+      const key = normalizeDisplayName(displayName);
+      if (!id || !key) continue;
+      map.set(key, {
+        id,
+        avatarPath:
+          typeof u?.avatarPath === "string" && u.avatarPath.trim()
+            ? u.avatarPath
+            : null,
+        updatedAt: u?.updatedAt,
+      });
+    }
+    return map;
+  }, [users]);
+
   const teamStats = useMemo(() => {
     if (!tasks) return [];
-
-    const normalize = (s: string) =>
-      s.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 
     const userGroupByName = new Map<string, string>();
     for (const u of (users ?? []) as any[]) {
       const name = typeof u?.displayName === "string" ? u.displayName : "";
-      const key = normalize(name);
+      const key = normalizeDisplayName(name);
       if (!key) continue;
       const groups = Array.isArray(u?.groups) ? u.groups : [];
       const groupNames = groups
@@ -91,7 +116,7 @@ export default function Team() {
       }
 
       for (const name of assignees) {
-        const k = normalize(name);
+        const k = normalizeDisplayName(name);
         if (!stats[k]) {
           const grp = userGroupByName.get(k) ?? "";
           stats[k] = {
@@ -147,14 +172,22 @@ export default function Team() {
         {teamStats.map((member) => (
           <Card key={member.name} className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center gap-4 pb-2">
+              {(() => {
+                const key = normalizeDisplayName(member.name);
+                const u = userByNormalizedName.get(key);
+                const avatarSrc =
+                  u?.id && u?.avatarPath
+                    ? `${api.users.avatar.path.replace(":id", u.id)}?v=${encodeURIComponent(String(u.updatedAt ?? ""))}`
+                    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.name}`;
+                return (
               <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
-                <AvatarImage
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.name}`}
-                />
+                <AvatarImage src={avatarSrc} />
                 <AvatarFallback>
                   {member.name.substring(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
+                );
+              })()}
               <div className="flex flex-col">
                 <CardTitle className="text-base font-semibold">
                   {member.name}
