@@ -831,7 +831,10 @@ export default function BienTapPage() {
             <AlertDialogAction
               onClick={() => {
                 if (!deleteTaskTarget?.id) return;
-                if ((deleteTaskTarget as any).createdBy !== user?.id) {
+                if (
+                  role !== UserRole.ADMIN &&
+                  (deleteTaskTarget as any).createdBy !== user?.id
+                ) {
                   toast({
                     title: t.common.error,
                     description:

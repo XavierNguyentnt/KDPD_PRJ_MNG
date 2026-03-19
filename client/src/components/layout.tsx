@@ -13,7 +13,6 @@ import {
   Sun,
   Moon,
   Shield,
-  UserCog,
   FileText,
   Menu,
   X,
@@ -371,7 +370,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       : []),
     { href: "/team", label: language === "vi" ? "Nhóm" : "Team", icon: Users },
     ...(role === UserRole.ADMIN
-      ? [{ href: "/admin/users", label: "Quản lý người dùng", icon: UserCog }]
+      ? [
+          {
+            href: "/admin",
+            label: language === "vi" ? "Quản trị" : "Admin",
+            icon: Shield,
+          },
+        ]
       : []),
   ];
 

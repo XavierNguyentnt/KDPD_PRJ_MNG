@@ -695,7 +695,10 @@ export default function ThietKePage() {
             <AlertDialogAction
               onClick={() => {
                 if (!deleteConfirm.target?.id) return;
-                if ((deleteConfirm.target as any).createdBy !== user?.id) {
+                if (
+                  role !== UserRole.ADMIN &&
+                  (deleteConfirm.target as any).createdBy !== user?.id
+                ) {
                   toast({
                     title: t.common.error,
                     description:

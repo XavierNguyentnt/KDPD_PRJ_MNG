@@ -13,7 +13,7 @@ import BienTapPage from "@/pages/bien-tap";
 import ThietKePage from "@/pages/thiet-ke";
 import CNTTPage from "@/pages/cntt";
 import Team from "@/pages/team";
-import AdminUsersPage from "@/pages/admin-users";
+import AdminDashboardPage from "@/pages/admin-dashboard";
 import ThuKyHopPhanPage from "@/pages/thu-ky-hop-phan";
 import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
@@ -137,7 +137,7 @@ function GuardedCNTTPage() {
   return <CNTTPage />;
 }
 
-function GuardedAdminUsersPage() {
+function GuardedAdminDashboardPage() {
   const { role } = useAuth();
   const [_, navigate] = useLocation();
   const allowed = role === UserRole.ADMIN;
@@ -145,7 +145,18 @@ function GuardedAdminUsersPage() {
     navigate("/");
     return null;
   }
-  return <AdminUsersPage />;
+  return <AdminDashboardPage />;
+}
+
+function RedirectLegacyAdminUsersPage() {
+  const { role } = useAuth();
+  const [_, navigate] = useLocation();
+  if (role === UserRole.ADMIN) {
+    navigate("/admin");
+    return null;
+  }
+  navigate("/");
+  return null;
 }
 
 function Router() {
@@ -166,7 +177,8 @@ function Router() {
         <Route path="/thu-ky-hop-phan" component={ThuKyHopPhanPage} />
         <Route path="/thu-ky-hop-phan/:sub" component={ThuKyHopPhanPage} />
         <Route path="/team" component={Team} />
-        <Route path="/admin/users" component={GuardedAdminUsersPage} />
+        <Route path="/admin" component={GuardedAdminDashboardPage} />
+        <Route path="/admin/users" component={RedirectLegacyAdminUsersPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
