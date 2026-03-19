@@ -203,6 +203,7 @@ export function TaskTable({
 
   const getAssignmentLabel = (stageType: string): string => {
     if (stageType === "kiem_soat") return language === "vi" ? "Người kiểm soát" : "Controller";
+    if (stageType === "btv") return language === "vi" ? "BTV" : "Editor";
     if (stageType.startsWith("nhan_su_")) return (language === "vi" ? "Nhân sự " : "Staff ") + stageType.replace("nhan_su_", "");
     if (stageType === "primary") return language === "vi" ? "Người thực hiện" : "Assignee";
     if (stageType === "ktv_chinh") return language === "vi" ? "KTV chính" : "Lead";

@@ -267,6 +267,13 @@ export const api = {
         200: z.array(z.custom<typeof users.$inferSelect>()),
       },
     },
+    listTaskFilterStaff: {
+      method: "GET" as const,
+      path: "/api/users/task-filter-staff",
+      responses: {
+        200: z.array(z.custom<typeof users.$inferSelect>()),
+      },
+    },
     uploadAvatar: {
       method: "POST" as const,
       path: "/api/users/me/avatar",

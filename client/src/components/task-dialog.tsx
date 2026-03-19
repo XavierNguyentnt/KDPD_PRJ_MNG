@@ -282,7 +282,9 @@ export function TaskDialog({
   const redoMutation = useRedoTask();
   const isNewTask = !task;
   const [isEditing, setIsEditing] = useState(false);
-  const canDeleteTask = !!task && (task as any).createdBy === user?.id;
+  const canDeleteTask =
+    !!task &&
+    (role === UserRole.ADMIN || (task as any).createdBy === user?.id);
 
   const parseYyyyMmDdLocal = (
     value: string | null | undefined,
@@ -617,6 +619,11 @@ export function TaskDialog({
     dueDate: string | null;
     completeDate: string;
   };
+  type ThietKeMetaSlot = {
+    enabled: boolean;
+    displayName: string;
+    userId: string | null;
+  };
   const [thietKeKtvChinh, setThietKeKtvChinh] = useState<ThietKeSlot>({
     id: "ktv",
     displayName: "",
@@ -626,6 +633,16 @@ export function TaskDialog({
     completeDate: "",
   });
   const [thietKeTroLyList, setThietKeTroLyList] = useState<ThietKeSlot[]>([]);
+  const [thietKeBtv, setThietKeBtv] = useState<ThietKeMetaSlot>({
+    enabled: false,
+    displayName: "",
+    userId: null,
+  });
+  const [thietKeKiemSoat, setThietKeKiemSoat] = useState<ThietKeMetaSlot>({
+    enabled: false,
+    displayName: "",
+    userId: null,
+  });
 
   // Công việc chung / CNTT: nhiều nhân sự (Nhân sự 1, 2, ... Người kiểm soát) — mỗi người có ngày nhận, hạn, ngày hoàn thành thực tế, trạng thái, tiến độ
   type MultiAssigneeSlot = {
@@ -762,6 +779,8 @@ export function TaskDialog({
         completeDate: "",
       });
       setThietKeTroLyList([]);
+      setThietKeBtv({ enabled: false, displayName: "", userId: null });
+      setThietKeKiemSoat({ enabled: false, displayName: "", userId: null });
       return;
     }
     const toDateStr = (v: string | Date | null | undefined) => {
@@ -805,6 +824,34 @@ export function TaskDialog({
         dueDate: null,
         completeDate: "",
       });
+    }
+    const btv = taskAssignmentsList.find(
+      (a: { stageType: string }) => a.stageType === "btv",
+    ) as { userId: string } | undefined;
+    if (btv?.userId) {
+      setThietKeBtv({
+        enabled: true,
+        displayName:
+          users.find((u: { id: string }) => u.id === btv.userId)?.displayName ??
+          "",
+        userId: btv.userId,
+      });
+    } else {
+      setThietKeBtv({ enabled: false, displayName: "", userId: null });
+    }
+    const kiemSoat = taskAssignmentsList.find(
+      (a: { stageType: string }) => a.stageType === "kiem_soat",
+    ) as { userId: string } | undefined;
+    if (kiemSoat?.userId) {
+      setThietKeKiemSoat({
+        enabled: true,
+        displayName:
+          users.find((u: { id: string }) => u.id === kiemSoat.userId)
+            ?.displayName ?? "",
+        userId: kiemSoat.userId,
+      });
+    } else {
+      setThietKeKiemSoat({ enabled: false, displayName: "", userId: null });
     }
     const troLyAssignments = taskAssignmentsList.filter(
       (a: { stageType: string }) => a.stageType?.startsWith("tro_ly_"),
@@ -1017,53 +1064,103 @@ export function TaskDialog({
         merged.title = `[Bản sao của] ${initialValues.title}`;
       }
       form.reset(merged);
-      if ((initialValues as any)?.__thietKeKtvChinh) {
-        const v = (initialValues as any).__thietKeKtvChinh as {
-          displayName?: string;
-          userId?: string | null;
-          receiveDate?: string;
-          dueDate?: string | null;
-          completeDate?: string;
-        };
+      const mergedGroup =
+        (merged as { group?: string | null })?.group ?? defaultGroup ?? null;
+      if (mergedGroup === "Thiết kế") {
+        if ((initialValues as any)?.__thietKeKtvChinh) {
+          const v = (initialValues as any).__thietKeKtvChinh as {
+            displayName?: string;
+            userId?: string | null;
+            receiveDate?: string;
+            dueDate?: string | null;
+            completeDate?: string;
+          };
+          setThietKeKtvChinh({
+            id: "ktv",
+            displayName: v?.displayName ?? "",
+            userId: v?.userId ?? null,
+            receiveDate: v?.receiveDate ?? "",
+            dueDate: v?.dueDate ?? null,
+            completeDate: v?.completeDate ?? "",
+          });
+        } else {
+          setThietKeKtvChinh({
+            id: "ktv",
+            displayName: "",
+            userId: null,
+            receiveDate: "",
+            dueDate: null,
+            completeDate: "",
+          });
+        }
+        if ((initialValues as any)?.__thietKeTroLyList) {
+          const list = (initialValues as any).__thietKeTroLyList as Array<{
+            displayName?: string;
+            userId?: string | null;
+            receiveDate?: string;
+            dueDate?: string | null;
+            completeDate?: string;
+          }>;
+          if (Array.isArray(list)) {
+            setThietKeTroLyList(
+              list.map((s, idx) => ({
+                id: "tly-" + (s.userId ?? idx),
+                displayName: s.displayName ?? "",
+                userId: s.userId ?? null,
+                receiveDate: s.receiveDate ?? "",
+                dueDate: s.dueDate ?? null,
+                completeDate: s.completeDate ?? "",
+              })),
+            );
+          } else {
+            setThietKeTroLyList([]);
+          }
+        } else {
+          setThietKeTroLyList([]);
+        }
+        if ((initialValues as any)?.__thietKeBtv) {
+          const v = (initialValues as any).__thietKeBtv as {
+            displayName?: string;
+            userId?: string | null;
+          };
+          setThietKeBtv({
+            enabled: true,
+            displayName: v?.displayName ?? "",
+            userId: v?.userId ?? null,
+          });
+        } else {
+          setThietKeBtv({ enabled: false, displayName: "", userId: null });
+        }
+        if ((initialValues as any)?.__thietKeKiemSoat) {
+          const v = (initialValues as any).__thietKeKiemSoat as {
+            displayName?: string;
+            userId?: string | null;
+          };
+          setThietKeKiemSoat({
+            enabled: true,
+            displayName: v?.displayName ?? "",
+            userId: v?.userId ?? null,
+          });
+        } else {
+          setThietKeKiemSoat({
+            enabled: false,
+            displayName: "",
+            userId: null,
+          });
+        }
+      } else {
         setThietKeKtvChinh({
           id: "ktv",
-          displayName: v?.displayName ?? "",
-          userId: v?.userId ?? null,
-          receiveDate: v?.receiveDate ?? "",
-          dueDate: v?.dueDate ?? null,
-          completeDate: v?.completeDate ?? "",
+          displayName: "",
+          userId: null,
+          receiveDate: "",
+          dueDate: null,
+          completeDate: "",
         });
+        setThietKeTroLyList([]);
+        setThietKeBtv({ enabled: false, displayName: "", userId: null });
+        setThietKeKiemSoat({ enabled: false, displayName: "", userId: null });
       }
-      if ((initialValues as any)?.__thietKeTroLyList) {
-        const list = (initialValues as any).__thietKeTroLyList as Array<{
-          displayName?: string;
-          userId?: string | null;
-          receiveDate?: string;
-          dueDate?: string | null;
-          completeDate?: string;
-        }>;
-        if (Array.isArray(list)) {
-          setThietKeTroLyList(
-            list.map((s, idx) => ({
-              id: "tly-" + (s.userId ?? idx),
-              displayName: s.displayName ?? "",
-              userId: s.userId ?? null,
-              receiveDate: s.receiveDate ?? "",
-              dueDate: s.dueDate ?? null,
-              completeDate: s.completeDate ?? "",
-            })),
-          );
-        }
-      }
-      setThietKeKtvChinh({
-        id: "ktv",
-        displayName: "",
-        userId: null,
-        receiveDate: "",
-        dueDate: null,
-        completeDate: "",
-      });
-      setThietKeTroLyList([]);
       setMultiAssigneesList([
         {
           id: "1",
@@ -1152,6 +1249,14 @@ export function TaskDialog({
         (a.stageType === "kiem_soat" || a.stageType === "doc_duyet"),
     );
   }, [taskWithAssignments, currentUserId]);
+  const isAssigneeForThisTask = useMemo(() => {
+    const list = (taskWithAssignments as any)?.assignments as
+      | Array<{ userId: string; stageType: string }>
+      | undefined;
+    if (!Array.isArray(list) || !currentUserId) return false;
+    return list.some((a) => a.userId === currentUserId);
+  }, [taskWithAssignments, currentUserId]);
+  const canEditNotesRaw = !isNewTask && isAssigneeForThisTask;
 
   useEffect(() => {
     if (!open) {
@@ -1547,7 +1652,7 @@ export function TaskDialog({
 
       // Thiết kế: gửi assignments từ Kỹ thuật viên chính + Trợ lý thiết kế
       if (selectedGroup === "Thiết kế") {
-        const thietKeAssignments: Array<{
+        const designWorkAssignments: Array<{
           userId: string;
           stageType: string;
           roundNumber: number;
@@ -1558,7 +1663,7 @@ export function TaskDialog({
           progress: number;
         }> = [];
         if (thietKeKtvChinh.userId) {
-          thietKeAssignments.push({
+          designWorkAssignments.push({
             userId: thietKeKtvChinh.userId,
             stageType: "ktv_chinh",
             roundNumber: 1,
@@ -1571,7 +1676,7 @@ export function TaskDialog({
         }
         thietKeTroLyList.forEach((slot, i) => {
           if (slot.userId) {
-            thietKeAssignments.push({
+            designWorkAssignments.push({
               userId: slot.userId,
               stageType: `tro_ly_${i + 1}`,
               roundNumber: 1,
@@ -1583,9 +1688,46 @@ export function TaskDialog({
             });
           }
         });
-        if (thietKeAssignments.length > 0)
-          payload.assignments = thietKeAssignments;
-        const anyCompleted = thietKeAssignments.some((a) => !!a.completedAt);
+        const designMetaAssignments: Array<{
+          userId: string;
+          stageType: string;
+          roundNumber: number;
+          receivedAt: null;
+          dueDate: null;
+          completedAt: null;
+          status: string;
+          progress: number;
+        }> = [];
+        if (thietKeBtv.enabled && thietKeBtv.userId) {
+          designMetaAssignments.push({
+            userId: thietKeBtv.userId,
+            stageType: "btv",
+            roundNumber: 1,
+            receivedAt: null,
+            dueDate: null,
+            completedAt: null,
+            status: "not_started",
+            progress: 0,
+          });
+        }
+        if (thietKeKiemSoat.enabled && thietKeKiemSoat.userId) {
+          designMetaAssignments.push({
+            userId: thietKeKiemSoat.userId,
+            stageType: "kiem_soat",
+            roundNumber: 1,
+            receivedAt: null,
+            dueDate: null,
+            completedAt: null,
+            status: "not_started",
+            progress: 0,
+          });
+        }
+        const thietKeAssignments = [
+          ...designWorkAssignments,
+          ...designMetaAssignments,
+        ];
+        if (thietKeAssignments.length > 0) payload.assignments = thietKeAssignments;
+        const anyCompleted = designWorkAssignments.some((a) => !!a.completedAt);
         if (anyCompleted) payload.status = "Completed";
         const maxDueTc = maxDateString(
           thietKeKtvChinh.dueDate,
@@ -1597,8 +1739,8 @@ export function TaskDialog({
         );
         payload.dueDate = maxDueTc ?? null;
         payload.actualCompletedAt = maxActualTc ?? null;
-        const nTc = thietKeAssignments.length;
-        const mTc = thietKeAssignments.filter((a) => !!a.completedAt).length;
+        const nTc = designWorkAssignments.length;
+        const mTc = designWorkAssignments.filter((a) => !!a.completedAt).length;
         payload.progress = nTc === 0 ? 0 : Math.round((100 / nTc) * mTc);
       }
       // Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần: gửi assignments từ danh sách nhiều nhân sự
@@ -1861,7 +2003,7 @@ export function TaskDialog({
 
     // Thiết kế: gửi assignments từ KTV chính + Trợ lý thiết kế
     if (canEditMeta && task.group === "Thiết kế") {
-      const thietKeAssignments: Array<{
+      const designWorkAssignments: Array<{
         userId: string;
         stageType: string;
         roundNumber: number;
@@ -1872,7 +2014,7 @@ export function TaskDialog({
         progress: number;
       }> = [];
       if (thietKeKtvChinh.userId) {
-        thietKeAssignments.push({
+        designWorkAssignments.push({
           userId: thietKeKtvChinh.userId,
           stageType: "ktv_chinh",
           roundNumber: 1,
@@ -1885,7 +2027,7 @@ export function TaskDialog({
       }
       thietKeTroLyList.forEach((slot, i) => {
         if (slot.userId) {
-          thietKeAssignments.push({
+          designWorkAssignments.push({
             userId: slot.userId,
             stageType: `tro_ly_${i + 1}`,
             roundNumber: 1,
@@ -1897,8 +2039,46 @@ export function TaskDialog({
           });
         }
       });
+      const designMetaAssignments: Array<{
+        userId: string;
+        stageType: string;
+        roundNumber: number;
+        receivedAt: null;
+        dueDate: null;
+        completedAt: null;
+        status: string;
+        progress: number;
+      }> = [];
+      if (thietKeBtv.enabled && thietKeBtv.userId) {
+        designMetaAssignments.push({
+          userId: thietKeBtv.userId,
+          stageType: "btv",
+          roundNumber: 1,
+          receivedAt: null,
+          dueDate: null,
+          completedAt: null,
+          status: "not_started",
+          progress: 0,
+        });
+      }
+      if (thietKeKiemSoat.enabled && thietKeKiemSoat.userId) {
+        designMetaAssignments.push({
+          userId: thietKeKiemSoat.userId,
+          stageType: "kiem_soat",
+          roundNumber: 1,
+          receivedAt: null,
+          dueDate: null,
+          completedAt: null,
+          status: "not_started",
+          progress: 0,
+        });
+      }
+      const thietKeAssignments = [
+        ...designWorkAssignments,
+        ...designMetaAssignments,
+      ];
       (payload as Record<string, unknown>).assignments = thietKeAssignments;
-      const anyCompleted = thietKeAssignments.some((a) => !!a.completedAt);
+      const anyCompleted = designWorkAssignments.some((a) => !!a.completedAt);
       if (anyCompleted)
         (payload as Record<string, unknown>).status = "Completed";
       const maxDueTc = maxDateString(
@@ -1912,8 +2092,8 @@ export function TaskDialog({
       (payload as Record<string, unknown>).dueDate = maxDueTc ?? null;
       (payload as Record<string, unknown>).actualCompletedAt =
         maxActualTc ?? null;
-      const nTc = thietKeAssignments.length;
-      const mTc = thietKeAssignments.filter((a) => !!a.completedAt).length;
+      const nTc = designWorkAssignments.length;
+      const mTc = designWorkAssignments.filter((a) => !!a.completedAt).length;
       (payload as Record<string, unknown>).progress =
         nTc === 0 ? 0 : Math.round((100 / nTc) * mTc);
     }
@@ -2817,6 +2997,129 @@ export function TaskDialog({
                     : "Lead technician and design assistant(s)."}
                 </p>
                 <div className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {!thietKeBtv.enabled && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setThietKeBtv({
+                            enabled: true,
+                            displayName: "",
+                            userId: null,
+                          })
+                        }
+                        disabled={!canEditMeta && !isNewTask}>
+                        + {language === "vi" ? "Thêm BTV" : "Add editor"}
+                      </Button>
+                    )}
+                    {!thietKeKiemSoat.enabled && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setThietKeKiemSoat({
+                            enabled: true,
+                            displayName: "",
+                            userId: null,
+                          })
+                        }
+                        disabled={!canEditMeta && !isNewTask}>
+                        +{" "}
+                        {language === "vi"
+                          ? "Thêm Người kiểm soát"
+                          : "Add controller"}
+                      </Button>
+                    )}
+                  </div>
+                  {thietKeBtv.enabled && (
+                    <div className="flex flex-wrap items-end gap-4 p-3 rounded-lg border bg-muted/20">
+                      <div className="flex-1 min-w-[200px]">
+                        <AssigneePicker
+                          label={
+                            language === "vi"
+                              ? "Biên tập viên (BTV)"
+                              : "Editor"
+                          }
+                          value={thietKeBtv.displayName}
+                          assigneeId={thietKeBtv.userId}
+                          onChange={(displayName, userId) =>
+                            setThietKeBtv({
+                              enabled: true,
+                              displayName,
+                              userId,
+                            })
+                          }
+                          disabled={!canEditMeta && !isNewTask}
+                          placeholder={
+                            language === "vi"
+                              ? "Tìm theo tên hoặc email..."
+                              : "Search by name or email..."
+                          }
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() =>
+                          setThietKeBtv({
+                            enabled: false,
+                            displayName: "",
+                            userId: null,
+                          })
+                        }
+                        disabled={!canEditMeta && !isNewTask}>
+                        ×
+                      </Button>
+                    </div>
+                  )}
+                  {thietKeKiemSoat.enabled && (
+                    <div className="flex flex-wrap items-end gap-4 p-3 rounded-lg border bg-muted/20">
+                      <div className="flex-1 min-w-[200px]">
+                        <AssigneePicker
+                          label={
+                            language === "vi"
+                              ? "Người kiểm soát"
+                              : "Controller"
+                          }
+                          value={thietKeKiemSoat.displayName}
+                          assigneeId={thietKeKiemSoat.userId}
+                          onChange={(displayName, userId) =>
+                            setThietKeKiemSoat({
+                              enabled: true,
+                              displayName,
+                              userId,
+                            })
+                          }
+                          disabled={!canEditMeta && !isNewTask}
+                          placeholder={
+                            language === "vi"
+                              ? "Tìm theo tên hoặc email..."
+                              : "Search by name or email..."
+                          }
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() =>
+                          setThietKeKiemSoat({
+                            enabled: false,
+                            displayName: "",
+                            userId: null,
+                          })
+                        }
+                        disabled={!canEditMeta && !isNewTask}>
+                        ×
+                      </Button>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-end gap-4 p-3 rounded-lg border bg-muted/20">
                     <div className="flex-1 min-w-[200px]">
                       <AssigneePicker
@@ -3879,6 +4182,7 @@ export function TaskDialog({
                   {...form.register("notes")}
                   placeholder={t.task.notes + "..."}
                   className="min-h-[100px] resize-none"
+                  disabled={!isNewTask && (!isEditing || !(canEditMetaRaw || canEditNotesRaw))}
                 />
               </div>
             </div>
@@ -3931,7 +4235,7 @@ export function TaskDialog({
                 onClick={() => onOpenChange(false)}>
                 {t.common.cancel}
               </Button>
-              {!isNewTask && canEditMetaRaw && !isEditing && (
+              {!isNewTask && (canEditMetaRaw || canEditNotesRaw) && !isEditing && (
                 <Button type="button" onClick={() => setIsEditing(true)}>
                   {language === "vi" ? "Cập nhật" : "Update"}
                 </Button>

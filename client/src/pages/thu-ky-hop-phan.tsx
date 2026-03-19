@@ -16,7 +16,10 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
-import { useUsers } from "@/hooks/use-works-and-components";
+import {
+  useUsers,
+  useTaskFilterStaffUsers,
+} from "@/hooks/use-works-and-components";
 import { TranslatorPicker } from "@/components/translator-picker";
 import {
   TaskTable,
@@ -870,6 +873,7 @@ export default function ThuKyHopPhanPage() {
     isError: tasksError,
   } = useTasks();
   const { data: users = [] } = useUsers();
+  const { data: taskFilterUsers = [] } = useTaskFilterStaffUsers();
   const { data: works = [], isLoading: worksLoading } = useQuery({
     queryKey: ["works"],
     queryFn: fetchWorks,
@@ -3341,7 +3345,7 @@ export default function ThuKyHopPhanPage() {
             </div>
             <div className="px-4 py-3 border-b border-border bg-muted/20">
               <TaskFilters
-                users={users}
+                users={taskFilterUsers}
                 components={taskComponentOptions}
                 filters={taskFilters}
                 onFiltersChange={(f) =>

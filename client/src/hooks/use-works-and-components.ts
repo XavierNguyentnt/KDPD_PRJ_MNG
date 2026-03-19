@@ -37,3 +37,17 @@ export function useUsers() {
     },
   });
 }
+
+export function useTaskFilterStaffUsers() {
+  return useQuery({
+    queryKey: [api.users.listTaskFilterStaff.path],
+    queryFn: async (): Promise<User[]> => {
+      const res = await fetch(api.users.listTaskFilterStaff.path, {
+        credentials: "include",
+      });
+      if (res.status === 503) return [];
+      if (!res.ok) throw new Error("Failed to fetch task-filter staff users");
+      return api.users.listTaskFilterStaff.responses[200].parse(await res.json());
+    },
+  });
+}

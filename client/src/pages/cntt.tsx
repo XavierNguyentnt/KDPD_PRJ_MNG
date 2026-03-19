@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useWorks,
   useComponents,
-  useUsers,
+  useTaskFilterStaffUsers,
 } from "@/hooks/use-works-and-components";
 import { TaskStatsBadgesOnly } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
@@ -310,7 +310,7 @@ export default function CNTTPage() {
   const deleteConfirm = useConfirmDialog<TaskWithAssignmentDetails>();
 
   const { data: components = [] } = useComponents();
-  const usersQuery = useUsers();
+  const usersQuery = useTaskFilterStaffUsers();
   const users = usersQuery.data ?? [];
   const stages = useMemo(
     () =>

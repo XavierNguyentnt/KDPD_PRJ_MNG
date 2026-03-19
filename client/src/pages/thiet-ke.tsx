@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useWorks,
   useComponents,
-  useUsers,
+  useTaskFilterStaffUsers,
 } from "@/hooks/use-works-and-components";
 import { TaskStatsBadgesOnly } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
@@ -132,6 +132,7 @@ function handleExportTasks(
   };
   const getAssignmentLabel = (stageType: string): string => {
     if (stageType === "kiem_soat") return "Người kiểm soát";
+    if (stageType === "btv") return "BTV";
     if (stageType.startsWith("nhan_su_"))
       return "Nhân sự " + stageType.replace("nhan_su_", "");
     if (stageType === "primary") return "Người thực hiện";
@@ -314,7 +315,7 @@ export default function ThietKePage() {
   const deleteConfirm = useConfirmDialog<TaskWithAssignmentDetails>();
 
   const { data: components = [] } = useComponents();
-  const { data: users = [] } = useUsers();
+  const { data: users = [] } = useTaskFilterStaffUsers();
   const stages = useMemo(
     () =>
       Array.from(
@@ -579,6 +580,24 @@ export default function ThietKePage() {
                     dueDate: null,
                     completeDate: "",
                   }));
+                }
+                const btv = assignments.find(
+                  (a: any) => a?.stageType === "btv",
+                );
+                if (btv) {
+                  initial.__thietKeBtv = {
+                    displayName: btv.displayName ?? "",
+                    userId: btv.userId ?? null,
+                  };
+                }
+                const kiemSoat = assignments.find(
+                  (a: any) => a?.stageType === "kiem_soat",
+                );
+                if (kiemSoat) {
+                  initial.__thietKeKiemSoat = {
+                    displayName: kiemSoat.displayName ?? "",
+                    userId: kiemSoat.userId ?? null,
+                  };
                 }
                 setCreateInitialValues(initial);
                 setCreateDuplicateMode(true);

@@ -1217,9 +1217,18 @@ export async function registerRoutes(
         : req.params.id;
       const existing = await storage.getTask(id);
       if (!existing) return res.status(404).json({ message: "Task not found" });
-      const reqUserId = (req.user as UserWithRolesAndGroups)?.id;
+      const reqUser = req.user as UserWithRolesAndGroups;
+      const reqUserId = reqUser?.id;
       const createdBy = (existing as { createdBy?: string | null }).createdBy;
-      if (!createdBy || !reqUserId || createdBy !== reqUserId) {
+      const isAdmin = Array.isArray(reqUser?.roles)
+        ? reqUser.roles.some(
+            (r) =>
+              r.name === UserRole.ADMIN ||
+              (typeof r.code === "string" &&
+                r.code.toLowerCase() === "admin"),
+          )
+        : false;
+      if (!reqUserId || (!isAdmin && (!createdBy || createdBy !== reqUserId))) {
         return res.status(403).json({
           message: "Chỉ người tạo công việc mới có quyền xóa công việc này.",
         });
@@ -2636,6 +2645,41 @@ export async function registerRoutes(
       console.error("Error fetching users:", err);
       res.status(500).json({
         message: err instanceof Error ? err.message : "Failed to fetch users",
+      });
+    }
+  });
+
+  app.get(api.users.listTaskFilterStaff.path, requireAuth, async (_req, res) => {
+    try {
+      requireDb();
+      const norm = (s: string) =>
+        s
+          .normalize("NFKD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/\s+/g, "")
+          .trim();
+      const deptKey = norm("Ban thư ký");
+      const list = await dbStorage.getUsersWithRolesAndGroups();
+      const filtered = list.filter((u) => {
+        const hasPassword =
+          typeof (u as any).passwordHash === "string" &&
+          String((u as any).passwordHash).trim() !== "";
+        const dept = typeof u.department === "string" ? u.department : "";
+        return hasPassword && norm(dept) === deptKey;
+      });
+      res.json(filtered.map(sanitizeUser));
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message.includes("Database not configured")
+      ) {
+        return res.status(503).json({ message: err.message });
+      }
+      console.error("Error fetching task-filter staff:", err);
+      res.status(500).json({
+        message:
+          err instanceof Error ? err.message : "Failed to fetch staff users",
       });
     }
   });

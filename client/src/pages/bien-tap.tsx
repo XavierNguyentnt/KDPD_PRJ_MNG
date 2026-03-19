@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useWorks,
   useComponents,
-  useUsers,
+  useTaskFilterStaffUsers,
 } from "@/hooks/use-works-and-components";
 import { TaskStatsBadgesOnly } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
@@ -346,7 +346,7 @@ export default function BienTapPage() {
 
   const { data: works = [] } = useWorks();
   const { data: components = [] } = useComponents();
-  const { data: users = [] } = useUsers();
+  const { data: users = [] } = useTaskFilterStaffUsers();
   const stages = useMemo(
     () =>
       Array.from(
