@@ -74,6 +74,40 @@ type NotificationEmailExtra = {
   recipientIsController?: boolean | null;
 };
 
+export async function sendPasswordResetEmail(input: {
+  to: string;
+  recipientName?: string | null;
+  temporaryPassword: string;
+}): Promise<void> {
+  const subjectPrefix = process.env.MAIL_SUBJECT_PREFIX || "[KDPD]";
+  const subject = `${subjectPrefix} Lấy lại mật khẩu`;
+  const safeName = String(input.recipientName ?? "").trim();
+  const greeting = safeName ? `Kính gửi ${safeName},` : "Kính gửi anh/chị,";
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;background:#f8fafc;padding:24px 0">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+    <div style="height:4px;background:#0ea5e9"></div>
+    <div style="padding:18px 22px">
+      <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:10px">Lấy lại mật khẩu</div>
+      <div style="font-size:14px;color:#334155;line-height:1.7">
+        <div style="margin-bottom:10px">${greeting}</div>
+        <div style="margin-bottom:10px">Hệ thống đã tạo mật khẩu mới cho tài khoản của anh/chị. Vui lòng dùng mật khẩu này để đăng nhập và đổi mật khẩu trong giao diện hệ thống.</div>
+        <div style="margin:14px 0;padding:12px 14px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc">
+          <div style="font-size:12px;color:#64748b;margin-bottom:6px">Mật khẩu mới</div>
+          <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;font-size:18px;color:#0f172a;letter-spacing:0.5px">${String(
+            input.temporaryPassword,
+          )}</div>
+        </div>
+        <div style="font-size:13px;color:#64748b">Nếu anh/chị không yêu cầu lấy lại mật khẩu, vui lòng liên hệ quản trị hệ thống.</div>
+      </div>
+    </div>
+    <div style="border-top:1px solid #e5e7eb;padding:12px 22px;font-size:12px;color:#64748b">
+      Đây là email tự động từ Hệ thống KDPD.
+    </div>
+  </div>
+  </div>`;
+  await sendEmail({ to: input.to, subject, html });
+}
+
 export async function sendNotificationEmail(
   userId: string,
   notification: Notification,

@@ -3,7 +3,7 @@ import type { Server } from "http";
 import bcrypt from "bcrypt";
 import path from "path";
 import { mkdir, unlink, writeFile } from "fs/promises";
-import { randomUUID } from "crypto";
+import { randomInt, randomUUID } from "crypto";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
@@ -20,7 +20,7 @@ import { passport } from "./auth";
 import { requireAuth, requireRole, rateLimit } from "./middleware";
 import multer from "multer";
 import { buildNotificationContent } from "./notifications";
-import { sendNotificationEmail } from "./email";
+import { sendNotificationEmail, sendPasswordResetEmail } from "./email";
 import { getPublicKey as getPushPublicKey, sendWebPushToUser } from "./push";
 import {
   buildGoogleCalendarAuthUrl,
@@ -45,6 +45,25 @@ function sanitizeUser(
 ): Omit<User, "passwordHash"> & { passwordHash?: never } {
   const { passwordHash: _, ...rest } = user;
   return rest;
+}
+
+function generateStrongPassword(length = 8): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const special = "!@#$%^&*()-_=+[]{}<>?,.";
+  const all = upper + lower + digits + special;
+
+  const pick = (chars: string) => chars[randomInt(chars.length)]!;
+  const chars = [pick(upper), pick(lower), pick(digits), pick(special)];
+  while (chars.length < length) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = randomInt(i + 1);
+    const t = chars[i];
+    chars[i] = chars[j];
+    chars[j] = t;
+  }
+  return chars.join("");
 }
 
 /** Validate task_type + related_contract: nếu gắn hợp đồng thì bắt buộc work và task_type không phải GENERAL. */
@@ -169,6 +188,11 @@ export async function registerRoutes(
     max: 5,
     keyPrefix: "auth:changePassword",
   });
+  const forgotPasswordRateLimit = rateLimit({
+    windowMs: 60_000,
+    max: 5,
+    keyPrefix: "auth:forgotPassword",
+  });
   app.post(api.auth.login.path, loginRateLimit, (req, res, next) => {
     const input = api.auth.login.input.safeParse(req.body);
     if (!input.success) {
@@ -213,6 +237,48 @@ export async function registerRoutes(
       },
     )(req, res, next);
   });
+
+  app.post(
+    api.auth.forgotPassword.path,
+    forgotPasswordRateLimit,
+    async (req, res) => {
+      try {
+        const body = api.auth.forgotPassword.input.parse(req.body);
+        const email = body.email.toLowerCase().trim();
+        const u = await dbStorage.getUserByEmail(email);
+        if (u?.email && u.isActive) {
+          const temporaryPassword = generateStrongPassword(8);
+          const hash = await bcrypt.hash(temporaryPassword, 10);
+          await dbStorage.updateUser(u.id, { passwordHash: hash });
+          await sendPasswordResetEmail({
+            to: u.email,
+            recipientName: u.displayName ?? null,
+            temporaryPassword,
+          });
+        }
+        return res.json({
+          message:
+            "Nếu email tồn tại trong hệ thống, mật khẩu mới đã được gửi đến email đó.",
+        });
+      } catch (err) {
+        if (err instanceof z.ZodError) {
+          return res.status(400).json({
+            message: err.errors[0].message,
+            field: err.errors[0].path.join("."),
+          });
+        }
+        if (
+          err instanceof Error &&
+          err.message.includes("Database not configured")
+        ) {
+          return res.status(503).json({ message: err.message });
+        }
+        return res.status(500).json({
+          message: err instanceof Error ? err.message : "Failed",
+        });
+      }
+    },
+  );
 
   app.post(api.auth.logout.path, requireAuth, (req, res, next) => {
     req.logout((err) => {

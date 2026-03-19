@@ -73,6 +73,17 @@ export const api = {
         401: errorSchemas.internal,
       },
     },
+    forgotPassword: {
+      method: "POST" as const,
+      path: "/api/auth/forgot-password",
+      input: z.object({
+        email: z.string().email(),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: errorSchemas.validation,
+      },
+    },
     logout: {
       method: "POST" as const,
       path: "/api/auth/logout",
