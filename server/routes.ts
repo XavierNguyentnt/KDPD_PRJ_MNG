@@ -2509,6 +2509,20 @@ export async function registerRoutes(
     try {
       if (!db)
         return res.status(503).json({ message: "Database not configured" });
+      const u = req.user as UserWithRolesAndGroups;
+      const roles = Array.isArray(u?.roles) ? u.roles : [];
+      const hasAdminManager = roles.some(
+        (r) => r.name === UserRole.ADMIN || r.name === UserRole.MANAGER,
+      );
+      const hasSecretary = roles.some(
+        (r) => r.name === "Thư ký hợp phần" || r.code === "prj_secretary",
+      );
+      if (!hasAdminManager && !hasSecretary) {
+        return res.status(403).json({
+          message:
+            "Forbidden. Required role: Admin/Manager/Thư ký hợp phần",
+        });
+      }
       const input = api.components.create.input.parse(req.body);
       const row = await dbStorage.createComponent(input);
       res.json(row);
@@ -2525,6 +2539,20 @@ export async function registerRoutes(
     try {
       if (!db)
         return res.status(503).json({ message: "Database not configured" });
+      const u = req.user as UserWithRolesAndGroups;
+      const roles = Array.isArray(u?.roles) ? u.roles : [];
+      const hasAdminManager = roles.some(
+        (r) => r.name === UserRole.ADMIN || r.name === UserRole.MANAGER,
+      );
+      const hasSecretary = roles.some(
+        (r) => r.name === "Thư ký hợp phần" || r.code === "prj_secretary",
+      );
+      if (!hasAdminManager && !hasSecretary) {
+        return res.status(403).json({
+          message:
+            "Forbidden. Required role: Admin/Manager/Thư ký hợp phần",
+        });
+      }
       const id = Array.isArray(req.params.id)
         ? req.params.id[0]
         : req.params.id;

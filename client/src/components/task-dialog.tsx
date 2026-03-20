@@ -2351,7 +2351,7 @@ export function TaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[52rem] max-h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="sm:max-w-[56rem] lg:max-w-[64rem] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           {!isNewTask && task && (
             <div className="flex items-center gap-3 mb-2">

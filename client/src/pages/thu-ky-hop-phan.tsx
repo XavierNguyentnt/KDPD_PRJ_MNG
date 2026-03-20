@@ -774,6 +774,15 @@ export default function ThuKyHopPhanPage() {
   // Admin, Quản lý có thể xem tất cả trang quản lý công việc (kể cả Thư ký hợp phần).
   const canAccessPage =
     !!thuKyRole || role === UserRole.ADMIN || role === UserRole.MANAGER;
+  const canCreateComponent = canAccessPage;
+
+  const [componentCreateOpen, setComponentCreateOpen] = useState(false);
+  const [componentName, setComponentName] = useState("");
+  const [componentCode, setComponentCode] = useState("");
+  const [componentDescription, setComponentDescription] = useState("");
+  const [componentDisplayOrder, setComponentDisplayOrder] =
+    useState<string>("0");
+  const [componentCodeEdited, setComponentCodeEdited] = useState(false);
 
   const [tasksPage, setTasksPage] = useState(1);
   const [taskViewMode, setTaskViewMode] = useState<"table" | "board">("table");
@@ -955,6 +964,66 @@ export default function ThuKyHopPhanPage() {
     queryFn: fetchComponents,
   });
 
+  useEffect(() => {
+    if (!componentCreateOpen) return;
+    const max = componentsList.reduce(
+      (m, c) => Math.max(m, c.displayOrder ?? 0),
+      0,
+    );
+    setComponentDisplayOrder(String(max + 1));
+  }, [componentCreateOpen, componentsList]);
+
+  useEffect(() => {
+    if (!componentCreateOpen) return;
+    if (componentCodeEdited) return;
+    const next = normalizeSearch(componentName)
+      .replace(/[^a-z0-9\s_]/g, " ")
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/_+/g, "_");
+    setComponentCode(next);
+  }, [componentCreateOpen, componentName, componentCodeEdited]);
+
+  const createComponentMutation = useMutation({
+    mutationFn: async (payload: {
+      code: string;
+      name: string;
+      description?: string | null;
+      displayOrder?: number;
+    }) => {
+      const res = await fetch(api.components.create.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message || "Không thể tạo hợp phần");
+      }
+      return res.json() as Promise<Component>;
+    },
+    onSuccess: async () => {
+      toast({
+        title: "Thành công",
+        description: "Đã tạo hợp phần.",
+      });
+      setComponentCreateOpen(false);
+      setComponentName("");
+      setComponentCode("");
+      setComponentDescription("");
+      setComponentCodeEdited(false);
+      await queryClient.invalidateQueries({ queryKey: ["components"] });
+    },
+    onError: (e: any) => {
+      toast({
+        title: "Lỗi",
+        description: e?.message || "Không thể tạo hợp phần",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Chỉ Thư ký hợp phần: lọc works/tc/pc theo hợp phần được gán.
   const worksScoped = useMemo(
     () =>
@@ -1114,7 +1183,11 @@ export default function ThuKyHopPhanPage() {
           normalizeSearch(t.group ?? "").includes(q),
       );
     }
-    const filtersForStats: TaskFilterState = { ...taskFilters, status: "all", vote: "all" };
+    const filtersForStats: TaskFilterState = {
+      ...taskFilters,
+      status: "all",
+      vote: "all",
+    };
     return applyTaskFilters(list, filtersForStats, worksScoped);
   }, [tasksScoped, tasksSearch, taskFilters, worksScoped]);
   const activeStatsKey = useMemo(
@@ -3279,24 +3352,37 @@ export default function ThuKyHopPhanPage() {
           setLocation(tabToPath(v));
         }}
         className="w-full">
-        <TabsList className="w-full flex-nowrap overflow-x-auto lg:w-auto lg:overflow-visible">
-          <TabsTrigger value="tasks" className="shrink-0 whitespace-nowrap">
-            Công việc
-          </TabsTrigger>
-          <TabsTrigger value="works" className="shrink-0 whitespace-nowrap">
-            Danh mục tác phẩm
-          </TabsTrigger>
-          <TabsTrigger
-            value="translation"
-            className="shrink-0 whitespace-nowrap">
-            Hợp đồng dịch thuật
-          </TabsTrigger>
-          <TabsTrigger
-            value="proofreading"
-            className="shrink-0 whitespace-nowrap">
-            Hợp đồng hiệu đính
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col lg:flex-row gap-2 lg:items-center lg:justify-between">
+          <TabsList className="w-full flex-nowrap overflow-x-auto lg:w-auto lg:overflow-visible">
+            <TabsTrigger value="tasks" className="shrink-0 whitespace-nowrap">
+              Công việc
+            </TabsTrigger>
+            <TabsTrigger value="works" className="shrink-0 whitespace-nowrap">
+              Danh mục tác phẩm
+            </TabsTrigger>
+            <TabsTrigger
+              value="translation"
+              className="shrink-0 whitespace-nowrap">
+              Hợp đồng dịch thuật
+            </TabsTrigger>
+            <TabsTrigger
+              value="proofreading"
+              className="shrink-0 whitespace-nowrap">
+              Hợp đồng hiệu đính
+            </TabsTrigger>
+          </TabsList>
+
+          {canCreateComponent && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => setComponentCreateOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Thêm hợp phần
+            </Button>
+          )}
+        </div>
 
         {/* Tab: Tasks */}
         <TabsContent value="tasks" className="mt-6">
@@ -3305,7 +3391,9 @@ export default function ThuKyHopPhanPage() {
               tasks={tasksForStats}
               activeKey={activeStatsKey}
               onSelectKey={(key) =>
-                setTaskFilters((prev) => toggleTaskStatsBadgeInFilters(prev, key))
+                setTaskFilters((prev) =>
+                  toggleTaskStatsBadgeInFilters(prev, key),
+                )
               }
             />
           </div>
@@ -5704,11 +5792,100 @@ export default function ThuKyHopPhanPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={componentCreateOpen} onOpenChange={setComponentCreateOpen}>
+        <DialogContent className="sm:max-w-[42rem]">
+          <DialogHeader>
+            <DialogTitle>Thêm hợp phần</DialogTitle>
+            <DialogDescription>
+              Tạo hợp phần dịch thuật mới (lưu vào bảng components).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Tên hợp phần *</Label>
+              <Input
+                value={componentName}
+                onChange={(e) => setComponentName(e.target.value)}
+                placeholder="Ví dụ: Phật tạng toàn dịch"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Mã hợp phần (code) *</Label>
+              <Input
+                value={componentCode}
+                onChange={(e) => {
+                  setComponentCodeEdited(true);
+                  setComponentCode(e.target.value);
+                }}
+                placeholder="Ví dụ: phat_tang_toan_dich"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Mô tả</Label>
+              <Input
+                value={componentDescription}
+                onChange={(e) => setComponentDescription(e.target.value)}
+                placeholder="(Tuỳ chọn)"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Thứ tự hiển thị</Label>
+              <NumberInput
+                value={componentDisplayOrder}
+                onChange={(v) => setComponentDisplayOrder(v)}
+                placeholder="0"
+                decimals={0}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setComponentCreateOpen(false)}
+              disabled={createComponentMutation.isPending}>
+              Hủy
+            </Button>
+            <Button
+              onClick={() => {
+                const code = componentCode.trim();
+                const name = componentName.trim();
+                if (!name || !code) {
+                  toast({
+                    title: "Lỗi",
+                    description: "Vui lòng nhập Tên và Mã hợp phần.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                createComponentMutation.mutate({
+                  code,
+                  name,
+                  description: componentDescription.trim() || null,
+                  displayOrder:
+                    Number.parseInt(componentDisplayOrder || "0", 10) || 0,
+                });
+              }}
+              disabled={createComponentMutation.isPending}>
+              {createComponentMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Đang tạo...
+                </>
+              ) : (
+                "Tạo hợp phần"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Work create/edit dialog - simple form */}
       <Dialog
         open={workDialog.open}
         onOpenChange={(open) => setWorkDialog({ open, work: workDialog.work })}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[56rem] lg:max-w-[64rem]">
           <DialogHeader>
             <DialogTitle>
               {workDialog.work ? "Chỉnh sửa tác phẩm" : "Thêm tác phẩm"}
@@ -5797,7 +5974,7 @@ export default function ThuKyHopPhanPage() {
             mode: tcDialog.mode,
           })
         }>
-        <DialogContent className="max-w-[90rem] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="w-[95vw] sm:max-w-[72rem] lg:max-w-[80rem] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {tcDialog.mode === "view"
@@ -5840,7 +6017,7 @@ export default function ThuKyHopPhanPage() {
             mode: pcDialog.mode,
           })
         }>
-        <DialogContent className="max-w-[90rem] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="w-[95vw] sm:max-w-[72rem] lg:max-w-[80rem] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {pcDialog.mode === "view"
