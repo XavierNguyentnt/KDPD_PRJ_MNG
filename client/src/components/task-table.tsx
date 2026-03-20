@@ -9,7 +9,20 @@ import { formatDateDDMMYYYY } from "@/lib/utils";
 import { Workflow, BienTapWorkflowHelpers, BienTapStageType, StageStatus } from "@shared/workflow";
 import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Pencil, Trash2, Copy as CopyIcon } from "lucide-react";
 
-export type TaskSortColumn = "id" | "title" | "group" | "assignee" | "priority" | "status" | "dueDate" | "progress" | "receivedDate" | "actualCompletedAt" | "vote";
+export type TaskSortColumn =
+  | "id"
+  | "title"
+  | "group"
+  | "assignee"
+  | "priority"
+  | "status"
+  | "dueDate"
+  | "progress"
+  | "receivedDate"
+  | "actualCompletedAt"
+  | "vote"
+  | "createdAt"
+  | "updatedAt";
 
 /** Sort tasks by column. Use with TaskTable sortBy/sortDir/onSort. */
 export function sortTasks(
@@ -21,12 +34,20 @@ export function sortTasks(
   const dir = sortDir === "asc" ? 1 : -1;
   const getVal = (t: TaskWithAssignmentDetails, col: TaskSortColumn) => {
     if (col === "receivedDate") return (t as TaskWithAssignmentDetails & { receivedAt?: string | Date | null }).receivedAt;
+    if (col === "createdAt") return (t as any).createdAt;
+    if (col === "updatedAt") return (t as any).updatedAt;
     return t[col as keyof TaskWithAssignmentDetails];
   };
   const cmp = (a: TaskWithAssignmentDetails, b: TaskWithAssignmentDetails): number => {
     const av = getVal(a, sortBy);
     const bv = getVal(b, sortBy);
-    if (sortBy === "dueDate" || sortBy === "actualCompletedAt" || sortBy === "receivedDate") {
+    if (
+      sortBy === "dueDate" ||
+      sortBy === "actualCompletedAt" ||
+      sortBy === "receivedDate" ||
+      sortBy === "createdAt" ||
+      sortBy === "updatedAt"
+    ) {
       const ad = av ? (typeof av === "string" ? av.slice(0, 10) : (av as Date).toISOString?.()?.slice(0, 10) ?? "") : "";
       const bd = bv ? (typeof bv === "string" ? bv.slice(0, 10) : (bv as Date).toISOString?.()?.slice(0, 10) ?? "") : "";
       return (ad < bd ? -1 : ad > bd ? 1 : 0) * dir;
@@ -68,6 +89,8 @@ interface TaskTableProps {
       key: string;
       label: string;
       render: (task: TaskWithAssignmentDetails) => React.ReactNode;
+      sortable?: boolean;
+      sortKey?: TaskSortColumn;
     }>;
   };
   actions?: {
@@ -666,11 +689,34 @@ export function TaskTable({
                 className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
               />
             )}
-            {defaultColumns.customColumns?.map((col) => (
-              <th key={col.key} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                {col.label}
-              </th>
-            ))}
+            {defaultColumns.customColumns?.map((col) => {
+              const sortColumn =
+                col.sortKey ??
+                (col.key === "createdAt" || col.key === "updatedAt"
+                  ? (col.key as TaskSortColumn)
+                  : null);
+              if (col.sortable && sortColumn) {
+                return (
+                  <SortableHead
+                    key={col.key}
+                    label={col.label}
+                    column={sortColumn}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    onSort={onSort}
+                    className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
+                  />
+                );
+              }
+              return (
+                <th
+                  key={col.key}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                >
+                  {col.label}
+                </th>
+              );
+            })}
             {hasActions && (
               <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px]"></th>
             )}

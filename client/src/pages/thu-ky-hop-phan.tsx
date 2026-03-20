@@ -190,6 +190,17 @@ export type ProofreadingContractSortColumn =
   | "pageCount"
   | "rateRatio";
 
+type WorksProgressFilter =
+  | "all"
+  | "signed_contract"
+  | "progress_check"
+  | "expert_review"
+  | "project_acceptance"
+  | "settlement"
+  | "proofreading_completed"
+  | "editing_completed"
+  | "design_completed";
+
 // Sort functions with multi-column support
 function sortWorks(
   works: Work[],
@@ -810,6 +821,8 @@ export default function ThuKyHopPhanPage() {
   const [worksComponentFilter, setWorksComponentFilter] =
     useState<string>("all");
   const [worksStageFilter, setWorksStageFilter] = useState<string>("all");
+  const [worksProgressFilter, setWorksProgressFilter] =
+    useState<WorksProgressFilter>("all");
   const [worksSortColumns, setWorksSortColumns] = useState<
     Array<{ column: WorkSortColumn; dir: "asc" | "desc" }>
   >([]);
@@ -1077,7 +1090,12 @@ export default function ThuKyHopPhanPage() {
   // Reset page to 1 when filters change
   useEffect(() => {
     setWorksPage(1);
-  }, [worksComponentFilter, worksStageFilter, worksSearch]);
+  }, [
+    worksComponentFilter,
+    worksStageFilter,
+    worksProgressFilter,
+    worksSearch,
+  ]);
 
   useEffect(() => {
     setTcPage(1);
@@ -1295,6 +1313,103 @@ export default function ThuKyHopPhanPage() {
   const getWorkTitle = (id: string | null) =>
     id ? (workTitleById.get(id) ?? "—") : "—";
 
+  const proofreadingCompletionByWorkId = useMemo(() => {
+    const map = new Map<string, string>();
+    proofreadingContracts.forEach((c) => {
+      if (!c.actualCompletionDate || !c.workId) return;
+      const date =
+        typeof c.actualCompletionDate === "string"
+          ? c.actualCompletionDate.slice(0, 10)
+          : new Date(c.actualCompletionDate as any).toISOString().slice(0, 10);
+      const prev = map.get(c.workId);
+      if (!prev || date > prev) map.set(c.workId, date);
+    });
+    return map;
+  }, [proofreadingContracts]);
+
+  const editingCompletionByWorkId = useMemo(() => {
+    const map = new Map<string, string>();
+    tasks
+      .filter((t) => t.group === "Biên tập" && t.relatedWorkId)
+      .forEach((t) => {
+        const wf = t.workflow;
+        let roundType = "";
+        if (typeof wf === "string") {
+          try {
+            const parsed = JSON.parse(wf) as {
+              rounds?: Array<{ roundType?: string | null }>;
+            };
+            roundType = parsed?.rounds?.[0]?.roundType ?? "";
+          } catch {
+            roundType = "";
+          }
+        } else if (typeof wf === "object" && wf) {
+          const parsed = wf as {
+            rounds?: Array<{ roundType?: string | null }>;
+          };
+          roundType = parsed?.rounds?.[0]?.roundType ?? "";
+        }
+        if (!roundType.toLowerCase().includes("bông chuyển in")) return;
+        const v = t.actualCompletedAt;
+        if (!v) return;
+        const date = typeof v === "string" ? new Date(v) : v;
+        if (!date || Number.isNaN(date.getTime())) return;
+        const dateStr = date.toISOString().slice(0, 10);
+        const key = t.relatedWorkId as string;
+        const prev = map.get(key);
+        if (!prev || dateStr > prev) map.set(key, dateStr);
+      });
+    return map;
+  }, [tasks]);
+
+  const tcByWorkId = useMemo(() => {
+    const map = new Map<string, TranslationContract[]>();
+    tcScoped.forEach((c) => {
+      if (!c.workId) return;
+      const list = map.get(c.workId) ?? [];
+      list.push(c);
+      map.set(c.workId, list);
+    });
+    return map;
+  }, [tcScoped]);
+
+  const pcByWorkId = useMemo(() => {
+    const map = new Map<string, ProofreadingContract[]>();
+    pcScoped.forEach((c) => {
+      if (!c.workId) return;
+      const list = map.get(c.workId) ?? [];
+      list.push(c);
+      map.set(c.workId, list);
+    });
+    return map;
+  }, [pcScoped]);
+
+  const bienTapTasksByWorkId = useMemo(() => {
+    const map = new Map<string, TaskWithAssignmentDetails[]>();
+    (tasks || [])
+      .filter((t) => t.group === "Biên tập" && t.relatedWorkId)
+      .forEach((t) => {
+        const key = t.relatedWorkId as string;
+        const list = map.get(key) ?? [];
+        list.push(t);
+        map.set(key, list);
+      });
+    return map;
+  }, [tasks]);
+
+  const thietKeTasksByWorkId = useMemo(() => {
+    const map = new Map<string, TaskWithAssignmentDetails[]>();
+    (tasks || [])
+      .filter((t) => t.group === "Thiết kế" && t.relatedWorkId)
+      .forEach((t) => {
+        const key = t.relatedWorkId as string;
+        const list = map.get(key) ?? [];
+        list.push(t);
+        map.set(key, list);
+      });
+    return map;
+  }, [tasks]);
+
   // Filter and sort ALL data from DB (before pagination)
   // Order: Filter -> Sort -> Paginate (in paginatedWorks)
   const filteredWorks = useMemo(() => {
@@ -1310,7 +1425,37 @@ export default function ThuKyHopPhanPage() {
       list = list.filter((w) => w.stage === worksStageFilter);
     }
 
-    // Step 3: Filter by search
+    // Step 3: Filter by work progress
+    if (worksProgressFilter && worksProgressFilter !== "all") {
+      list = list.filter((w) => {
+        const tcList = tcByWorkId.get(w.id) ?? [];
+        const pcList = pcByWorkId.get(w.id) ?? [];
+        if (worksProgressFilter === "signed_contract") return tcList.length > 0;
+        if (worksProgressFilter === "progress_check")
+          return tcList.some((c) => !!c.progressCheckDate);
+        if (worksProgressFilter === "expert_review")
+          return tcList.some((c) => !!c.expertReviewDate);
+        if (worksProgressFilter === "project_acceptance")
+          return tcList.some((c) => !!c.projectAcceptanceDate);
+        if (worksProgressFilter === "settlement")
+          return tcList.some((c) => c.settlementValue != null);
+        if (worksProgressFilter === "proofreading_completed")
+          return (
+            pcList.length > 0 && pcList.every((p) => !!p.actualCompletionDate)
+          );
+        if (worksProgressFilter === "editing_completed")
+          return !!editingCompletionByWorkId.get(w.id);
+        if (worksProgressFilter === "design_completed") {
+          const tkList = thietKeTasksByWorkId.get(w.id) ?? [];
+          return (
+            tkList.length > 0 && tkList.every((t) => t.status === "Completed")
+          );
+        }
+        return true;
+      });
+    }
+
+    // Step 4: Filter by search
     if (worksSearch.trim()) {
       const q = normalizeSearch(worksSearch.trim());
       list = list.filter(
@@ -1324,15 +1469,20 @@ export default function ThuKyHopPhanPage() {
       );
     }
 
-    // Step 4: Apply sorting to ALL filtered data (not just current page)
+    // Step 5: Apply sorting to ALL filtered data (not just current page)
     return sortWorks(list, worksSortColumns, getComponentName);
   }, [
     worksScoped,
     worksSearch,
     worksComponentFilter,
     worksStageFilter,
+    worksProgressFilter,
     worksSortColumns,
     componentsList,
+    tcByWorkId,
+    pcByWorkId,
+    editingCompletionByWorkId,
+    thietKeTasksByWorkId,
   ]);
 
   // Filter and sort ALL data from DB (before pagination)
@@ -1583,103 +1733,6 @@ export default function ThuKyHopPhanPage() {
     });
     return map;
   }, [proofreadingContracts]);
-
-  const proofreadingCompletionByWorkId = useMemo(() => {
-    const map = new Map<string, string>();
-    proofreadingContracts.forEach((c) => {
-      if (!c.actualCompletionDate || !c.workId) return;
-      const date =
-        typeof c.actualCompletionDate === "string"
-          ? c.actualCompletionDate.slice(0, 10)
-          : new Date(c.actualCompletionDate as any).toISOString().slice(0, 10);
-      const prev = map.get(c.workId);
-      if (!prev || date > prev) map.set(c.workId, date);
-    });
-    return map;
-  }, [proofreadingContracts]);
-
-  const editingCompletionByWorkId = useMemo(() => {
-    const map = new Map<string, string>();
-    tasks
-      .filter((t) => t.group === "Biên tập" && t.relatedWorkId)
-      .forEach((t) => {
-        const wf = t.workflow;
-        let roundType = "";
-        if (typeof wf === "string") {
-          try {
-            const parsed = JSON.parse(wf) as {
-              rounds?: Array<{ roundType?: string | null }>;
-            };
-            roundType = parsed?.rounds?.[0]?.roundType ?? "";
-          } catch {
-            roundType = "";
-          }
-        } else if (typeof wf === "object" && wf) {
-          const parsed = wf as {
-            rounds?: Array<{ roundType?: string | null }>;
-          };
-          roundType = parsed?.rounds?.[0]?.roundType ?? "";
-        }
-        if (!roundType.toLowerCase().includes("bông chuyển in")) return;
-        const v = t.actualCompletedAt;
-        if (!v) return;
-        const date = typeof v === "string" ? new Date(v) : v;
-        if (!date || Number.isNaN(date.getTime())) return;
-        const dateStr = date.toISOString().slice(0, 10);
-        const key = t.relatedWorkId as string;
-        const prev = map.get(key);
-        if (!prev || dateStr > prev) map.set(key, dateStr);
-      });
-    return map;
-  }, [tasks]);
-
-  const tcByWorkId = useMemo(() => {
-    const map = new Map<string, TranslationContract[]>();
-    tcScoped.forEach((c) => {
-      if (!c.workId) return;
-      const list = map.get(c.workId) ?? [];
-      list.push(c);
-      map.set(c.workId, list);
-    });
-    return map;
-  }, [tcScoped]);
-
-  const pcByWorkId = useMemo(() => {
-    const map = new Map<string, ProofreadingContract[]>();
-    pcScoped.forEach((c) => {
-      if (!c.workId) return;
-      const list = map.get(c.workId) ?? [];
-      list.push(c);
-      map.set(c.workId, list);
-    });
-    return map;
-  }, [pcScoped]);
-
-  const bienTapTasksByWorkId = useMemo(() => {
-    const map = new Map<string, TaskWithAssignmentDetails[]>();
-    (tasks || [])
-      .filter((t) => t.group === "Biên tập" && t.relatedWorkId)
-      .forEach((t) => {
-        const key = t.relatedWorkId as string;
-        const list = map.get(key) ?? [];
-        list.push(t);
-        map.set(key, list);
-      });
-    return map;
-  }, [tasks]);
-
-  const thietKeTasksByWorkId = useMemo(() => {
-    const map = new Map<string, TaskWithAssignmentDetails[]>();
-    (tasks || [])
-      .filter((t) => t.group === "Thiết kế" && t.relatedWorkId)
-      .forEach((t) => {
-        const key = t.relatedWorkId as string;
-        const list = map.get(key) ?? [];
-        list.push(t);
-        map.set(key, list);
-      });
-    return map;
-  }, [tasks]);
 
   type ProgressBadge = {
     label: string;
@@ -2404,6 +2457,7 @@ export default function ThuKyHopPhanPage() {
       "Tiêu đề Hán Nôm",
       "Hợp phần",
       "Giai đoạn",
+      "Tiến độ tác phẩm",
       "Mã tài liệu",
       "Số chữ gốc",
       "Số trang gốc",
@@ -2418,6 +2472,11 @@ export default function ThuKyHopPhanPage() {
       work.titleHannom ?? "—",
       getComponentName(work.componentId),
       formatStageDisplay(work.stage),
+      (() => {
+        const badges = buildWorkProgressBadges(work);
+        const latest = badges.length ? badges[badges.length - 1] : null;
+        return latest?.label ?? "—";
+      })(),
       work.documentCode ?? "—",
       formatNumberAccounting(work.baseWordCount),
       formatNumberAccounting(work.basePageCount),
@@ -3672,6 +3731,45 @@ export default function ThuKyHopPhanPage() {
                           {formatStageDisplay(s)}
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Tiến độ tác phẩm
+                  </Label>
+                  <Select
+                    value={worksProgressFilter}
+                    onValueChange={(v) =>
+                      setWorksProgressFilter(v as WorksProgressFilter)
+                    }>
+                    <SelectTrigger className="w-[220px] h-9 bg-background">
+                      <SelectValue placeholder="Tất cả tiến độ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      <SelectItem value="signed_contract">
+                        Ký hợp đồng
+                      </SelectItem>
+                      <SelectItem value="progress_check">
+                        Kiểm tra tiến độ
+                      </SelectItem>
+                      <SelectItem value="expert_review">
+                        Thẩm định cấp chuyên gia
+                      </SelectItem>
+                      <SelectItem value="project_acceptance">
+                        Nghiệm thu cấp Dự án
+                      </SelectItem>
+                      <SelectItem value="settlement">Quyết toán</SelectItem>
+                      <SelectItem value="proofreading_completed">
+                        Hiệu đính (hoàn thành)
+                      </SelectItem>
+                      <SelectItem value="editing_completed">
+                        Biên tập (hoàn thành)
+                      </SelectItem>
+                      <SelectItem value="design_completed">
+                        Thiết kế (hoàn thành)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

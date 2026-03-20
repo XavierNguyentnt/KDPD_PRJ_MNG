@@ -379,6 +379,7 @@ export default function AdminDashboardPage() {
                     {
                       key: "createdAt",
                       label: language === "vi" ? "Ngày tạo" : "Created at",
+                      sortable: true,
                       render: (task) => (
                         <span className="text-sm text-muted-foreground whitespace-nowrap">
                           {formatDateDDMMYYYY((task as any).createdAt) || "—"}
@@ -388,6 +389,7 @@ export default function AdminDashboardPage() {
                     {
                       key: "updatedAt",
                       label: language === "vi" ? "Ngày cập nhật" : "Updated at",
+                      sortable: true,
                       render: (task) => (
                         <span className="text-sm text-muted-foreground whitespace-nowrap">
                           {formatDateDDMMYYYY((task as any).updatedAt) || "—"}
