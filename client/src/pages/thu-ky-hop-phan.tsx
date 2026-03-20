@@ -27,7 +27,11 @@ import {
   type TaskSortColumn,
 } from "@/components/task-table";
 import { TaskKanbanBoard } from "@/components/task-kanban-board";
-import { TaskStatsBadgesOnly } from "@/components/task-stats";
+import {
+  getTaskStatsBadgeKeyFromFilters,
+  TaskStatsBadgesOnly,
+  toggleTaskStatsBadgeInFilters,
+} from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
 import {
   TaskFilters,
@@ -1098,6 +1102,25 @@ export default function ThuKyHopPhanPage() {
     taskSortBy,
     taskSortDir,
   ]);
+  const tasksForStats = useMemo(() => {
+    let list = tasksScoped;
+    if (tasksSearch.trim()) {
+      const q = normalizeSearch(tasksSearch.trim());
+      list = list.filter(
+        (t) =>
+          normalizeSearch(t.title ?? "").includes(q) ||
+          normalizeSearch(t.description ?? "").includes(q) ||
+          normalizeSearch(t.assignee ?? "").includes(q) ||
+          normalizeSearch(t.group ?? "").includes(q),
+      );
+    }
+    const filtersForStats: TaskFilterState = { ...taskFilters, status: "all", vote: "all" };
+    return applyTaskFilters(list, filtersForStats, worksScoped);
+  }, [tasksScoped, tasksSearch, taskFilters, worksScoped]);
+  const activeStatsKey = useMemo(
+    () => getTaskStatsBadgeKeyFromFilters(taskFilters),
+    [taskFilters.status, taskFilters.vote],
+  );
 
   const handleTaskSort = (column: TaskSortColumn) => {
     setTaskSortBy((prev) => {
@@ -3278,7 +3301,13 @@ export default function ThuKyHopPhanPage() {
         {/* Tab: Tasks */}
         <TabsContent value="tasks" className="mt-6">
           <div className="grid gap-6">
-            <TaskStatsBadgesOnly tasks={filteredTasks} />
+            <TaskStatsBadgesOnly
+              tasks={tasksForStats}
+              activeKey={activeStatsKey}
+              onSelectKey={(key) =>
+                setTaskFilters((prev) => toggleTaskStatsBadgeInFilters(prev, key))
+              }
+            />
           </div>
           <div className="rounded-xl border border-border bg-card overflow-hidden mt-6">
             <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">

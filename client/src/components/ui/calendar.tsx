@@ -1,11 +1,15 @@
-import * as React from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker } from "react-day-picker"
+"use client";
 
-import { cn } from "@/lib/utils"
-import { buttonVariants } from "@/components/ui/button"
+import * as React from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { DayPicker } from "react-day-picker";
+import { vi } from "date-fns/locale";
 
-export type CalendarProps = React.ComponentProps<typeof DayPicker>
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { useI18n } from "@/hooks/use-i18n";
+
+export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
 function Calendar({
   className,
@@ -13,17 +17,33 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
-  const hasDropdown = (props as { captionLayout?: string }).captionLayout === "dropdown";
-  
+  const hasDropdown =
+    (props as { captionLayout?: string }).captionLayout === "dropdown";
+  const { language } = useI18n();
+  const locale = props.locale ?? (language === "vi" ? vi : undefined);
+  const weekStartsOn =
+    props.weekStartsOn ?? (language === "vi" ? 1 : undefined);
+  const labels = React.useMemo(() => {
+    if (language !== "vi") return props.labels;
+    return {
+      ...props.labels,
+      labelMonthDropdown: props.labels?.labelMonthDropdown ?? (() => "Tháng:"),
+      labelYearDropdown: props.labels?.labelYearDropdown ?? (() => "Năm:"),
+    };
+  }, [props.labels, language]);
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
+      locale={locale}
+      weekStartsOn={weekStartsOn as any}
+      labels={labels as any}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-3",
-        caption: hasDropdown 
-          ? "flex justify-center pt-2 pb-2 relative items-center mb-1" 
+        caption: hasDropdown
+          ? "flex justify-center pt-2 pb-2 relative items-center mb-1"
           : "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-medium hidden",
         caption_dropdowns: "flex justify-center items-center gap-2.5 pb-1",
@@ -33,7 +53,7 @@ function Calendar({
           "hover:bg-accent hover:text-accent-foreground",
           "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
           "transition-colors cursor-pointer",
-          "shadow-sm"
+          "shadow-sm",
         ),
         dropdown_month: cn(
           "h-8 px-3 pr-8 text-sm font-medium min-w-[130px]",
@@ -41,7 +61,7 @@ function Calendar({
           "hover:bg-accent hover:text-accent-foreground",
           "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
           "transition-colors cursor-pointer",
-          "shadow-sm"
+          "shadow-sm",
         ),
         dropdown_year: cn(
           "h-8 px-3 pr-8 text-sm font-medium min-w-[100px]",
@@ -49,13 +69,13 @@ function Calendar({
           "hover:bg-accent hover:text-accent-foreground",
           "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
           "transition-colors cursor-pointer",
-          "shadow-sm"
+          "shadow-sm",
         ),
         dropdown_icon: "hidden",
         nav: hasDropdown ? "hidden" : "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
@@ -67,7 +87,7 @@ function Calendar({
         cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
         ),
         day_range_end: "day-range-end",
         day_selected:
@@ -91,8 +111,8 @@ function Calendar({
       }}
       {...props}
     />
-  )
+  );
 }
-Calendar.displayName = "Calendar"
+Calendar.displayName = "Calendar";
 
-export { Calendar }
+export { Calendar };

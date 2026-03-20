@@ -1,6 +1,8 @@
 "use client";
 
+import { useCallback, useMemo } from "react";
 import { useI18n } from "@/hooks/use-i18n";
+import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -10,8 +12,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
-import { Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Filter, X } from "lucide-react";
 import type { User } from "@shared/schema";
+import { compareNamesByLastNameAZ } from "@/lib/utils";
 
 export interface TaskFilterState {
   staffId: string;
@@ -87,13 +91,31 @@ export function applyTaskFilters<
   }
 
   if (filters.status && filters.status !== "all") {
-    list = list.filter((t) => t.status === filters.status);
+    if (filters.status === "Not Finished") {
+      list = list.filter(
+        (t) =>
+          !(t.status === "Completed" || (t as any).actualCompletedAt != null),
+      );
+    } else if (filters.status === "Behind Schedule") {
+      list = list.filter((t) => {
+        if (t.status !== "In Progress") return false;
+        if ((t as any).actualCompletedAt != null) return false;
+        if (!t.dueDate) return false;
+        return new Date(String(t.dueDate)) < new Date();
+      });
+    } else {
+      list = list.filter((t) => t.status === filters.status);
+    }
   }
 
   if (filters.vote && filters.vote !== "all") {
-    list = list.filter(
-      (t) => (t.vote ?? "").toLowerCase() === filters.vote.toLowerCase(),
-    );
+    if (filters.vote === "unrated") {
+      list = list.filter((t) => !(t.vote ?? "").trim());
+    } else {
+      list = list.filter(
+        (t) => (t.vote ?? "").toLowerCase() === filters.vote.toLowerCase(),
+      );
+    }
   }
 
   if (filters.roundType && filters.roundType !== "all") {
@@ -145,11 +167,11 @@ export function applyTaskFilters<
   if (filters.dateTo) {
     const to = filters.dateTo.slice(0, 10);
     list = list.filter((t) => {
-      const d = t.dueDate
-        ? typeof t.dueDate === "string"
+      if (!t.dueDate) return false;
+      const d =
+        typeof t.dueDate === "string"
           ? t.dueDate.slice(0, 10)
-          : (t.dueDate as Date).toISOString().slice(0, 10)
-        : "";
+          : (t.dueDate as Date).toISOString().slice(0, 10);
       return d <= to;
     });
   }
@@ -182,6 +204,51 @@ export function TaskFilters({
   roundTypeOptions = [],
 }: TaskFiltersProps) {
   const { t, language } = useI18n();
+  const { toast } = useToast();
+  const staffOptions = useMemo(() => {
+    return users
+      .filter((u) => u.isActive !== false)
+      .map((u) => ({
+        id: u.id,
+        label: u.displayName || u.email || u.id,
+      }))
+      .sort((a, b) => compareNamesByLastNameAZ(a.label, b.label));
+  }, [users]);
+
+  const warnInvalidDateRange = useCallback(() => {
+    toast({
+      variant: "destructive",
+      title: language === "vi" ? "Khoảng ngày không hợp lệ" : "Invalid date range",
+      description:
+        language === "vi"
+          ? "Đến ngày không được nhỏ hơn Từ ngày."
+          : "End date cannot be earlier than start date.",
+    });
+  }, [toast, language]);
+
+  const handleDateFromChange = useCallback(
+    (v: string | null) => {
+      const next = v ?? "";
+      if (next && filters.dateTo && filters.dateTo < next) {
+        warnInvalidDateRange();
+        return;
+      }
+      onFiltersChange({ dateFrom: next });
+    },
+    [filters.dateTo, onFiltersChange, warnInvalidDateRange],
+  );
+
+  const handleDateToChange = useCallback(
+    (v: string | null) => {
+      const next = v ?? "";
+      if (next && filters.dateFrom && next < filters.dateFrom) {
+        warnInvalidDateRange();
+        return;
+      }
+      onFiltersChange({ dateTo: next });
+    },
+    [filters.dateFrom, onFiltersChange, warnInvalidDateRange],
+  );
 
   return (
     <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-3">
@@ -202,13 +269,11 @@ export function TaskFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t.filter.allStaff}</SelectItem>
-            {users
-              .filter((u) => u.isActive !== false)
-              .map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  {u.displayName || u.email || u.id}
-                </SelectItem>
-              ))}
+            {staffOptions.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -267,6 +332,10 @@ export function TaskFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t.dashboard.allStatus}</SelectItem>
+            <SelectItem value="Not Finished">{t.stats.notFinished}</SelectItem>
+            <SelectItem value="Behind Schedule">
+              {t.dashboard.behindSchedule}
+            </SelectItem>
             <SelectItem value="Not Started">{t.status.notStarted}</SelectItem>
             <SelectItem value="In Progress">{t.status.inProgress}</SelectItem>
             <SelectItem value="Completed">{t.status.completed}</SelectItem>
@@ -278,7 +347,8 @@ export function TaskFilters({
 
       <div className="flex flex-col gap-1 w-full sm:w-auto">
         <Label className="text-xs text-muted-foreground">
-          {t.filter.year ?? (language === "vi" ? "Năm nhận việc" : "Received year")}
+          {t.filter.year ??
+            (language === "vi" ? "Năm nhận việc" : "Received year")}
         </Label>
         <Select
           value={filters.receivedYear}
@@ -286,13 +356,15 @@ export function TaskFilters({
           <SelectTrigger className="w-full sm:w-[140px] h-9 bg-background">
             <SelectValue
               placeholder={
-                t.filter.allYears ?? (language === "vi" ? "Tất cả năm" : "All years")
+                t.filter.allYears ??
+                (language === "vi" ? "Tất cả năm" : "All years")
               }
             />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">
-              {t.filter.allYears ?? (language === "vi" ? "Tất cả năm" : "All years")}
+              {t.filter.allYears ??
+                (language === "vi" ? "Tất cả năm" : "All years")}
             </SelectItem>
             {yearOptions.map((y) => (
               <SelectItem key={y} value={y}>
@@ -327,6 +399,9 @@ export function TaskFilters({
               </SelectItem>
               <SelectItem value="khong_hoan_thanh">
                 {language === "vi" ? "Không hoàn thành" : "Not completed"}
+              </SelectItem>
+              <SelectItem value="unrated">
+                {language === "vi" ? "Chưa đánh giá" : "Unrated"}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -366,7 +441,7 @@ export function TaskFilters({
         </Label>
         <DateInput
           value={filters.dateFrom || null}
-          onChange={(v) => onFiltersChange({ dateFrom: v ?? "" })}
+          onChange={handleDateFromChange}
           placeholder="dd/mm/yyyy"
           className="h-9 w-full sm:w-[120px] bg-background"
         />
@@ -378,10 +453,31 @@ export function TaskFilters({
         </Label>
         <DateInput
           value={filters.dateTo || null}
-          onChange={(v) => onFiltersChange({ dateTo: v ?? "" })}
+          onChange={handleDateToChange}
           placeholder="dd/mm/yyyy"
           className="h-9 w-full sm:w-[120px] bg-background"
         />
+      </div>
+      <div className="flex items-end gap-2 w-full sm:w-auto">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9"
+          onClick={() => onFiltersChange(getDefaultTaskFilters())}
+        >
+          <X className="h-4 w-4" />
+          {language === "vi" ? "Xoá lọc" : "Clear filters"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9"
+          onClick={() => onFiltersChange({ dateFrom: "", dateTo: "" })}
+          disabled={!filters.dateFrom && !filters.dateTo}
+        >
+          <X className="h-4 w-4" />
+          {language === "vi" ? "Xoá ngày" : "Clear dates"}
+        </Button>
       </div>
     </div>
   );

@@ -17,7 +17,11 @@ import {
 } from "@/hooks/use-works-and-components";
 import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
-import { TaskStatsBadgesOnly } from "@/components/task-stats";
+import {
+  getTaskStatsBadgeKeyFromFilters,
+  TaskStatsBadgesOnly,
+  toggleTaskStatsBadgeInFilters,
+} from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
 import { TaskTable, type TaskSortColumn } from "@/components/task-table";
 import { TaskKanbanBoard } from "@/components/task-kanban-board";
@@ -99,6 +103,7 @@ export default function AdminDashboardPage() {
     viewMode,
     setViewMode,
     filteredTasks,
+    tasksForStats,
     availableGroups,
     availableYears,
   } = useTaskListControls({
@@ -109,6 +114,10 @@ export default function AdminDashboardPage() {
     works,
     includedGroups: null,
   });
+  const activeStatsKey = useMemo(
+    () => getTaskStatsBadgeKeyFromFilters(filters),
+    [filters.status, filters.vote],
+  );
 
   const [selectedTask, setSelectedTask] =
     useState<TaskWithAssignmentDetails | null>(null);
@@ -180,7 +189,13 @@ export default function AdminDashboardPage() {
             </Button>
           </div>
         </div>
-        <TaskStatsBadgesOnly tasks={filteredTasks} />
+        <TaskStatsBadgesOnly
+          tasks={tasksForStats}
+          activeKey={activeStatsKey}
+          onSelectKey={(key) =>
+            setFilters((prev) => toggleTaskStatsBadgeInFilters(prev, key))
+          }
+        />
       </section>
 
       <Tabs defaultValue="tasks">

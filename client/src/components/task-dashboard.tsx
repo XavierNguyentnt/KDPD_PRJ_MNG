@@ -108,9 +108,10 @@ export function applyDashboardBadgeFilter(
         (t) => (t.assignee?.trim() ?? "") === filter.value
       );
     case "group":
-      return tasks.filter(
-        (t) => (t.group?.trim() ?? "(Không nhóm)") === filter.value
-      );
+      if (filter.value === "(Không nhóm)" || filter.value === "(No group)") {
+        return tasks.filter((t) => !(t.group?.trim() ?? ""));
+      }
+      return tasks.filter((t) => (t.group?.trim() ?? "") === filter.value);
     case "schedule":
       if (filter.value === "in_progress_on_time") {
         return tasks.filter((t) => t.status === "In Progress" && isOnSchedule(t));
@@ -149,6 +150,7 @@ export function TaskDashboard({
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
 
   const locale = language === "vi" ? vi : undefined;
+  const noGroupLabel = language === "vi" ? "(Không nhóm)" : "(No group)";
 
   const stats = useMemo(() => {
     const total = tasks.length;
@@ -178,19 +180,19 @@ export function TaskDashboard({
   const byGroup = useMemo(() => {
     const counts: Record<string, number> = {};
     tasks.forEach((task) => {
-      const g = task.group?.trim() || "(Không nhóm)";
+      const g = task.group?.trim() || noGroupLabel;
       counts[g] = (counts[g] || 0) + 1;
     });
     return Object.entries(counts)
       .map(([group, count]) => ({ group, count }))
       .sort((a, b) => b.count - a.count);
-  }, [tasks]);
+  }, [tasks, noGroupLabel]);
 
   /** Chuẩn hóa tên nhóm cho biểu đồ cột (CV chung + Công việc chung -> CV chung). */
   const normalizeGroupName = (g: string | null | undefined): string => {
     const s = (g ?? "").trim();
     if (s === "Công việc chung" || s === "CV chung") return "CV chung";
-    return s || "(Không nhóm)";
+    return s || noGroupLabel;
   };
 
   /** Thứ tự nhóm công việc cho biểu đồ cột. */
@@ -392,7 +394,13 @@ export function TaskDashboard({
         </Card>
         <Card
           className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
-          onClick={() => onBadgeFilter?.({ type: "status", value: "Completed" })}
+          onClick={() =>
+            onBadgeFilter?.(
+              isActive({ type: "status", value: "Completed" })
+                ? null
+                : { type: "status", value: "Completed" },
+            )
+          }
         >
           <CardContent className="p-5 flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-200/60 dark:bg-emerald-700/40">
@@ -406,7 +414,13 @@ export function TaskDashboard({
         </Card>
         <Card
           className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300"
-          onClick={() => onBadgeFilter?.({ type: "status", value: "In Progress" })}
+          onClick={() =>
+            onBadgeFilter?.(
+              isActive({ type: "status", value: "In Progress" })
+                ? null
+                : { type: "status", value: "In Progress" },
+            )
+          }
         >
           <CardContent className="p-5 flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-200/60 dark:bg-blue-700/40">

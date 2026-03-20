@@ -14,7 +14,11 @@ import {
   useComponents,
   useTaskFilterStaffUsers,
 } from "@/hooks/use-works-and-components";
-import { TaskStatsBadgesOnly } from "@/components/task-stats";
+import {
+  getTaskStatsBadgeKeyFromFilters,
+  TaskStatsBadgesOnly,
+  toggleTaskStatsBadgeInFilters,
+} from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
 import {
   TaskTable,
@@ -439,6 +443,25 @@ export default function BienTapPage() {
     list = applyTaskFilters(list, filters, works);
     return sortTasks(list, sortBy, sortDir);
   }, [bienTapTasksScoped, search, filters, works, sortBy, sortDir]);
+  const tasksForStats = useMemo(() => {
+    let list = bienTapTasksScoped;
+    if (search.trim()) {
+      const q = normalizeSearch(search.trim());
+      list = list.filter(
+        (t) =>
+          normalizeSearch(t.title ?? "").includes(q) ||
+          normalizeSearch(t.description ?? "").includes(q) ||
+          normalizeSearch(t.assignee ?? "").includes(q) ||
+          normalizeSearch(t.id ?? "").includes(q),
+      );
+    }
+    const filtersForStats: TaskFilterState = { ...filters, status: "all", vote: "all" };
+    return applyTaskFilters(list, filtersForStats, works);
+  }, [bienTapTasksScoped, search, filters, works]);
+  const activeStatsKey = useMemo(
+    () => getTaskStatsBadgeKeyFromFilters(filters),
+    [filters.status, filters.vote],
+  );
 
   const handleSort = (column: TaskSortColumn) => {
     setSortBy((prev) => {
@@ -540,7 +563,13 @@ export default function BienTapPage() {
                 </Button>
               </div>
             </div>
-            <TaskStatsBadgesOnly tasks={filteredTasks} />
+            <TaskStatsBadgesOnly
+              tasks={tasksForStats}
+              activeKey={activeStatsKey}
+              onSelectKey={(key) =>
+                setFilters((prev) => toggleTaskStatsBadgeInFilters(prev, key))
+              }
+            />
           </section>
 
           {/* Task List */}

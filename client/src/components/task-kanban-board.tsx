@@ -1,13 +1,13 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
   DndContext,
-  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
   useDroppable,
   useDraggable,
   type DragEndEvent,
+  type DragCancelEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
@@ -43,7 +43,7 @@ export function TaskKanbanBoard({
   const { t, language } = useI18n();
   const { mutate: updateTask, isPending: isUpdating } = useUpdateTask();
   const { toast } = useToast();
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const lastDragEndAtRef = useRef(0);
 
   const STATUS_ORDER = useMemo(
     () => ["Not Started", "In Progress", "Completed", "Pending", "Cancelled"],
@@ -68,13 +68,24 @@ export function TaskKanbanBoard({
     const byStatus = new Map<string, TaskWithAssignmentDetails[]>();
     STATUS_ORDER.forEach((s) => byStatus.set(s, []));
     for (const task of tasks) {
-      const key = task.status && STATUS_ORDER.includes(task.status) ? task.status : task.status || "Not Started";
+      const key =
+        task.status && STATUS_ORDER.includes(task.status)
+          ? task.status
+          : task.status || "Not Started";
       byStatus.set(key, [...(byStatus.get(key) ?? []), task]);
     }
-    const unknownStatuses = Array.from(byStatus.keys()).filter((s) => !STATUS_ORDER.includes(s));
+    const unknownStatuses = Array.from(byStatus.keys()).filter(
+      (s) => !STATUS_ORDER.includes(s),
+    );
     const ordered = [
-      ...STATUS_ORDER.map((s) => [s, byStatus.get(s) ?? []] as [string, TaskWithAssignmentDetails[]]),
-      ...unknownStatuses.map((s) => [s, byStatus.get(s) ?? []] as [string, TaskWithAssignmentDetails[]]),
+      ...STATUS_ORDER.map(
+        (s) =>
+          [s, byStatus.get(s) ?? []] as [string, TaskWithAssignmentDetails[]],
+      ),
+      ...unknownStatuses.map(
+        (s) =>
+          [s, byStatus.get(s) ?? []] as [string, TaskWithAssignmentDetails[]],
+      ),
     ];
     return ordered;
   }, [tasks, STATUS_ORDER]);
@@ -82,23 +93,32 @@ export function TaskKanbanBoard({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
-    })
+    }),
   );
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(String(event.active.id));
+  const handleDragStart = useCallback((_event: DragStartEvent) => {
+    lastDragEndAtRef.current = 0;
+  }, []);
+
+  const handleDragCancel = useCallback((_event: DragCancelEvent) => {
+    lastDragEndAtRef.current = Date.now();
   }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      setActiveId(null);
+      lastDragEndAtRef.current = Date.now();
       const { active, over } = event;
       if (!over) return;
       const activeIdStr = String(active.id);
       const overIdStr = String(over.id);
-      if (activeIdStr.startsWith(TASK_PREFIX) && overIdStr.startsWith(COLUMN_PREFIX)) {
+      if (
+        activeIdStr.startsWith(TASK_PREFIX) &&
+        overIdStr.startsWith(COLUMN_PREFIX)
+      ) {
         const taskId = activeIdStr.slice(TASK_PREFIX.length);
-        const targetStatus = decodeURIComponent(overIdStr.slice(COLUMN_PREFIX.length));
+        const targetStatus = decodeURIComponent(
+          overIdStr.slice(COLUMN_PREFIX.length),
+        );
         const task = tasks.find((x) => x.id === taskId);
         if (!task || task.status === targetStatus) return;
         updateTask(
@@ -120,16 +140,19 @@ export function TaskKanbanBoard({
                 variant: "destructive",
               });
             },
-          }
+          },
         );
       }
     },
-    [tasks, updateTask, toast, t, language]
+    [tasks, updateTask, toast, t, language],
   );
 
-  const activeTask = useMemo(
-    () => (activeId && activeId.startsWith(TASK_PREFIX) ? tasks.find((t) => TASK_PREFIX + t.id === activeId) : null),
-    [activeId, tasks]
+  const handleTaskClick = useCallback(
+    (task: TaskWithAssignmentDetails) => {
+      if (Date.now() - lastDragEndAtRef.current < 250) return;
+      onTaskClick(task);
+    },
+    [onTaskClick],
   );
 
   // Hiển thị đầy đủ 5 cột trạng thái ngay cả khi chưa có công việc ở một số cột
@@ -137,13 +160,19 @@ export function TaskKanbanBoard({
   if (!hasAnyTask) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-border bg-muted/20 min-h-[320px] p-8">
-        <p className="text-sm text-muted-foreground">{t.dashboard.noTasksFound}</p>
+        <p className="text-sm text-muted-foreground">
+          {t.dashboard.noTasksFound}
+        </p>
       </div>
     );
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragCancel={handleDragCancel}
+      onDragEnd={handleDragEnd}>
       <ScrollArea className="w-full whitespace-nowrap rounded-md border border-border">
         <div className="flex gap-4 p-4 min-h-[420px]">
           {columns.map(([statusName, columnTasks]) => {
@@ -154,7 +183,7 @@ export function TaskKanbanBoard({
                 id={columnId}
                 title={getStatusLabel(statusName)}
                 tasks={columnTasks}
-                onTaskClick={onTaskClick}
+                onTaskClick={handleTaskClick}
                 getPriorityColor={getPriorityColor}
                 getStatusColor={getStatusColor}
                 isUpdating={isUpdating}
@@ -164,17 +193,6 @@ export function TaskKanbanBoard({
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
-
-      <DragOverlay dropAnimation={null}>
-        {activeTask ? (
-          <KanbanCard
-            task={activeTask}
-            getPriorityColor={getPriorityColor}
-            getStatusColor={getStatusColor}
-            isDragOverlay
-          />
-        ) : null}
-      </DragOverlay>
     </DndContext>
   );
 }
@@ -203,8 +221,7 @@ function KanbanColumn({
       ref={setNodeRef}
       className={`flex-shrink-0 w-[300px] rounded-lg border-2 bg-muted/30 transition-colors ${
         isOver ? "border-primary bg-primary/5" : "border-border"
-      }`}
-    >
+      }`}>
       <div className="p-3 border-b border-border flex items-center justify-between">
         <span className="font-semibold text-sm">{title}</span>
         <Badge variant="secondary" className="text-xs">
@@ -237,66 +254,62 @@ function KanbanCard({
   onTaskClick,
   getPriorityColor,
   getStatusColor,
-  isDragOverlay,
 }: {
   task: TaskWithAssignmentDetails;
   onTaskClick?: (task: TaskWithAssignmentDetails) => void;
   getPriorityColor: (p: string) => string;
   getStatusColor: (s: string) => string;
-  isDragOverlay?: boolean;
 }) {
   const { language, t } = useI18n();
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: TASK_PREFIX + task.id,
-    data: { task },
-  });
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: TASK_PREFIX + task.id,
+      data: { task },
+    });
 
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      }
-    : undefined;
+  const style =
+    transform
+      ? {
+          transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        }
+      : undefined;
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className={`cursor-grab active:cursor-grabbing rounded-lg border bg-card text-card-foreground shadow-sm transition-shadow ${
-        isDragging && !isDragOverlay ? "opacity-50 shadow-md" : ""
-      } ${isDragOverlay ? "cursor-grabbing shadow-lg ring-2 ring-primary/20 rotate-1" : ""}`}
-      onClick={!isDragOverlay && onTaskClick ? () => onTaskClick(task) : undefined}
-    >
+      className={`touch-none select-none cursor-grab active:cursor-grabbing rounded-lg border bg-card text-card-foreground shadow-sm transition-shadow ${
+        isDragging ? "relative z-50 shadow-lg ring-2 ring-primary/20" : ""
+      }`}
+      {...listeners}
+      {...attributes}
+      onClick={onTaskClick ? () => onTaskClick(task) : undefined}>
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
-          {!isDragOverlay && (
-            <button
-              type="button"
-              className="touch-none p-0.5 rounded hover:bg-muted text-muted-foreground cursor-grab active:cursor-grabbing"
-              {...listeners}
-              {...attributes}
-              onClick={(e) => e.stopPropagation()}
-              aria-label="Drag"
-            >
-              <GripVertical className="h-4 w-4" />
-            </button>
-          )}
+          <div className="p-0.5 rounded text-muted-foreground">
+            <GripVertical className="h-4 w-4" />
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium line-clamp-2">{task.title ?? ""}</p>
+            <p className="text-sm font-medium line-clamp-2">
+              {task.title ?? ""}
+            </p>
             <div className="flex flex-wrap gap-1 mt-2">
               <Badge className={`text-xs ${getStatusColor(task.status)}`}>
                 {task.status === "Not Started"
                   ? t.status.notStarted
                   : task.status === "In Progress"
-                  ? t.status.inProgress
-                  : task.status === "Completed"
-                  ? t.status.completed
-                  : task.status === "Pending"
-                  ? t.status.pending
-                  : task.status === "Cancelled"
-                  ? t.status.cancelled
-                  : task.status}
+                    ? t.status.inProgress
+                    : task.status === "Completed"
+                      ? t.status.completed
+                      : task.status === "Pending"
+                        ? t.status.pending
+                        : task.status === "Cancelled"
+                          ? t.status.cancelled
+                          : task.status}
               </Badge>
-              <Badge variant="outline" className={`text-xs ${getPriorityColor(task.priority ?? "")}`}>
+              <Badge
+                variant="outline"
+                className={`text-xs ${getPriorityColor(task.priority ?? "")}`}>
                 {task.priority ?? "—"}
               </Badge>
             </div>
@@ -310,7 +323,9 @@ function KanbanCard({
               <Progress value={task.progress ?? 0} className="h-1.5" />
             </div>
             {task.assignee && (
-              <p className="text-xs text-muted-foreground mt-1 truncate">{task.assignee}</p>
+              <p className="text-xs text-muted-foreground mt-1 truncate">
+                {task.assignee}
+              </p>
             )}
           </div>
         </div>

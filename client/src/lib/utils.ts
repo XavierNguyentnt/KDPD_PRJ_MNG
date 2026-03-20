@@ -15,6 +15,36 @@ export function normalizeSearch(input: string): string {
     .replace(/Đ/g, "d");
 }
 
+export function getLastNameKey(input: string): string {
+  const raw = String(input ?? "").trim();
+  if (!raw) return "";
+  const single = raw.split(",")[0]?.trim() ?? "";
+  const parts = single.split(/\s+/).filter(Boolean);
+  return (parts[parts.length - 1] ?? single).trim();
+}
+
+export function compareNamesByLastNameAZ(a: string, b: string): number {
+  const aa = String(a ?? "").trim();
+  const bb = String(b ?? "").trim();
+  if (!aa && !bb) return 0;
+  if (!aa) return 1;
+  if (!bb) return -1;
+
+  const al = getLastNameKey(aa);
+  const bl = getLastNameKey(bb);
+  const primary = al.localeCompare(bl, "vi", {
+    sensitivity: "base",
+    ignorePunctuation: true,
+    numeric: true,
+  });
+  if (primary !== 0) return primary;
+  return aa.localeCompare(bb, "vi", {
+    sensitivity: "base",
+    ignorePunctuation: true,
+    numeric: true,
+  });
+}
+
 /** Parse to local date (no UTC shift). Returns [year, month0, day] or null. */
 function parseToLocalDate(value: string | Date | null | undefined): [number, number, number] | null {
   if (value == null || value === "") return null;

@@ -15,7 +15,11 @@ import {
   useComponents,
   useTaskFilterStaffUsers,
 } from "@/hooks/use-works-and-components";
-import { TaskStatsBadgesOnly } from "@/components/task-stats";
+import {
+  getTaskStatsBadgeKeyFromFilters,
+  TaskStatsBadgesOnly,
+  toggleTaskStatsBadgeInFilters,
+} from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
 import {
   TaskTable,
@@ -382,6 +386,44 @@ export default function CVChungPage() {
     sortBy,
     sortDir,
   ]);
+  const tasksForStats = useMemo(() => {
+    if (!datasetForList) return [];
+    let list = datasetForList.filter(
+      (t) => t.group && CV_CHUNG_GROUP_NAMES.includes(t.group),
+    );
+    if (role === UserRole.EMPLOYEE) {
+      const uid = user?.id ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            (t as any).createdBy === uid ||
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else {
+        const exact = (user?.displayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
+    }
+    if (search.trim()) {
+      const q = normalizeSearch(search.trim());
+      list = list.filter(
+        (t) =>
+          normalizeSearch(t.title ?? "").includes(q) ||
+          normalizeSearch(t.description ?? "").includes(q) ||
+          normalizeSearch(t.assignee ?? "").includes(q) ||
+          normalizeSearch(t.id ?? "").includes(q),
+      );
+    }
+    const filtersForStats: TaskFilterState = { ...filters, status: "all", vote: "all" };
+    return applyTaskFilters(list, filtersForStats, worksForFilter);
+  }, [datasetForList, role, user?.id, user?.displayName, search, filters, worksForFilter]);
+  const activeStatsKey = useMemo(
+    () => getTaskStatsBadgeKeyFromFilters(filters),
+    [filters.status, filters.vote],
+  );
 
   const handleSort = (column: TaskSortColumn) => {
     setSortBy((prev) => {
@@ -471,7 +513,13 @@ export default function CVChungPage() {
             </Button>
           </div>
         </div>
-        <TaskStatsBadgesOnly tasks={filteredTasks} />
+        <TaskStatsBadgesOnly
+          tasks={tasksForStats}
+          activeKey={activeStatsKey}
+          onSelectKey={(key) =>
+            setFilters((prev) => toggleTaskStatsBadgeInFilters(prev, key))
+          }
+        />
       </section>
 
       {/* Task List */}

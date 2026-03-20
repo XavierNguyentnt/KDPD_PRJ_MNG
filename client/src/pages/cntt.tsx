@@ -14,7 +14,11 @@ import {
   useComponents,
   useTaskFilterStaffUsers,
 } from "@/hooks/use-works-and-components";
-import { TaskStatsBadgesOnly } from "@/components/task-stats";
+import {
+  getTaskStatsBadgeKeyFromFilters,
+  TaskStatsBadgesOnly,
+  toggleTaskStatsBadgeInFilters,
+} from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
 import {
   TaskTable,
@@ -293,6 +297,7 @@ export default function CNTTPage() {
     viewMode,
     setViewMode,
     filteredTasks,
+    tasksForStats,
     availableGroups,
     availableYears,
   } = useTaskListControls({
@@ -350,6 +355,10 @@ export default function CNTTPage() {
         return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
     }
   };
+  const activeStatsKey = useMemo(
+    () => getTaskStatsBadgeKeyFromFilters(filters),
+    [filters.status, filters.vote],
+  );
 
   if (isLoading) {
     return (
@@ -432,7 +441,13 @@ export default function CNTTPage() {
             </Button>
           </div>
         </div>
-        <TaskStatsBadgesOnly tasks={filteredTasks} />
+        <TaskStatsBadgesOnly
+          tasks={tasksForStats}
+          activeKey={activeStatsKey}
+          onSelectKey={(key) =>
+            setFilters((prev) => toggleTaskStatsBadgeInFilters(prev, key))
+          }
+        />
       </section>
 
       <section className="section-card">

@@ -24,7 +24,7 @@ import { TaskCalendarView } from "@/components/task-calendar-view";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
-import { normalizeSearch } from "@/lib/utils";
+import { compareNamesByLastNameAZ, normalizeSearch } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -41,6 +41,7 @@ import {
   Filter,
   AlertTriangle,
   Plus,
+  X,
   Bell,
   MessageSquare,
   Calendar,
@@ -64,6 +65,7 @@ export default function Dashboard() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [voteFilter, setVoteFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
   const [receivedYearFilter, setReceivedYearFilter] = useState("all");
   const [badgeFilter, setBadgeFilter] = useState<DashboardBadgeFilter>(null);
@@ -123,11 +125,23 @@ export default function Dashboard() {
 
   // Get unique groups from tasks
   const datasetForList = includeArchivedForList ? tasksAll : tasks;
+  const noGroupLabel = language === "vi" ? "(Không nhóm)" : "(No group)";
 
   const availableGroups = useMemo(() => {
     if (!datasetForList) return [];
-    const groups = new Set(datasetForList.map((t) => t.group).filter(Boolean));
-    return Array.from(groups).sort();
+    const groups = new Set<string>();
+    let hasNoGroup = false;
+    for (const t of datasetForList) {
+      const g = (t.group ?? "").trim();
+      if (!g) {
+        hasNoGroup = true;
+        continue;
+      }
+      groups.add(g);
+    }
+    const ordered = Array.from(groups).sort();
+    if (hasNoGroup) ordered.push(noGroupLabel);
+    return ordered;
   }, [datasetForList]);
 
   const availableYears = useMemo(() => {
@@ -150,7 +164,11 @@ export default function Dashboard() {
       }
     }
     if (groupFilter !== "all") {
-      list = list.filter((t) => t.group === groupFilter);
+      if (groupFilter === noGroupLabel) {
+        list = list.filter((t) => !(t.group ?? "").trim());
+      } else {
+        list = list.filter((t) => (t.group ?? "").trim() === groupFilter);
+      }
     }
     const years = new Set<string>();
     for (const t of list) {
@@ -165,7 +183,7 @@ export default function Dashboard() {
       if (y) years.add(y);
     }
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
-  }, [tasksAll, role, user?.id, user?.displayName, groupFilter]);
+  }, [tasksAll, role, user?.id, user?.displayName, groupFilter, noGroupLabel]);
 
   // Base filtered list (role, search, group, status) — dùng cho thống kê dashboard
   const baseFilteredTasks = useMemo(() => {
@@ -188,7 +206,13 @@ export default function Dashboard() {
       }
     }
     if (groupFilter !== "all") {
-      filtered = filtered.filter((t) => t.group === groupFilter);
+      if (groupFilter === noGroupLabel) {
+        filtered = filtered.filter((t) => !(t.group ?? "").trim());
+      } else {
+        filtered = filtered.filter(
+          (t) => (t.group ?? "").trim() === groupFilter,
+        );
+      }
     }
     if (receivedYearFilter !== "all") {
       const y = String(receivedYearFilter).trim();
@@ -216,25 +240,39 @@ export default function Dashboard() {
     if (statusFilter !== "all") {
       filtered = filtered.filter((t) => t.status === statusFilter);
     }
+    if (voteFilter !== "all") {
+      if (voteFilter === "unrated") {
+        filtered = filtered.filter((t) => !String(t.vote ?? "").trim());
+      } else {
+        const v = String(voteFilter).toLowerCase();
+        filtered = filtered.filter(
+          (t) => String(t.vote ?? "").toLowerCase() === v,
+        );
+      }
+    }
     return filtered;
   }, [
     datasetForList,
     role,
     search,
     statusFilter,
+    voteFilter,
     groupFilter,
+    receivedYearFilter,
+    user?.id,
     user?.displayName,
+    noGroupLabel,
   ]);
 
-  // Dùng cho thống kê dashboard (bao gồm archived để giữ số liệu chính xác cho vote)
-  const baseFilteredTasksAll = useMemo(() => {
-    if (!tasksAll) return [];
-    let filtered: TaskWithAssignmentDetails[] = tasksAll;
+  const tasksForDashboardStats = useMemo(() => {
+    if (!datasetForList) return [];
+    let filtered: TaskWithAssignmentDetails[] = datasetForList;
     if (role === UserRole.EMPLOYEE) {
       const uid = user?.id ?? null;
       if (uid) {
         filtered = filtered.filter(
           (t) =>
+            (t as any).createdBy === uid ||
             t.assigneeId === uid ||
             (Array.isArray(t.assignments)
               ? t.assignments.some((a: any) => a?.userId === uid)
@@ -245,32 +283,46 @@ export default function Dashboard() {
         filtered = filtered.filter((t) => (t.assignee ?? "").trim() === exact);
       }
     }
-    if (groupFilter !== "all") {
-      filtered = filtered.filter((t) => t.group === groupFilter);
-    }
     if (search.trim()) {
-      const lower = normalizeSearch(search.trim());
+      const q = normalizeSearch(search.trim());
       filtered = filtered.filter(
         (t) =>
-          normalizeSearch(t.title ?? "").includes(lower) ||
-          normalizeSearch(t.description ?? "").includes(lower) ||
-          normalizeSearch(t.assignee ?? "").includes(lower) ||
-          normalizeSearch(t.group ?? "").includes(lower),
+          normalizeSearch(t.title ?? "").includes(q) ||
+          normalizeSearch(t.description ?? "").includes(q) ||
+          normalizeSearch(t.assignee ?? "").includes(q) ||
+          normalizeSearch(t.id ?? "").includes(q),
       );
     }
-    // Không áp dụng statusFilter cho số liệu? Giữ nguyên như danh sách để nhất quán.
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((t) => t.status === statusFilter);
+    if (groupFilter !== "all") {
+      if (groupFilter === noGroupLabel) {
+        filtered = filtered.filter((t) => !(t.group ?? "").trim());
+      } else {
+        filtered = filtered.filter((t) => (t.group ?? "").trim() === groupFilter);
+      }
+    }
+    if (receivedYearFilter !== "all") {
+      const y = String(receivedYearFilter).trim();
+      filtered = filtered.filter((t) => {
+        const r = (t as any).receivedAt ?? null;
+        const s =
+          typeof r === "string"
+            ? r.slice(0, 10)
+            : r instanceof Date
+            ? r.toISOString().slice(0, 10)
+            : "";
+        return s ? s.slice(0, 4) === y : false;
+      });
     }
     return filtered;
   }, [
     datasetForList,
     role,
     search,
-    statusFilter,
     groupFilter,
     receivedYearFilter,
+    user?.id,
     user?.displayName,
+    noGroupLabel,
   ]);
 
   // Danh sách task sau khi áp dụng badge filter + sắp xếp (hiển thị trong bảng)
@@ -338,20 +390,115 @@ export default function Dashboard() {
         count,
         display: name || t.task.unassigned,
       }))
-      .sort((a, b) => b.count - a.count)
+      .sort((a, b) => {
+        const aName = a.name?.trim() ?? "";
+        const bName = b.name?.trim() ?? "";
+        if (!aName && !bName) return 0;
+        if (!aName) return 1;
+        if (!bName) return -1;
+        return compareNamesByLastNameAZ(a.display, b.display);
+      })
       .slice(0, 20);
   }, [baseFilteredTasks, t]);
 
-  const handleBadgeFilter = useCallback((filter: DashboardBadgeFilter) => {
-    setBadgeFilter(filter);
-    setTimeout(
-      () =>
-        taskListRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        }),
-      100,
-    );
+  const handleBadgeFilter = useCallback(
+    (filter: DashboardBadgeFilter) => {
+      setBadgeFilter(filter);
+
+      const nextStatusFilter = (() => {
+        if (!filter) {
+          if (
+            badgeFilter &&
+            (badgeFilter.type === "status" || badgeFilter.type === "overdue")
+          ) {
+            return "all";
+          }
+          return null;
+        }
+        if (filter.type === "status") {
+          const v = String(filter.value);
+          if (
+            v === "Not Started" ||
+            v === "In Progress" ||
+            v === "Completed" ||
+            v === "Pending" ||
+            v === "Cancelled"
+          ) {
+            return v;
+          }
+          return null;
+        }
+        if (filter.type === "overdue") return "In Progress";
+        return null;
+      })();
+      if (nextStatusFilter != null) setStatusFilter(nextStatusFilter);
+
+      const nextVoteFilter = (() => {
+        if (!filter) {
+          if (badgeFilter && badgeFilter.type === "not_completed") return "all";
+          return null;
+        }
+        if (filter.type === "not_completed") return "khong_hoan_thanh";
+        return null;
+      })();
+      if (nextVoteFilter != null) setVoteFilter(nextVoteFilter);
+
+      setTimeout(
+        () =>
+          taskListRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          }),
+        100,
+      );
+    },
+    [badgeFilter],
+  );
+
+  useEffect(() => {
+    const isSame = (a: DashboardBadgeFilter, b: DashboardBadgeFilter) => {
+      if (!a && !b) return true;
+      if (!a || !b) return false;
+      return a.type === b.type && (a as any).value === (b as any).value;
+    };
+
+    const desired: DashboardBadgeFilter = (() => {
+      if (voteFilter === "khong_hoan_thanh") {
+        return { type: "not_completed", value: "not_completed" };
+      }
+      if (badgeFilter?.type === "overdue" && statusFilter === "In Progress") {
+        return badgeFilter;
+      }
+      if (statusFilter !== "all") {
+        return { type: "status", value: statusFilter };
+      }
+      return null;
+    })();
+
+    if (desired) {
+      if (!isSame(badgeFilter, desired)) setBadgeFilter(desired);
+      return;
+    }
+
+    if (
+      badgeFilter &&
+      (badgeFilter.type === "status" ||
+        badgeFilter.type === "overdue" ||
+        badgeFilter.type === "not_completed")
+    ) {
+      setBadgeFilter(null);
+    }
+  }, [badgeFilter, statusFilter, voteFilter]);
+
+  const clearAllFilters = useCallback(() => {
+    setSearch("");
+    setStatusFilter("all");
+    setVoteFilter("all");
+    setGroupFilter("all");
+    setReceivedYearFilter("all");
+    setSelectedAssignees([]);
+    setBadgeFilter(null);
+    setIncludeArchivedForList(false);
   }, []);
 
   const handleSort = useCallback((column: TaskSortColumn) => {
@@ -361,7 +508,6 @@ export default function Dashboard() {
       return column;
     });
   }, []);
-
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "High":
@@ -578,7 +724,7 @@ export default function Dashboard() {
       {/* Dashboard thống kê: badges + biểu đồ xu hướng */}
       <section>
         <TaskDashboard
-          tasks={baseFilteredTasksAll}
+          tasks={tasksForDashboardStats}
           onBadgeFilter={handleBadgeFilter}
           activeBadgeFilter={badgeFilter}
         />
@@ -693,6 +839,50 @@ export default function Dashboard() {
                 <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select value={voteFilter} onValueChange={setVoteFilter}>
+              <SelectTrigger className="w-full sm:w-[160px] bg-background">
+                <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                <SelectValue
+                  placeholder={
+                    (t.filter as any)?.vote ??
+                    (language === "vi" ? "Đánh giá" : "Vote")
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  {language === "vi" ? "Tất cả đánh giá" : "All votes"}
+                </SelectItem>
+                <SelectItem value="tot">
+                  {language === "vi" ? "Tốt" : "Good"}
+                </SelectItem>
+                <SelectItem value="kha">
+                  {language === "vi" ? "Khá" : "Fair"}
+                </SelectItem>
+                <SelectItem value="khong_tot">
+                  {language === "vi" ? "Không tốt" : "Not good"}
+                </SelectItem>
+                <SelectItem value="khong_hoan_thanh">
+                  {language === "vi"
+                    ? "Không hoàn thành"
+                    : "Not completed"}
+                </SelectItem>
+                <SelectItem value="unrated">
+                  {language === "vi" ? "Chưa đánh giá" : "Unrated"}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={clearAllFilters}
+            >
+              <X className="h-4 w-4" />
+              {language === "vi" ? "Xoá lọc" : "Clear filters"}
+            </Button>
 
             <ToggleGroup
               type="single"

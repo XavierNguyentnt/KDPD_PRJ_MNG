@@ -4,13 +4,67 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, AlertCircle, Clock, BarChart3, PauseCircle, AlertTriangle } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { useI18n } from "@/hooks/use-i18n";
+import type { TaskFilterState } from "@/components/task-filters";
 
 interface TaskStatsProps {
   tasks: TaskWithAssignmentDetails[];
+  activeKey?: TaskStatsBadgeKey;
+  onSelectKey?: (key: TaskStatsBadgeKey) => void;
 }
 
-/** 5 thẻ thống kê (badges) với gradient: Tổng (trắng), Hoàn thành (xanh lá), Đang tiến hành (xanh lam), Quá hạn (cam), Không hoàn thành (đỏ) */
-export function TaskStatsBadgesOnly({ tasks }: TaskStatsProps) {
+export type TaskStatsBadgeKey =
+  | "all"
+  | "completed"
+  | "in_progress"
+  | "pending"
+  | "not_finished"
+  | "behind_schedule"
+  | "not_completed";
+
+export function getTaskStatsBadgeKeyFromFilters(
+  filters: Pick<TaskFilterState, "status" | "vote">,
+): TaskStatsBadgeKey {
+  if ((filters.vote ?? "all") === "khong_hoan_thanh") return "not_completed";
+  switch (filters.status) {
+    case "Completed":
+      return "completed";
+    case "In Progress":
+      return "in_progress";
+    case "Pending":
+      return "pending";
+    case "Not Finished":
+      return "not_finished";
+    case "Behind Schedule":
+      return "behind_schedule";
+    default:
+      return "all";
+  }
+}
+
+export function toggleTaskStatsBadgeInFilters(
+  prev: TaskFilterState,
+  key: TaskStatsBadgeKey,
+): TaskFilterState {
+  const active = getTaskStatsBadgeKeyFromFilters(prev);
+  if (active === key) {
+    return { ...prev, status: "all", vote: "all" };
+  }
+  if (key === "not_completed") {
+    return { ...prev, status: "all", vote: "khong_hoan_thanh" };
+  }
+  if (key === "completed") return { ...prev, status: "Completed", vote: "all" };
+  if (key === "in_progress") return { ...prev, status: "In Progress", vote: "all" };
+  if (key === "pending") return { ...prev, status: "Pending", vote: "all" };
+  if (key === "not_finished") return { ...prev, status: "Not Finished", vote: "all" };
+  if (key === "behind_schedule") return { ...prev, status: "Behind Schedule", vote: "all" };
+  return { ...prev, status: "all", vote: "all" };
+}
+
+export function TaskStatsBadgesOnly({
+  tasks,
+  activeKey = "all",
+  onSelectKey,
+}: TaskStatsProps) {
   const { t } = useI18n();
   const stats = useMemo(() => {
     const total = tasks.length;
@@ -18,6 +72,7 @@ export function TaskStatsBadgesOnly({ tasks }: TaskStatsProps) {
     const completed = tasks.filter((x) => isCompleted(x)).length;
     const inProgress = tasks.filter((x) => x.status === "In Progress").length;
     const pending = tasks.filter((x) => x.status === "Pending").length;
+    const notFinished = tasks.filter((x) => !isCompleted(x)).length;
     const overdueInProgress = tasks.filter((x) => {
       if (x.status !== "In Progress") return false;
       if (!x.dueDate || isCompleted(x)) return false;
@@ -25,23 +80,29 @@ export function TaskStatsBadgesOnly({ tasks }: TaskStatsProps) {
     }).length;
     const notCompleted = tasks.filter((x) => x.vote === "khong_hoan_thanh").length;
     const behindSchedule = overdueInProgress;
-    return { total, completed, inProgress, pending, overdueInProgress, behindSchedule, notCompleted };
+    return { total, completed, inProgress, pending, notFinished, overdueInProgress, behindSchedule, notCompleted };
   }, [tasks]);
 
   const badges = [
-    { label: t.stats.totalTasks, value: stats.total, icon: BarChart3, gradient: "bg-white dark:bg-slate-900/30", textClass: "text-slate-700 dark:text-slate-100", iconBg: "bg-slate-200/60 dark:bg-slate-700/40" },
-    { label: t.stats.completed, value: stats.completed, icon: CheckCircle2, gradient: "bg-emerald-50 dark:bg-emerald-950/30", textClass: "text-emerald-700 dark:text-emerald-300", iconBg: "bg-emerald-200/60 dark:bg-emerald-700/40" },
-    { label: t.stats.inProgress, value: stats.inProgress, icon: Clock, gradient: "bg-blue-50 dark:bg-blue-950/30", textClass: "text-blue-700 dark:text-blue-300", iconBg: "bg-blue-200/60 dark:bg-blue-700/40" },
-    { label: t.status.pending, value: stats.pending, icon: PauseCircle, gradient: "bg-yellow-50 dark:bg-yellow-950/30", textClass: "text-yellow-700 dark:text-yellow-300", iconBg: "bg-yellow-200/60 dark:bg-yellow-700/40" },
-    { label: t.stats.notFinished, value: stats.overdueInProgress, icon: AlertCircle, gradient: "bg-amber-50 dark:bg-amber-950/30", textClass: "text-amber-800 dark:text-amber-300", iconBg: "bg-amber-200/60 dark:bg-amber-700/40" },
-    { label: t.dashboard.behindSchedule, value: stats.behindSchedule, icon: AlertTriangle, gradient: "bg-orange-50 dark:bg-orange-950/30", textClass: "text-orange-700 dark:text-orange-300", iconBg: "bg-orange-200/60 dark:bg-orange-700/40" },
-    { label: t.stats.notCompleted, value: stats.notCompleted, icon: AlertCircle, gradient: "bg-rose-50 dark:bg-rose-950/30", textClass: "text-rose-700 dark:text-rose-300", iconBg: "bg-rose-200/60 dark:bg-rose-700/40" },
+    { key: "all" as const, label: t.stats.totalTasks, value: stats.total, icon: BarChart3, gradient: "bg-white dark:bg-slate-900/30", textClass: "text-slate-700 dark:text-slate-100", iconBg: "bg-slate-200/60 dark:bg-slate-700/40" },
+    { key: "completed" as const, label: t.stats.completed, value: stats.completed, icon: CheckCircle2, gradient: "bg-emerald-50 dark:bg-emerald-950/30", textClass: "text-emerald-700 dark:text-emerald-300", iconBg: "bg-emerald-200/60 dark:bg-emerald-700/40" },
+    { key: "in_progress" as const, label: t.stats.inProgress, value: stats.inProgress, icon: Clock, gradient: "bg-blue-50 dark:bg-blue-950/30", textClass: "text-blue-700 dark:text-blue-300", iconBg: "bg-blue-200/60 dark:bg-blue-700/40" },
+    { key: "pending" as const, label: t.status.pending, value: stats.pending, icon: PauseCircle, gradient: "bg-yellow-50 dark:bg-yellow-950/30", textClass: "text-yellow-700 dark:text-yellow-300", iconBg: "bg-yellow-200/60 dark:bg-yellow-700/40" },
+    { key: "not_finished" as const, label: t.stats.notFinished, value: stats.notFinished, icon: AlertCircle, gradient: "bg-amber-50 dark:bg-amber-950/30", textClass: "text-amber-800 dark:text-amber-300", iconBg: "bg-amber-200/60 dark:bg-amber-700/40" },
+    { key: "behind_schedule" as const, label: t.dashboard.behindSchedule, value: stats.behindSchedule, icon: AlertTriangle, gradient: "bg-orange-50 dark:bg-orange-950/30", textClass: "text-orange-700 dark:text-orange-300", iconBg: "bg-orange-200/60 dark:bg-orange-700/40" },
+    { key: "not_completed" as const, label: t.stats.notCompleted, value: stats.notCompleted, icon: AlertCircle, gradient: "bg-rose-50 dark:bg-rose-950/30", textClass: "text-rose-700 dark:text-rose-300", iconBg: "bg-rose-200/60 dark:bg-rose-700/40" },
   ];
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-      {badges.map(({ label, value, icon: Icon, gradient, textClass, iconBg }) => (
-        <Card key={label} className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 ${gradient} ${textClass}`}>
+      {badges.map(({ key, label, value, icon: Icon, gradient, textClass, iconBg }) => (
+        <Card
+          key={key}
+          className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${gradient} ${textClass} ${
+            activeKey === key ? "ring-2 ring-primary/30" : ""
+          }`}
+          onClick={() => onSelectKey?.(key)}
+        >
           <CardContent className="p-5 flex items-center gap-4">
             <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${iconBg}`}>
               <Icon className="h-6 w-6" />

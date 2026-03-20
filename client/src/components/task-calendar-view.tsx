@@ -10,6 +10,7 @@ import {
   subMonths,
   subWeeks,
 } from "date-fns";
+import { vi } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 
@@ -706,6 +707,7 @@ export function TaskCalendarView({
               onMonthChange={(m) => setSelectedDate(m)}
               showOutsideDays
               weekStartsOn={1}
+              locale={language === "vi" ? vi : undefined}
               captionLayout="buttons"
               classNames={{
                 months: "flex flex-col",
@@ -1221,6 +1223,7 @@ export function TaskCalendarView({
                 onMonthChange={(m) => setSelectedDate(m)}
                 showOutsideDays
                 weekStartsOn={1}
+                locale={language === "vi" ? vi : undefined}
                 captionLayout="buttons"
                 modifiers={modifiers}
                 className="p-2"

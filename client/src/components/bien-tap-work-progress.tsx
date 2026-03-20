@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { BienTapWorkflowHelpers, StageStatus, type Workflow } from "@shared/workflow";
 import { differenceInCalendarDays, parseISO } from "date-fns";
-import { normalizeSearch } from "@/lib/utils";
+import { compareNamesByLastNameAZ, normalizeSearch } from "@/lib/utils";
 import { Eye } from "lucide-react";
 
 type RoundItem = {
@@ -178,9 +178,12 @@ const getAssigneesForWork = (rounds: RoundItem[]): string[] => {
 
 const getWorkVotes = (tasks: TaskWithAssignmentDetails[]): string[] => {
   const votes = new Set<string>();
+  let hasUnrated = false;
   tasks.forEach((task) => {
-    if (task.vote) votes.add(task.vote);
+    if (task.vote && String(task.vote).trim()) votes.add(String(task.vote));
+    else hasUnrated = true;
   });
+  if (hasUnrated) votes.add("unrated");
   return Array.from(votes);
 };
 
@@ -270,7 +273,7 @@ export function BienTapWorkProgress({ tasks, works, components }: BienTapWorkPro
         });
       });
     });
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
+    return Array.from(names).sort(compareNamesByLastNameAZ);
   }, [workGroups]);
 
   const filteredGroups = useMemo(() => {
@@ -406,6 +409,7 @@ export function BienTapWorkProgress({ tasks, works, components }: BienTapWorkPro
                   <SelectItem value="kha">Hoàn thành khá</SelectItem>
                   <SelectItem value="khong_tot">Không tốt</SelectItem>
                   <SelectItem value="khong_hoan_thanh">Không hoàn thành</SelectItem>
+                <SelectItem value="unrated">Chưa đánh giá</SelectItem>
                 </SelectContent>
               </Select>
             </div>

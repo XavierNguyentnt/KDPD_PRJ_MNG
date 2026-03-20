@@ -7,6 +7,7 @@ import type {
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000
+const DEFAULT_TOAST_DURATION = 8000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -149,9 +150,8 @@ function toast({ ...props }: Toast) {
     })
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
-  const isDestructive = (props as { variant?: "default" | "destructive" }).variant === "destructive"
   const effectiveDuration =
-    (props as { duration?: number }).duration ?? (isDestructive ? 9999999 : 3000)
+    (props as { duration?: number }).duration ?? DEFAULT_TOAST_DURATION
 
   dispatch({
     type: "ADD_TOAST",

@@ -134,6 +134,55 @@ export function useTaskListControls(params: {
     sortDir,
   ]);
 
+  const tasksForStats = useMemo(() => {
+    if (!tasks) return [];
+    let list = tasks.slice();
+    if (includedGroups && includedGroups.length > 0) {
+      list = list.filter((t) => includedGroups.includes(t.group || ""));
+    }
+    if (groupFilter !== "all") {
+      list = list.filter((t) => t.group === groupFilter);
+    }
+    if (role === UserRole.EMPLOYEE) {
+      const uid = userId ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            (t as any).createdBy === uid ||
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else if (userDisplayName) {
+        const exact = (userDisplayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
+    }
+    if (search.trim()) {
+      const q = normalizeSearch(search.trim());
+      list = list.filter(
+        (t) =>
+          normalizeSearch(t.title ?? "").includes(q) ||
+          normalizeSearch(t.description ?? "").includes(q) ||
+          normalizeSearch(t.assignee ?? "").includes(q) ||
+          normalizeSearch(t.id ?? "").includes(q),
+      );
+    }
+    const filtersForStats: TaskFilterState = { ...filters, status: "all", vote: "all" };
+    return applyTaskFilters(list, filtersForStats, works);
+  }, [
+    tasks,
+    includedGroups,
+    groupFilter,
+    role,
+    userId,
+    userDisplayName,
+    search,
+    filters,
+    works,
+  ]);
+
   function handleSort(column: TaskSortColumn) {
     setSortBy((prev) => {
       if (prev === column) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -155,6 +204,7 @@ export function useTaskListControls(params: {
     viewMode,
     setViewMode,
     filteredTasks,
+    tasksForStats,
     availableGroups,
     availableYears,
   };
