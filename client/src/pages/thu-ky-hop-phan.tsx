@@ -842,6 +842,8 @@ export default function ThuKyHopPhanPage() {
     Array<{ column: ProofreadingContractSortColumn; dir: "asc" | "desc" }>
   >([]);
   const [tcColumnVis, setTcColumnVis] = useState({
+    contractNumber: true,
+    translators: true,
     overviewValue: true,
     translationValue: true,
     contractValue: true,
@@ -1938,6 +1940,119 @@ export default function ThuKyHopPhanPage() {
   const someSelectedOnPage =
     paginatedWorks.some((w) => selectedWorkSet.has(w.id)) && !allSelectedOnPage;
 
+  const workTcIdsForOutstanding = useMemo(() => {
+    if (!tcColumnVis.outstanding) return [];
+    const ids = new Set<string>();
+    paginatedWorks.forEach((w) => {
+      const list = tcByWorkId.get(w.id) ?? [];
+      list.forEach((c) => {
+        if (c?.id) ids.add(c.id);
+      });
+    });
+    return Array.from(ids);
+  }, [paginatedWorks, tcByWorkId, tcColumnVis.outstanding]);
+
+  const worksFinanceQueries = useQueries({
+    queries: workTcIdsForOutstanding.map((id) => ({
+      queryKey: ["finance-summary", id],
+      queryFn: () => fetchFinanceSummary(id),
+      enabled: !!id && tcColumnVis.outstanding,
+      staleTime: 60_000,
+    })),
+  });
+  const outstandingByTcIdForWorks = useMemo(() => {
+    const map = new Map<string, number>();
+    worksFinanceQueries.forEach((q, idx) => {
+      const id = workTcIdsForOutstanding[idx];
+      if (id && q.data) map.set(id, Math.max(q.data.outstanding, 0));
+    });
+    return map;
+  }, [worksFinanceQueries, workTcIdsForOutstanding]);
+
+  const getWorkContractNumbers = useMemo(() => {
+    return (workId: string): string => {
+      const tcList = tcByWorkId.get(workId) ?? [];
+      const set = new Set<string>();
+      tcList.forEach((c) => {
+        const v = (c.contractNumber ?? "").trim();
+        if (v) set.add(v);
+      });
+      return set.size ? Array.from(set).join(", ") : "—";
+    };
+  }, [tcByWorkId]);
+
+  const getWorkTranslators = useMemo(() => {
+    return (workId: string): string => {
+      const tcList = tcByWorkId.get(workId) ?? [];
+      const set = new Set<string>();
+      tcList.forEach((c) => {
+        const raw = (getTranslatorName(c.id) ?? "").trim();
+        if (!raw || raw === "—") return;
+        raw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .forEach((name) => set.add(name));
+      });
+      return set.size ? Array.from(set).join(", ") : "—";
+    };
+  }, [tcByWorkId, getTranslatorName]);
+
+  const sumTcMoneyForWork = useMemo(() => {
+    const toNum = (v: unknown): number | null => {
+      if (v === null || v === undefined || v === "") return null;
+      const n = typeof v === "string" ? parseFloat(v) : Number(v);
+      return Number.isNaN(n) ? null : n;
+    };
+    return (
+      workId: string,
+      key:
+        | "overviewValue"
+        | "translationValue"
+        | "contractValue"
+        | "settlementValue",
+    ): number | null => {
+      const tcList = tcByWorkId.get(workId) ?? [];
+      let sum = 0;
+      let has = false;
+      tcList.forEach((c) => {
+        const v = toNum((c as any)[key]);
+        if (v == null) return;
+        sum += v;
+        has = true;
+      });
+      return has ? sum : null;
+    };
+  }, [tcByWorkId]);
+
+  const getOutstandingForWork = useMemo(() => {
+    return (workId: string): number | null => {
+      if (!tcColumnVis.outstanding) return null;
+      const tcList = tcByWorkId.get(workId) ?? [];
+      let sum = 0;
+      let has = false;
+      tcList.forEach((c) => {
+        const v = outstandingByTcIdForWorks.get(c.id);
+        if (typeof v !== "number") return;
+        sum += v;
+        has = true;
+      });
+      return has ? sum : null;
+    };
+  }, [tcByWorkId, outstandingByTcIdForWorks, tcColumnVis.outstanding]);
+
+  const worksTableColSpan = useMemo(() => {
+    const extra =
+      (tcColumnVis.contractNumber ? 1 : 0) +
+      (tcColumnVis.translators ? 1 : 0) +
+      (tcColumnVis.overviewValue ? 1 : 0) +
+      (tcColumnVis.translationValue ? 1 : 0) +
+      (tcColumnVis.contractValue ? 1 : 0) +
+      (tcColumnVis.settlementValue ? 1 : 0) +
+      (tcColumnVis.outstanding ? 1 : 0);
+    return 14 + extra;
+  }, [tcColumnVis]);
+
   const paginatedTc = useMemo(() => {
     const start = (tcPage - 1) * PAGE_SIZE;
     return tcDisplayList.slice(start, start + PAGE_SIZE);
@@ -2439,7 +2554,7 @@ export default function ThuKyHopPhanPage() {
     }
   };
 
-  const handleExportWorks = (
+  const handleExportWorks = async (
     filteredWorks: Work[],
     toast: (opts: any) => any,
   ) => {
@@ -2451,48 +2566,162 @@ export default function ThuKyHopPhanPage() {
       return;
     }
 
-    const workHeaders = [
-      "ID",
-      "Tiêu đề (VI)",
-      "Tiêu đề Hán Nôm",
-      "Hợp phần",
-      "Giai đoạn",
-      "Tiến độ tác phẩm",
-      "Mã tài liệu",
-      "Số chữ gốc",
-      "Số trang gốc",
-      "Hệ số ước tính",
-      "Số chữ ước tính",
-      "Số trang ước tính",
-      "Ghi chú",
-    ];
-    const workData = filteredWorks.map((work: Work) => [
-      work.id,
-      work.titleVi ?? "—",
-      work.titleHannom ?? "—",
-      getComponentName(work.componentId),
-      formatStageDisplay(work.stage),
-      (() => {
-        const badges = buildWorkProgressBadges(work);
-        const latest = badges.length ? badges[badges.length - 1] : null;
-        return latest?.label ?? "—";
-      })(),
-      work.documentCode ?? "—",
-      formatNumberAccounting(work.baseWordCount),
-      formatNumberAccounting(work.basePageCount),
-      work.estimateFactor != null
-        ? formatNumberAccounting(work.estimateFactor, 1)
-        : "—",
-      formatNumberAccounting(work.estimateWordCount),
-      formatNumberAccounting(work.estimatePageCount),
-      work.note ?? "—",
-    ]);
+    try {
+      const includeOutstanding = !!tcColumnVis.outstanding;
+      const tcIdsForOutstanding = includeOutstanding
+        ? Array.from(
+            new Set(
+              filteredWorks
+                .flatMap((w) => (tcByWorkId.get(w.id) ?? []).map((c) => c.id))
+                .filter(Boolean),
+            ),
+          )
+        : [];
 
-    const worksheet = XLSX.utils.aoa_to_sheet([workHeaders, ...workData]);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Danh_Muc_Tac_Pham");
-    const prefix = buildExportPrefix();
-    XLSX.writeFile(workbook, `${prefix}_Danh_Muc_Tac_Pham.xlsx`);
+      const outstandingByTcId = new Map<string, number>();
+      if (includeOutstanding && tcIdsForOutstanding.length > 0) {
+        const summaries = await Promise.all(
+          tcIdsForOutstanding.map((id) =>
+            fetchFinanceSummary(id)
+              .then((s) => ({
+                id,
+                outstanding: Math.max(s.outstanding ?? 0, 0),
+              }))
+              .catch(() => ({ id, outstanding: NaN })),
+          ),
+        );
+        summaries.forEach((s) => {
+          if (!s.id) return;
+          if (!Number.isNaN(s.outstanding))
+            outstandingByTcId.set(s.id, s.outstanding);
+        });
+      }
+
+      const columns: Array<{ header: string; get: (w: Work) => string }> = [
+        { header: "ID", get: (w) => w.id },
+        { header: "Tiêu đề (VI)", get: (w) => w.titleVi ?? "—" },
+        { header: "Tiêu đề Hán Nôm", get: (w) => w.titleHannom ?? "—" },
+        {
+          header: "Hợp phần",
+          get: (w) => getComponentName(w.componentId),
+        },
+        { header: "Giai đoạn", get: (w) => formatStageDisplay(w.stage) },
+      ];
+
+      if (tcColumnVis.contractNumber) {
+        columns.push({
+          header: "Số hợp đồng",
+          get: (w) => getWorkContractNumbers(w.id),
+        });
+      }
+      if (tcColumnVis.translators) {
+        columns.push({
+          header: "Dịch giả",
+          get: (w) => getWorkTranslators(w.id),
+        });
+      }
+
+      columns.push({
+        header: "Tiến độ",
+        get: (w) => {
+          const badges = buildWorkProgressBadges(w);
+          const latest = badges.length ? badges[badges.length - 1] : null;
+          return latest?.label ?? "—";
+        },
+      });
+
+      columns.push(
+        { header: "Mã tài liệu", get: (w) => w.documentCode ?? "—" },
+        {
+          header: "Số chữ gốc",
+          get: (w) => formatNumberAccounting(w.baseWordCount),
+        },
+        {
+          header: "Số trang gốc",
+          get: (w) => formatNumberAccounting(w.basePageCount),
+        },
+        {
+          header: "Hệ số ước tính",
+          get: (w) =>
+            w.estimateFactor != null
+              ? formatNumberAccounting(w.estimateFactor, 1)
+              : "—",
+        },
+        {
+          header: "Số chữ ước tính",
+          get: (w) => formatNumberAccounting(w.estimateWordCount),
+        },
+        {
+          header: "Số trang ước tính",
+          get: (w) => formatNumberAccounting(w.estimatePageCount),
+        },
+      );
+
+      if (tcColumnVis.overviewValue) {
+        columns.push({
+          header: "Kinh phí tổng quan",
+          get: (w) =>
+            formatNumberAccounting(sumTcMoneyForWork(w.id, "overviewValue")),
+        });
+      }
+      if (tcColumnVis.translationValue) {
+        columns.push({
+          header: "Kinh phí dịch thuật",
+          get: (w) =>
+            formatNumberAccounting(sumTcMoneyForWork(w.id, "translationValue")),
+        });
+      }
+      if (tcColumnVis.contractValue) {
+        columns.push({
+          header: "Giá trị HĐ",
+          get: (w) =>
+            formatNumberAccounting(sumTcMoneyForWork(w.id, "contractValue")),
+        });
+      }
+      if (tcColumnVis.settlementValue) {
+        columns.push({
+          header: "Giá trị quyết toán",
+          get: (w) =>
+            formatNumberAccounting(sumTcMoneyForWork(w.id, "settlementValue")),
+        });
+      }
+      if (tcColumnVis.outstanding) {
+        columns.push({
+          header: "Công nợ",
+          get: (w) => {
+            const tcList = tcByWorkId.get(w.id) ?? [];
+            let sum = 0;
+            let has = false;
+            tcList.forEach((c) => {
+              const v = outstandingByTcId.get(c.id);
+              if (typeof v !== "number") return;
+              sum += v;
+              has = true;
+            });
+            return formatNumberAccounting(has ? sum : null);
+          },
+        });
+      }
+
+      columns.push({ header: "Ghi chú", get: (w) => w.note ?? "—" });
+
+      const workHeaders = columns.map((c) => c.header);
+      const workData = filteredWorks.map((w) => columns.map((c) => c.get(w)));
+
+      const worksheet = XLSX.utils.aoa_to_sheet([workHeaders, ...workData]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Danh_Muc_Tac_Pham");
+      const prefix = buildExportPrefix();
+      XLSX.writeFile(workbook, `${prefix}_Danh_Muc_Tac_Pham.xlsx`);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Xuất Excel thất bại.";
+      toast({
+        title: "Lỗi",
+        description: message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExportTranslationContracts = async (
@@ -3676,7 +3905,9 @@ export default function ThuKyHopPhanPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleExportWorks(filteredWorks, toast)}>
+                    onClick={() =>
+                      void handleExportWorks(filteredWorks, toast)
+                    }>
                     <FileText className="w-4 h-4 mr-2" />
                     Xuất Excel
                   </Button>
@@ -3781,6 +4012,22 @@ export default function ThuKyHopPhanPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Cột hợp đồng</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={tcColumnVis.contractNumber}
+                      onCheckedChange={(v) =>
+                        setTcColumnVis((s) => ({ ...s, contractNumber: !!v }))
+                      }>
+                      Số hợp đồng
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={tcColumnVis.translators}
+                      onCheckedChange={(v) =>
+                        setTcColumnVis((s) => ({ ...s, translators: !!v }))
+                      }>
+                      Dịch giả
+                    </DropdownMenuCheckboxItem>
                     <DropdownMenuLabel>Cột tài chính</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuCheckboxItem
@@ -3889,6 +4136,16 @@ export default function ThuKyHopPhanPage() {
                           sortColumns={worksSortColumns}
                           onSort={handleWorksSort}
                         />
+                        {tcColumnVis.contractNumber && (
+                          <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[160px] min-w-[140px]">
+                            Số HĐ
+                          </TableHead>
+                        )}
+                        {tcColumnVis.translators && (
+                          <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[220px] min-w-[180px]">
+                            Dịch giả
+                          </TableHead>
+                        )}
                         <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
                           Tiến độ
                         </TableHead>
@@ -3933,6 +4190,31 @@ export default function ThuKyHopPhanPage() {
                           onSort={handleWorksSort}
                           className="text-right"
                         />
+                        {tcColumnVis.overviewValue && (
+                          <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[160px] min-w-[140px]">
+                            Kinh phí tổng quan
+                          </TableHead>
+                        )}
+                        {tcColumnVis.translationValue && (
+                          <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[160px] min-w-[140px]">
+                            Kinh phí dịch thuật
+                          </TableHead>
+                        )}
+                        {tcColumnVis.contractValue && (
+                          <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[160px] min-w-[140px]">
+                            Giá trị HĐ
+                          </TableHead>
+                        )}
+                        {tcColumnVis.settlementValue && (
+                          <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[160px] min-w-[140px]">
+                            Giá trị quyết toán
+                          </TableHead>
+                        )}
+                        {tcColumnVis.outstanding && (
+                          <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[140px] min-w-[120px]">
+                            Công nợ
+                          </TableHead>
+                        )}
                         <TableHead className="max-w-[120px] truncate">
                           Ghi chú
                         </TableHead>
@@ -3943,7 +4225,7 @@ export default function ThuKyHopPhanPage() {
                       {paginatedWorks.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={14}
+                            colSpan={worksTableColSpan}
                             className="text-center text-muted-foreground py-8">
                             Chưa có tác phẩm nào.
                           </TableCell>
@@ -3979,6 +4261,20 @@ export default function ThuKyHopPhanPage() {
                               {w.titleHannom ?? "—"}
                             </TableCell>
                             <TableCell>{formatStageDisplay(w.stage)}</TableCell>
+                            {tcColumnVis.contractNumber && (
+                              <TableCell
+                                className="p-4 align-middle max-w-[220px] truncate"
+                                title={getWorkContractNumbers(w.id)}>
+                                {getWorkContractNumbers(w.id)}
+                              </TableCell>
+                            )}
+                            {tcColumnVis.translators && (
+                              <TableCell
+                                className="p-4 align-middle max-w-[260px] truncate"
+                                title={getWorkTranslators(w.id)}>
+                                {getWorkTranslators(w.id)}
+                              </TableCell>
+                            )}
                             <TableCell className="p-4 align-middle">
                               <div className="flex flex-wrap gap-1.5">
                                 <TooltipProvider
@@ -4030,6 +4326,41 @@ export default function ThuKyHopPhanPage() {
                             <TableCell className="text-right">
                               {formatNumberAccounting(w.estimatePageCount)}
                             </TableCell>
+                            {tcColumnVis.overviewValue && (
+                              <TableCell className="text-right">
+                                {formatNumberAccounting(
+                                  sumTcMoneyForWork(w.id, "overviewValue"),
+                                )}
+                              </TableCell>
+                            )}
+                            {tcColumnVis.translationValue && (
+                              <TableCell className="text-right">
+                                {formatNumberAccounting(
+                                  sumTcMoneyForWork(w.id, "translationValue"),
+                                )}
+                              </TableCell>
+                            )}
+                            {tcColumnVis.contractValue && (
+                              <TableCell className="text-right">
+                                {formatNumberAccounting(
+                                  sumTcMoneyForWork(w.id, "contractValue"),
+                                )}
+                              </TableCell>
+                            )}
+                            {tcColumnVis.settlementValue && (
+                              <TableCell className="text-right">
+                                {formatNumberAccounting(
+                                  sumTcMoneyForWork(w.id, "settlementValue"),
+                                )}
+                              </TableCell>
+                            )}
+                            {tcColumnVis.outstanding && (
+                              <TableCell className="text-right">
+                                {formatNumberAccounting(
+                                  getOutstandingForWork(w.id),
+                                )}
+                              </TableCell>
+                            )}
                             <TableCell
                               className="max-w-[120px] truncate"
                               title={w.note ?? undefined}>
