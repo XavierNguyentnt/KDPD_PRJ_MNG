@@ -374,6 +374,20 @@ export function TaskTable({
 
   // Calculate left position for title column
   const titleColumnLeft = defaultColumns.id ? 80 : 0;
+
+  const baseColumnCount =
+    (defaultColumns.id ? 1 : 0) +
+    (defaultColumns.title ? 1 : 0) +
+    (defaultColumns.group ? 1 : 0) +
+    (defaultColumns.assignee ? 1 : 0) +
+    (defaultColumns.priority ? 1 : 0) +
+    (defaultColumns.status ? 1 : 0) +
+    (defaultColumns.dueDate ? 1 : 0) +
+    (defaultColumns.progress ? 1 : 0) +
+    (defaultColumns.receivedDate ? 1 : 0) +
+    (defaultColumns.actualCompletedAt ? 1 : 0) +
+    (defaultColumns.vote ? 1 : 0);
+  const customColumnCount = defaultColumns.customColumns?.length || 0;
   
   if (isMobile) {
     return (
@@ -667,8 +681,8 @@ export function TaskTable({
             <tr className="border-b transition-colors">
               <td 
                 colSpan={
-                  Object.values(defaultColumns).filter(Boolean).length +
-                  (defaultColumns.customColumns?.length || 0) +
+                  baseColumnCount +
+                  customColumnCount +
                   (hasActions ? 1 : 0)
                 } 
                 className="p-4 align-middle h-32 text-center text-muted-foreground"

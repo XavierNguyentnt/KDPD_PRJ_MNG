@@ -13,6 +13,7 @@ import {
   useWorks,
   useComponents,
   useTaskFilterStaffUsers,
+  useUsers,
 } from "@/hooks/use-works-and-components";
 import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
@@ -26,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { formatDateDDMMYYYY } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -74,6 +76,15 @@ export default function AdminDashboardPage() {
   const { data: works = [] } = useWorks();
   const { data: components = [] } = useComponents();
   const { data: users = [] } = useTaskFilterStaffUsers();
+  const { data: allUsers = [] } = useUsers();
+
+  const creatorNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const u of allUsers) {
+      if (u?.id) map.set(u.id, u.displayName || u.email || u.id);
+    }
+    return map;
+  }, [allUsers]);
 
   const {
     search,
@@ -337,6 +348,38 @@ export default function AdminDashboardPage() {
                   receivedDate: true,
                   actualCompletedAt: true,
                   vote: true,
+                  customColumns: [
+                    {
+                      key: "createdBy",
+                      label: language === "vi" ? "Người tạo" : "Created by",
+                      render: (task) => {
+                        const id = String((task as any).createdBy ?? "").trim();
+                        return (
+                          <span className="text-sm text-muted-foreground">
+                            {id ? creatorNameById.get(id) || id : "—"}
+                          </span>
+                        );
+                      },
+                    },
+                    {
+                      key: "createdAt",
+                      label: language === "vi" ? "Ngày tạo" : "Created at",
+                      render: (task) => (
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">
+                          {formatDateDDMMYYYY((task as any).createdAt) || "—"}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "updatedAt",
+                      label: language === "vi" ? "Ngày cập nhật" : "Updated at",
+                      render: (task) => (
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">
+                          {formatDateDDMMYYYY((task as any).updatedAt) || "—"}
+                        </span>
+                      ),
+                    },
+                  ],
                 }}
               />
             ) : (

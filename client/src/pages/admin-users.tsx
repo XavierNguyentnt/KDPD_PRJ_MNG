@@ -60,7 +60,7 @@ import {
   UserPlus,
   Search,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDateDDMMYYYY } from "@/lib/utils";
 import { api } from "@shared/routes";
 
 /** (roleId, componentId) từ user_roles — dùng cho Thư ký hợp phần + Tên Hợp phần */
@@ -868,6 +868,28 @@ export default function AdminUsersPage() {
                         </div>
                         <div className="grid gap-0.5">
                           <div className="text-[11px] text-muted-foreground">
+                            Người tạo
+                          </div>
+                          <div className="text-sm break-words">—</div>
+                        </div>
+                        <div className="grid gap-0.5">
+                          <div className="text-[11px] text-muted-foreground">
+                            Ngày tạo
+                          </div>
+                          <div className="text-sm break-words">
+                            {formatDateDDMMYYYY(u.createdAt) || "—"}
+                          </div>
+                        </div>
+                        <div className="grid gap-0.5">
+                          <div className="text-[11px] text-muted-foreground">
+                            Ngày cập nhật
+                          </div>
+                          <div className="text-sm break-words">
+                            {formatDateDDMMYYYY(u.updatedAt) || "—"}
+                          </div>
+                        </div>
+                        <div className="grid gap-0.5">
+                          <div className="text-[11px] text-muted-foreground">
                             Vai trò
                           </div>
                           <div className="text-sm break-words">
@@ -918,6 +940,9 @@ export default function AdminUsersPage() {
                       <TableHead>Email</TableHead>
                       <TableHead>Họ tên</TableHead>
                       <TableHead>Phòng ban</TableHead>
+                      <TableHead>Người tạo</TableHead>
+                      <TableHead>Ngày tạo</TableHead>
+                      <TableHead>Ngày cập nhật</TableHead>
                       <TableHead>Vai trò</TableHead>
                       <TableHead>Nhóm nhân sự</TableHead>
                       <TableHead>Trạng thái</TableHead>
@@ -930,6 +955,13 @@ export default function AdminUsersPage() {
                         <TableCell className="font-medium">{u.email}</TableCell>
                         <TableCell>{u.displayName}</TableCell>
                         <TableCell>{u.department ?? "—"}</TableCell>
+                        <TableCell>—</TableCell>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                          {formatDateDDMMYYYY(u.createdAt) || "—"}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                          {formatDateDDMMYYYY(u.updatedAt) || "—"}
+                        </TableCell>
                         <TableCell>
                           {u.roles?.map((r) => r.name).join(", ") || "—"}
                         </TableCell>
@@ -1286,9 +1318,7 @@ export default function AdminUsersPage() {
           {passwordDialog && (
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="newPassword">
-                  Mật khẩu mới
-                </Label>
+                <Label htmlFor="newPassword">Mật khẩu mới</Label>
                 <div className="relative">
                   <Input
                     id="newPassword"
@@ -1305,7 +1335,9 @@ export default function AdminUsersPage() {
                     size="icon"
                     className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
                     onClick={() => setShowNewPassword((v) => !v)}
-                    aria-label={showNewPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    aria-label={
+                      showNewPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+                    }
                     title={showNewPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
                     {showNewPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -1330,7 +1362,9 @@ export default function AdminUsersPage() {
                   );
                   return (
                     <div className="grid gap-1">
-                      <div className="text-xs font-medium">Yêu cầu mật khẩu</div>
+                      <div className="text-xs font-medium">
+                        Yêu cầu mật khẩu
+                      </div>
                       <Item ok={req.lengthOk} label="Tối thiểu 8 ký tự" />
                       <Item ok={req.upperOk} label="Có chữ hoa (A-Z)" />
                       <Item ok={req.lowerOk} label="Có chữ thường (a-z)" />
@@ -1361,7 +1395,9 @@ export default function AdminUsersPage() {
                     aria-label={
                       showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
                     }
-                    title={showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
+                    title={
+                      showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+                    }>
                     {showConfirmPassword ? (
                       <EyeOff className="h-4 w-4" />
                     ) : (
