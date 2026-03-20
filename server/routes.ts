@@ -3028,7 +3028,19 @@ export async function registerRoutes(
           : req.params.id;
         const body = z
           .object({
-            newPassword: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
+            newPassword: z
+              .string()
+              .min(8, "Mật khẩu tối thiểu 8 ký tự")
+              .refine((v) => /[A-Z]/.test(v), "Mật khẩu phải có chữ hoa (A-Z)")
+              .refine(
+                (v) => /[a-z]/.test(v),
+                "Mật khẩu phải có chữ thường (a-z)",
+              )
+              .refine((v) => /[0-9]/.test(v), "Mật khẩu phải có số (0-9)")
+              .refine(
+                (v) => /[^A-Za-z0-9]/.test(v),
+                "Mật khẩu phải có ký tự đặc biệt",
+              ),
           })
           .parse(req.body);
         const hash = await bcrypt.hash(body.newPassword, 10);

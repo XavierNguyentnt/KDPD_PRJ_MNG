@@ -117,7 +117,16 @@ export const api = {
       path: "/api/auth/change-password",
       input: z.object({
         currentPassword: z.string().min(1),
-        newPassword: z.string().min(6),
+        newPassword: z
+          .string()
+          .min(8, "Mật khẩu tối thiểu 8 ký tự")
+          .refine((v) => /[A-Z]/.test(v), "Mật khẩu phải có chữ hoa (A-Z)")
+          .refine((v) => /[a-z]/.test(v), "Mật khẩu phải có chữ thường (a-z)")
+          .refine((v) => /[0-9]/.test(v), "Mật khẩu phải có số (0-9)")
+          .refine(
+            (v) => /[^A-Za-z0-9]/.test(v),
+            "Mật khẩu phải có ký tự đặc biệt",
+          ),
       }),
       responses: {
         200: z.object({ message: z.string() }),

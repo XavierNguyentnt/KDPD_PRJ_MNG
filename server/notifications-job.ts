@@ -1,6 +1,10 @@
 import { db } from "./db";
 import * as dbStorage from "./db-storage";
-import { buildNotificationContent, DUE_SOON_DAYS, formatDateOnly } from "./notifications";
+import {
+  buildNotificationContent,
+  DUE_SOON_DAYS,
+  formatDateOnly,
+} from "./notifications";
 import { sendNotificationEmail } from "./email";
 import { sendWebPushToUser } from "./push";
 
@@ -12,6 +16,10 @@ const NOTIFICATIONS_JOB_INTERVAL_MS = Number.parseInt(
 const NOTIFICATIONS_JOB_CONCURRENCY = Math.max(
   1,
   Number.parseInt(process.env.NOTIFICATIONS_JOB_CONCURRENCY || "4", 10) || 1
+);
+const OVERDUE_REPEAT_DAYS = Math.max(
+  1,
+  Number.parseInt(process.env.OVERDUE_REMINDER_REPEAT_DAYS || "7", 10) || 7,
 );
 
 let isRunning = false;
@@ -38,42 +46,65 @@ async function processUserNotifications(userId: string, today: Date): Promise<vo
     const dueDateStr = formatDateOnly(assignment.dueDate);
     if (!dueDateStr) continue;
     const dueDate = new Date(dueDateStr);
-    const isCompleted = assignment.completedAt != null || task.status === "Completed";
+    const taskStatus = String(task.status || "");
+    const assignmentStatus = String((assignment as any).status || "");
+    const isTerminalStatus =
+      taskStatus === "Completed" ||
+      taskStatus === "Cancelled" ||
+      taskStatus === "Archived" ||
+      assignmentStatus === "completed" ||
+      assignmentStatus === "cancelled";
+    const isCompleted = assignment.completedAt != null || isTerminalStatus;
     if (isCompleted) continue;
     const diffDays = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     let type: "task_due_soon" | "task_overdue" | null = null;
     if (diffDays < 0) type = "task_overdue";
     else if (diffDays <= DUE_SOON_DAYS) type = "task_due_soon";
     if (!type) continue;
-    const existing = await dbStorage.getNotificationByAssignmentType(userId, assignment.id, type);
-    if (!existing) {
-      const content = buildNotificationContent(type, {
-        taskTitle: task.title ?? "",
-        taskId: assignment.taskId,
-        group: task.group ?? null,
-        dueDate: dueDateStr,
-        daysRemaining: diffDays,
-      });
-      const created = await dbStorage.createNotification({
-        userId,
-        type,
-        taskId: assignment.taskId,
-        taskAssignmentId: assignment.id,
-        title: content.title,
-        message: content.message,
-        isRead: false,
-        createdAt: new Date(),
-        readAt: null,
-      });
-      await sendNotificationEmail(userId, created, {
-        dueDate: dueDateStr,
-        taskTitle: task.title ?? "",
-        taskId: assignment.taskId,
-        group: task.group ?? null,
-        daysRemaining: diffDays,
-      });
-      await sendWebPushToUser(userId, created, { url: "/" });
+
+    const last = await dbStorage.getLatestNotificationByAssignmentType(
+      userId,
+      assignment.id,
+      type,
+    );
+    if (last && type === "task_overdue") {
+      const lastAt = last.createdAt instanceof Date ? last.createdAt : new Date(last.createdAt as any);
+      const lastDay = new Date(lastAt);
+      lastDay.setHours(0, 0, 0, 0);
+      const daysSince = Math.floor(
+        (today.getTime() - lastDay.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (daysSince < OVERDUE_REPEAT_DAYS) continue;
+    } else if (last) {
+      continue;
     }
+
+    const content = buildNotificationContent(type, {
+      taskTitle: task.title ?? "",
+      taskId: assignment.taskId,
+      group: task.group ?? null,
+      dueDate: dueDateStr,
+      daysRemaining: diffDays,
+    });
+    const created = await dbStorage.createNotification({
+      userId,
+      type,
+      taskId: assignment.taskId,
+      taskAssignmentId: assignment.id,
+      title: content.title,
+      message: content.message,
+      isRead: false,
+      createdAt: new Date(),
+      readAt: null,
+    });
+    await sendNotificationEmail(userId, created, {
+      dueDate: dueDateStr,
+      taskTitle: task.title ?? "",
+      taskId: assignment.taskId,
+      group: task.group ?? null,
+      daysRemaining: diffDays,
+    });
+    await sendWebPushToUser(userId, created, { url: "/" });
   }
 }
 

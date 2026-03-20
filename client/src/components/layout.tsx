@@ -23,6 +23,8 @@ import {
   Plus,
   Star,
   MoreVertical,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -73,6 +75,16 @@ import {
 import { TaskDialog } from "@/components/task-dialog";
 import { formatDistanceToNow } from "date-fns";
 
+function getPasswordRequirementState(password: string) {
+  const lengthOk = password.length >= 8;
+  const upperOk = /[A-Z]/.test(password);
+  const lowerOk = /[a-z]/.test(password);
+  const numberOk = /[0-9]/.test(password);
+  const specialOk = /[^A-Za-z0-9]/.test(password);
+  const ok = lengthOk && upperOk && lowerOk && numberOk && specialOk;
+  return { ok, lengthOk, upperOk, lowerOk, numberOk, specialOk };
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { role, user, logout, refreshMe } = useAuth();
@@ -118,6 +130,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [changingPassword, setChangingPassword] = useState(false);
   const [changePasswordMode, setChangePasswordMode] = useState(false);
   const [verifiedOldPassword, setVerifiedOldPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -193,6 +208,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setNewPassword("");
       setConfirmPassword("");
       setHasFocusedCurrent(false);
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
       setAvatarFile(null);
       if (avatarInputRef.current) avatarInputRef.current.value = "";
     }
@@ -1105,20 +1123,53 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     aria-hidden="true"
                     autoComplete="current-password"
                   />
-                  <Input
-                    type="password"
-                    placeholder={
-                      language === "vi"
-                        ? "Vui lòng nhập mật khẩu hiện tại để xác thực"
-                        : "Please enter your current password to verify"
-                    }
-                    name={currentPasswordNameRef.current}
-                    autoComplete="off"
-                    readOnly={!hasFocusedCurrent}
-                    onFocus={() => setHasFocusedCurrent(true)}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showCurrentPassword ? "text" : "password"}
+                      placeholder={
+                        language === "vi"
+                          ? "Vui lòng nhập mật khẩu hiện tại để xác thực"
+                          : "Please enter your current password to verify"
+                      }
+                      name={currentPasswordNameRef.current}
+                      autoComplete="off"
+                      readOnly={!hasFocusedCurrent}
+                      onFocus={() => setHasFocusedCurrent(true)}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                      onClick={() => setShowCurrentPassword((v) => !v)}
+                      aria-label={
+                        showCurrentPassword
+                          ? language === "vi"
+                            ? "Ẩn mật khẩu"
+                            : "Hide password"
+                          : language === "vi"
+                            ? "Hiện mật khẩu"
+                            : "Show password"
+                      }
+                      title={
+                        showCurrentPassword
+                          ? language === "vi"
+                            ? "Ẩn mật khẩu"
+                            : "Hide password"
+                          : language === "vi"
+                            ? "Hiện mật khẩu"
+                            : "Show password"
+                      }>
+                      {showCurrentPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                   <Button
                     className="w-full"
                     disabled={changingPassword || !currentPassword}
@@ -1161,31 +1212,165 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Input
-                    type="password"
-                    placeholder={
-                      language === "vi"
-                        ? "Mật khẩu mới (≥6 ký tự)"
-                        : "New password (≥6 chars)"
-                    }
-                    autoComplete="new-password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                  <Input
-                    type="password"
-                    placeholder={
-                      language === "vi"
-                        ? "Xác nhận mật khẩu mới"
-                        : "Confirm new password"
-                    }
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showNewPassword ? "text" : "password"}
+                      placeholder={
+                        language === "vi"
+                          ? "Mật khẩu mới (≥8 ký tự)"
+                          : "New password (≥8 chars)"
+                      }
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                      onClick={() => setShowNewPassword((v) => !v)}
+                      aria-label={
+                        showNewPassword
+                          ? language === "vi"
+                            ? "Ẩn mật khẩu"
+                            : "Hide password"
+                          : language === "vi"
+                            ? "Hiện mật khẩu"
+                            : "Show password"
+                      }
+                      title={
+                        showNewPassword
+                          ? language === "vi"
+                            ? "Ẩn mật khẩu"
+                            : "Hide password"
+                          : language === "vi"
+                            ? "Hiện mật khẩu"
+                            : "Show password"
+                      }>
+                      {showNewPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {(() => {
+                    const req = getPasswordRequirementState(newPassword);
+                    const Item = ({
+                      ok,
+                      label,
+                    }: {
+                      ok: boolean;
+                      label: string;
+                    }) => (
+                      <div
+                        className={`text-xs ${ok ? "text-emerald-700" : "text-muted-foreground"}`}>
+                        {ok ? "✓" : "•"} {label}
+                      </div>
+                    );
+                    return (
+                      <div className="grid gap-1">
+                        <div className="text-xs font-medium">
+                          {language === "vi"
+                            ? "Yêu cầu mật khẩu"
+                            : "Password requirements"}
+                        </div>
+                        <Item
+                          ok={req.lengthOk}
+                          label={
+                            language === "vi"
+                              ? "Tối thiểu 8 ký tự"
+                              : "Minimum 8 characters"
+                          }
+                        />
+                        <Item
+                          ok={req.upperOk}
+                          label={
+                            language === "vi"
+                              ? "Có chữ hoa (A-Z)"
+                              : "Contains uppercase (A-Z)"
+                          }
+                        />
+                        <Item
+                          ok={req.lowerOk}
+                          label={
+                            language === "vi"
+                              ? "Có chữ thường (a-z)"
+                              : "Contains lowercase (a-z)"
+                          }
+                        />
+                        <Item
+                          ok={req.numberOk}
+                          label={
+                            language === "vi"
+                              ? "Có số (0-9)"
+                              : "Contains number (0-9)"
+                          }
+                        />
+                        <Item
+                          ok={req.specialOk}
+                          label={
+                            language === "vi"
+                              ? "Có ký tự đặc biệt"
+                              : "Contains special character"
+                          }
+                        />
+                      </div>
+                    );
+                  })()}
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder={
+                        language === "vi"
+                          ? "Xác nhận mật khẩu mới"
+                          : "Confirm new password"
+                      }
+                      autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      aria-label={
+                        showConfirmPassword
+                          ? language === "vi"
+                            ? "Ẩn mật khẩu"
+                            : "Hide password"
+                          : language === "vi"
+                            ? "Hiện mật khẩu"
+                            : "Show password"
+                      }
+                      title={
+                        showConfirmPassword
+                          ? language === "vi"
+                            ? "Ẩn mật khẩu"
+                            : "Hide password"
+                          : language === "vi"
+                            ? "Hiện mật khẩu"
+                            : "Show password"
+                      }>
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                   <Button
                     className="w-full"
-                    disabled={changingPassword}
+                    disabled={
+                      changingPassword ||
+                      !getPasswordRequirementState(newPassword).ok ||
+                      newPassword !== confirmPassword
+                    }
                     onClick={async () => {
                       if (!newPassword) {
                         toast({
@@ -1202,16 +1387,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         });
                         return;
                       }
-                      if (newPassword.length < 6) {
+                      if (!getPasswordRequirementState(newPassword).ok) {
                         toast({
                           title:
                             language === "vi"
-                              ? "Mật khẩu quá ngắn"
-                              : "Password too short",
+                              ? "Mật khẩu chưa đạt yêu cầu"
+                              : "Password requirements not met",
                           description:
                             language === "vi"
-                              ? "Tối thiểu 6 ký tự"
-                              : "Minimum 6 characters",
+                              ? "Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
+                              : "Minimum 8 chars with upper/lowercase, number, and special character",
                           variant: "destructive",
                           duration: 5000,
                         });

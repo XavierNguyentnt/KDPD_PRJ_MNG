@@ -1366,6 +1366,26 @@ export async function getNotificationByAssignmentType(
   return rows[0];
 }
 
+export async function getLatestNotificationByAssignmentType(
+  userId: string,
+  taskAssignmentId: string,
+  type: string,
+): Promise<Notification | undefined> {
+  const rows = await requireDb()
+    .select()
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        eq(notifications.taskAssignmentId, taskAssignmentId),
+        eq(notifications.type, type),
+      ),
+    )
+    .orderBy(desc(notifications.createdAt))
+    .limit(1);
+  return rows[0];
+}
+
 export async function getNotificationByTaskType(
   userId: string,
   taskId: string,

@@ -48,6 +48,8 @@ import {
   Loader2,
   Pencil,
   Check,
+  Eye,
+  EyeOff,
   ChevronsUpDown,
   Users,
   UserCheck,
@@ -177,6 +179,16 @@ async function createUser(data: CreateUserPayload): Promise<ApiUser> {
   return res.json();
 }
 
+function getPasswordRequirementState(password: string) {
+  const lengthOk = password.length >= 8;
+  const upperOk = /[A-Z]/.test(password);
+  const lowerOk = /[a-z]/.test(password);
+  const numberOk = /[0-9]/.test(password);
+  const specialOk = /[^A-Za-z0-9]/.test(password);
+  const ok = lengthOk && upperOk && lowerOk && numberOk && specialOk;
+  return { ok, lengthOk, upperOk, lowerOk, numberOk, specialOk };
+}
+
 export default function AdminUsersPage() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
@@ -189,6 +201,8 @@ export default function AdminUsersPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [roleComboboxOpen, setRoleComboboxOpen] = useState(false);
   const [groupComboboxOpen, setGroupComboboxOpen] = useState(false);
   const [componentComboboxOpen, setComponentComboboxOpen] = useState(false);
@@ -365,11 +379,13 @@ export default function AdminUsersPage() {
 
   const handleSubmitPassword = () => {
     if (!passwordDialog) return;
-    if (newPassword.length < 6) {
+    const req = getPasswordRequirementState(newPassword);
+    if (!req.ok) {
       toast({
         variant: "destructive",
         title: "Lỗi",
-        description: "Mật khẩu tối thiểu 6 ký tự.",
+        description:
+          "Mật khẩu tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.",
       });
       return;
     }
@@ -884,6 +900,8 @@ export default function AdminUsersPage() {
                             setPasswordDialog({ user: u });
                             setNewPassword("");
                             setConfirmPassword("");
+                            setShowNewPassword(false);
+                            setShowConfirmPassword(false);
                           }}
                           className="w-full gap-1.5">
                           <KeyRound className="w-3.5 h-3.5" />
@@ -1269,27 +1287,88 @@ export default function AdminUsersPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="newPassword">
-                  Mật khẩu mới (tối thiểu 6 ký tự)
+                  Mật khẩu mới
                 </Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <Input
+                    id="newPassword"
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                    onClick={() => setShowNewPassword((v) => !v)}
+                    aria-label={showNewPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    title={showNewPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
+                    {showNewPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {(() => {
+                  const req = getPasswordRequirementState(newPassword);
+                  const Item = ({
+                    ok,
+                    label,
+                  }: {
+                    ok: boolean;
+                    label: string;
+                  }) => (
+                    <div
+                      className={`text-xs ${ok ? "text-emerald-700" : "text-muted-foreground"}`}>
+                      {ok ? "✓" : "•"} {label}
+                    </div>
+                  );
+                  return (
+                    <div className="grid gap-1">
+                      <div className="text-xs font-medium">Yêu cầu mật khẩu</div>
+                      <Item ok={req.lengthOk} label="Tối thiểu 8 ký tự" />
+                      <Item ok={req.upperOk} label="Có chữ hoa (A-Z)" />
+                      <Item ok={req.lowerOk} label="Có chữ thường (a-z)" />
+                      <Item ok={req.numberOk} label="Có số (0-9)" />
+                      <Item ok={req.specialOk} label="Có ký tự đặc biệt" />
+                    </div>
+                  );
+                })()}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="confirmPassword">Xác nhận mật khẩu</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    aria-label={
+                      showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+                    }
+                    title={showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -1302,7 +1381,8 @@ export default function AdminUsersPage() {
               disabled={
                 passwordMutation.isPending ||
                 !newPassword ||
-                newPassword !== confirmPassword
+                newPassword !== confirmPassword ||
+                !getPasswordRequirementState(newPassword).ok
               }>
               {passwordMutation.isPending ? (
                 <>
