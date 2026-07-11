@@ -126,6 +126,10 @@ function validateContractDates(
   return null;
 }
 
+function hasOwnField(body: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, key);
+}
+
 function validateAssignmentDates(
   assignments: Array<{
     receivedAt?: string;
@@ -2060,15 +2064,24 @@ export async function registerRoutes(
           return res
             .status(404)
             .json({ message: `Translation contract ${id} not found` });
+        const nextActualCompletionDate = hasOwnField(body, "actualCompletionDate")
+          ? input.actualCompletionDate
+          : existing.actualCompletionDate;
         const dateError = validateContractDates(
           input.startDate ?? existing.startDate,
           input.endDate ?? existing.endDate,
-          input.actualCompletionDate ?? existing.actualCompletionDate,
+          nextActualCompletionDate,
         );
         if (dateError) return res.status(400).json({ message: dateError });
+        const nextStatus =
+          nextActualCompletionDate != null
+            ? "Completed"
+            : hasOwnField(body, "status")
+              ? input.status
+              : existing.status;
         const updatePayload = {
           ...input,
-          status: input.actualCompletionDate ? "Completed" : input.status,
+          status: nextStatus,
         };
         const componentId = input.componentId ?? existing.componentId;
         const workId = input.workId ?? existing.workId;
@@ -2426,10 +2439,13 @@ export async function registerRoutes(
           return res
             .status(404)
             .json({ message: `Proofreading contract ${id} not found` });
+        const nextActualCompletionDate = hasOwnField(body, "actualCompletionDate")
+          ? input.actualCompletionDate
+          : existing.actualCompletionDate;
         const dateError = validateContractDates(
           input.startDate ?? existing.startDate,
           input.endDate ?? existing.endDate,
-          input.actualCompletionDate ?? existing.actualCompletionDate,
+          nextActualCompletionDate,
         );
         if (dateError) return res.status(400).json({ message: dateError });
         const row = await dbStorage.updateProofreadingContract(id, input);

@@ -7982,6 +7982,11 @@ function TranslationContractForm({
   }, [advanceRate, advanceIncludeOverview]);
   const [note, setNote] = useState(contract?.note ?? "");
   const [status, setStatus] = useState(contract?.status ?? "Active");
+  const [lastManualStatus, setLastManualStatus] = useState(
+    contract?.status && contract.status !== "Completed"
+      ? contract.status
+      : "Active",
+  );
   const [translatorUsers, setTranslatorUsers] = useState<
     Array<{ id: string; name: string }>
   >([]);
@@ -8097,9 +8102,13 @@ function TranslationContractForm({
   );
   useEffect(() => {
     if (actualCompletionDate.trim() !== "") {
-      setStatus("Completed");
+      if (status !== "Completed") setStatus("Completed");
+      return;
     }
-  }, [actualCompletionDate]);
+    if (status === "Completed") {
+      setStatus(lastManualStatus);
+    }
+  }, [actualCompletionDate, lastManualStatus, status]);
   const contractDateError = useMemo(() => {
     const start = parseDateOnly(startDate);
     const end = parseDateOnly(endDate);
@@ -8730,7 +8739,10 @@ function TranslationContractForm({
             <Label>Trạng thái</Label>
             <Select
               value={status}
-              onValueChange={setStatus}
+              onValueChange={(value) => {
+                setStatus(value);
+                if (value !== "Completed") setLastManualStatus(value);
+              }}
               disabled={readOnly || actualCompletionDate.trim() !== ""}>
               <SelectTrigger className="bg-background">
                 <SelectValue placeholder="Chọn trạng thái" />

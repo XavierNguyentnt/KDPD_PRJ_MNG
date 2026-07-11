@@ -277,14 +277,32 @@ export function TaskDialog({
         task.group === "Quét trùng lặp" ||
         task.group === "Thư ký hợp phần"),
   });
+
+  const [lastManualTaskStatus, setLastManualTaskStatus] =
+    useState<string>("Not Started");
+  const [isTaskStatusAutoCompleted, setIsTaskStatusAutoCompleted] =
+    useState(false);
+  const [lastManualBtv2Status, setLastManualBtv2Status] = useState<string>(
+    StageStatus.NOT_STARTED,
+  );
+  const [isBtv2StatusAutoCompleted, setIsBtv2StatusAutoCompleted] =
+    useState(false);
+  const [lastManualBtv1Status, setLastManualBtv1Status] = useState<string>(
+    StageStatus.NOT_STARTED,
+  );
+  const [isBtv1StatusAutoCompleted, setIsBtv1StatusAutoCompleted] =
+    useState(false);
+  const [lastManualDocDuyetStatus, setLastManualDocDuyetStatus] =
+    useState<string>(StageStatus.NOT_STARTED);
+  const [isDocDuyetStatusAutoCompleted, setIsDocDuyetStatusAutoCompleted] =
+    useState(false);
   const updateMutation = useUpdateTask();
   const deleteMutation = useDeleteTask();
   const redoMutation = useRedoTask();
   const isNewTask = !task;
   const [isEditing, setIsEditing] = useState(false);
   const canDeleteTask =
-    !!task &&
-    (role === UserRole.ADMIN || (task as any).createdBy === user?.id);
+    !!task && (role === UserRole.ADMIN || (task as any).createdBy === user?.id);
 
   const parseYyyyMmDdLocal = (
     value: string | null | undefined,
@@ -506,6 +524,17 @@ export function TaskDialog({
           ?.taskType ?? undefined,
     },
   });
+  const watchedGroup = form.watch("group") || "CÃ´ng viá»‡c chung";
+  const watchedStatus = form.watch("status") || "Not Started";
+  const watchedActualCompletedAt = form.watch("actualCompletedAt") ?? "";
+  const watchedBtv2CompleteDate = form.watch("btv2CompleteDate") ?? "";
+  const watchedBtv2Status = form.watch("btv2Status") ?? StageStatus.NOT_STARTED;
+  const watchedBtv1CompleteDate = form.watch("btv1CompleteDate") ?? "";
+  const watchedBtv1Status = form.watch("btv1Status") ?? StageStatus.NOT_STARTED;
+  const watchedDocDuyetCompleteDate = form.watch("docDuyetCompleteDate") ?? "";
+  const watchedDocDuyetStatus =
+    form.watch("docDuyetStatus") ?? StageStatus.NOT_STARTED;
+  void watchedGroup;
 
   const isBienTapGroup =
     form.watch("group") === "Biên tập" || effectiveTask?.group === "Biên tập";
@@ -901,8 +930,21 @@ export function TaskDialog({
       thietKeTroLyList.some(
         (s) => s.completeDate && s.completeDate.trim() !== "",
       );
-    if (hasComplete) form.setValue("status", "Completed");
-  }, [form, thietKeKtvChinh.completeDate, thietKeTroLyList]);
+    if (hasComplete) {
+      if (watchedStatus !== "Completed") form.setValue("status", "Completed");
+      setIsTaskStatusAutoCompleted(true);
+    } else if (isTaskStatusAutoCompleted && watchedStatus === "Completed") {
+      form.setValue("status", lastManualTaskStatus);
+      setIsTaskStatusAutoCompleted(false);
+    }
+  }, [
+    form,
+    isTaskStatusAutoCompleted,
+    lastManualTaskStatus,
+    thietKeKtvChinh.completeDate,
+    thietKeTroLyList,
+    watchedStatus,
+  ]);
 
   // Tự động cập nhật status = "Completed" khi tất cả nhân sự đã nhập ngày hoàn thành (Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần)
   useEffect(() => {
@@ -918,15 +960,149 @@ export function TaskDialog({
     const staffMulti = multiAssigneesList.filter(
       (s) => s.label !== "Người kiểm soát" && s.userId,
     );
-    if (staffMulti.length === 0) return;
+    if (staffMulti.length === 0) {
+      if (isTaskStatusAutoCompleted && watchedStatus === "Completed") {
+        form.setValue("status", lastManualTaskStatus);
+        setIsTaskStatusAutoCompleted(false);
+      }
+      return;
+    }
 
     const allCompleted = staffMulti.every((s) => !!s.completedAt);
     if (allCompleted) {
-      form.setValue("status", "Completed");
+      if (watchedStatus !== "Completed") form.setValue("status", "Completed");
+      setIsTaskStatusAutoCompleted(true);
+    } else if (isTaskStatusAutoCompleted && watchedStatus === "Completed") {
+      form.setValue("status", lastManualTaskStatus);
+      setIsTaskStatusAutoCompleted(false);
     }
-  }, [form, multiAssigneesList]);
+  }, [
+    form,
+    isTaskStatusAutoCompleted,
+    lastManualTaskStatus,
+    multiAssigneesList,
+    watchedStatus,
+  ]);
 
-  // Reset form when task changes; for Biên tập tasks populate workflow stage fields (use effectiveTask to get assignments when available)
+  useEffect(() => {
+    const group = form.watch("group");
+    if (
+      group === "C\u00f4ng vi\u1ec7c chung" ||
+      group === "CNTT" ||
+      group === "Qu\u00e9t tr\u00f9ng l\u1eb7p" ||
+      group === "Th\u01b0 k\u00fd h\u1ee3p ph\u1ea7n" ||
+      group === "Thi\u1ebft k\u1ebf"
+    ) {
+      return;
+    }
+    if (
+      group === "CÃ´ng viá»‡c chung" ||
+      group === "CNTT" ||
+      group === "QuÃ©t trÃ¹ng láº·p" ||
+      group === "ThÆ° kÃ½ há»£p pháº§n" ||
+      group === "Thiáº¿t káº¿"
+    ) {
+      return;
+    }
+
+    const shouldAutoCompleteTaskResolved =
+      group === "Bi\u00ean t\u1eadp"
+        ? String(watchedDocDuyetCompleteDate).trim() !== ""
+        : String(watchedActualCompletedAt).trim() !== "";
+    if (shouldAutoCompleteTaskResolved) {
+      if (watchedStatus !== "Completed") form.setValue("status", "Completed");
+      setIsTaskStatusAutoCompleted(true);
+    } else if (isTaskStatusAutoCompleted && watchedStatus === "Completed") {
+      form.setValue("status", lastManualTaskStatus);
+      setIsTaskStatusAutoCompleted(false);
+    }
+    return;
+
+    const shouldAutoCompleteTask =
+      group === "BiÃªn táº­p"
+        ? String(watchedDocDuyetCompleteDate).trim() !== ""
+        : String(watchedActualCompletedAt).trim() !== "";
+
+    if (shouldAutoCompleteTask) {
+      if (watchedStatus !== "Completed") form.setValue("status", "Completed");
+      setIsTaskStatusAutoCompleted(true);
+    } else if (isTaskStatusAutoCompleted && watchedStatus === "Completed") {
+      form.setValue("status", lastManualTaskStatus);
+      setIsTaskStatusAutoCompleted(false);
+    }
+  }, [
+    form,
+    isTaskStatusAutoCompleted,
+    lastManualTaskStatus,
+    watchedActualCompletedAt,
+    watchedDocDuyetCompleteDate,
+    watchedStatus,
+  ]);
+
+  useEffect(() => {
+    if (String(watchedBtv2CompleteDate).trim() !== "") {
+      if (watchedBtv2Status !== StageStatus.COMPLETED) {
+        form.setValue("btv2Status", StageStatus.COMPLETED);
+      }
+      setIsBtv2StatusAutoCompleted(true);
+    } else if (
+      isBtv2StatusAutoCompleted &&
+      watchedBtv2Status === StageStatus.COMPLETED
+    ) {
+      form.setValue("btv2Status", lastManualBtv2Status);
+      setIsBtv2StatusAutoCompleted(false);
+    }
+  }, [
+    form,
+    isBtv2StatusAutoCompleted,
+    lastManualBtv2Status,
+    watchedBtv2CompleteDate,
+    watchedBtv2Status,
+  ]);
+
+  useEffect(() => {
+    if (String(watchedBtv1CompleteDate).trim() !== "") {
+      if (watchedBtv1Status !== StageStatus.COMPLETED) {
+        form.setValue("btv1Status", StageStatus.COMPLETED);
+      }
+      setIsBtv1StatusAutoCompleted(true);
+    } else if (
+      isBtv1StatusAutoCompleted &&
+      watchedBtv1Status === StageStatus.COMPLETED
+    ) {
+      form.setValue("btv1Status", lastManualBtv1Status);
+      setIsBtv1StatusAutoCompleted(false);
+    }
+  }, [
+    form,
+    isBtv1StatusAutoCompleted,
+    lastManualBtv1Status,
+    watchedBtv1CompleteDate,
+    watchedBtv1Status,
+  ]);
+
+  useEffect(() => {
+    if (String(watchedDocDuyetCompleteDate).trim() !== "") {
+      if (watchedDocDuyetStatus !== StageStatus.COMPLETED) {
+        form.setValue("docDuyetStatus", StageStatus.COMPLETED);
+      }
+      setIsDocDuyetStatusAutoCompleted(true);
+    } else if (
+      isDocDuyetStatusAutoCompleted &&
+      watchedDocDuyetStatus === StageStatus.COMPLETED
+    ) {
+      form.setValue("docDuyetStatus", lastManualDocDuyetStatus);
+      setIsDocDuyetStatusAutoCompleted(false);
+    }
+  }, [
+    form,
+    isDocDuyetStatusAutoCompleted,
+    lastManualDocDuyetStatus,
+    watchedDocDuyetCompleteDate,
+    watchedDocDuyetStatus,
+  ]);
+
+  // Reset form when task changes; for BiÃªn táº­p tasks populate workflow stage fields (use effectiveTask to get assignments when available)
   useEffect(() => {
     if (!open) return;
     if (effectiveTask) {
@@ -1019,7 +1195,46 @@ export function TaskDialog({
           }
         } catch (_) {}
       }
-      form.reset(base);
+      const baseForm = base as FormData;
+      form.reset(baseForm);
+      setLastManualTaskStatus(
+        baseForm.status && baseForm.status !== "Completed"
+          ? baseForm.status
+          : "Not Started",
+      );
+      setIsTaskStatusAutoCompleted(
+        baseForm.status === "Completed" &&
+          (String(baseForm.actualCompletedAt ?? "").trim() !== "" ||
+            String(baseForm.docDuyetCompleteDate ?? "").trim() !== ""),
+      );
+      setLastManualBtv2Status(
+        baseForm.btv2Status && baseForm.btv2Status !== StageStatus.COMPLETED
+          ? baseForm.btv2Status
+          : StageStatus.NOT_STARTED,
+      );
+      setIsBtv2StatusAutoCompleted(
+        String(baseForm.btv2CompleteDate ?? "").trim() !== "" &&
+          baseForm.btv2Status === StageStatus.COMPLETED,
+      );
+      setLastManualBtv1Status(
+        baseForm.btv1Status && baseForm.btv1Status !== StageStatus.COMPLETED
+          ? baseForm.btv1Status
+          : StageStatus.NOT_STARTED,
+      );
+      setIsBtv1StatusAutoCompleted(
+        String(baseForm.btv1CompleteDate ?? "").trim() !== "" &&
+          baseForm.btv1Status === StageStatus.COMPLETED,
+      );
+      setLastManualDocDuyetStatus(
+        baseForm.docDuyetStatus &&
+          baseForm.docDuyetStatus !== StageStatus.COMPLETED
+          ? baseForm.docDuyetStatus
+          : StageStatus.NOT_STARTED,
+      );
+      setIsDocDuyetStatusAutoCompleted(
+        String(baseForm.docDuyetCompleteDate ?? "").trim() !== "" &&
+          baseForm.docDuyetStatus === StageStatus.COMPLETED,
+      );
     } else if (!task) {
       const baseDefaults: FormData = {
         title: "",
@@ -1064,6 +1279,30 @@ export function TaskDialog({
         merged.title = `[Bản sao của] ${initialValues.title}`;
       }
       form.reset(merged);
+      setLastManualTaskStatus(
+        merged.status && merged.status !== "Completed"
+          ? merged.status
+          : "Not Started",
+      );
+      setIsTaskStatusAutoCompleted(false);
+      setLastManualBtv2Status(
+        merged.btv2Status && merged.btv2Status !== StageStatus.COMPLETED
+          ? merged.btv2Status
+          : StageStatus.NOT_STARTED,
+      );
+      setIsBtv2StatusAutoCompleted(false);
+      setLastManualBtv1Status(
+        merged.btv1Status && merged.btv1Status !== StageStatus.COMPLETED
+          ? merged.btv1Status
+          : StageStatus.NOT_STARTED,
+      );
+      setIsBtv1StatusAutoCompleted(false);
+      setLastManualDocDuyetStatus(
+        merged.docDuyetStatus && merged.docDuyetStatus !== StageStatus.COMPLETED
+          ? merged.docDuyetStatus
+          : StageStatus.NOT_STARTED,
+      );
+      setIsDocDuyetStatusAutoCompleted(false);
       const mergedGroup =
         (merged as { group?: string | null })?.group ?? defaultGroup ?? null;
       if (mergedGroup === "Thiết kế") {
@@ -1726,7 +1965,8 @@ export function TaskDialog({
           ...designWorkAssignments,
           ...designMetaAssignments,
         ];
-        if (thietKeAssignments.length > 0) payload.assignments = thietKeAssignments;
+        if (thietKeAssignments.length > 0)
+          payload.assignments = thietKeAssignments;
         const anyCompleted = designWorkAssignments.some((a) => !!a.completedAt);
         if (anyCompleted) payload.status = "Completed";
         const maxDueTc = maxDateString(
@@ -2404,7 +2644,11 @@ export function TaskDialog({
                 <Select
                   disabled={!canEditMeta}
                   value={form.watch("status")}
-                  onValueChange={(val) => form.setValue("status", val)}>
+                  onValueChange={(val) => {
+                    form.setValue("status", val);
+                    setIsTaskStatusAutoCompleted(false);
+                    if (val !== "Completed") setLastManualTaskStatus(val);
+                  }}>
                   <SelectTrigger>
                     <SelectValue placeholder={t.task.selectStatus} />
                   </SelectTrigger>
@@ -2818,7 +3062,9 @@ export function TaskDialog({
                                               completedAt: v || null,
                                               status: v
                                                 ? "completed"
-                                                : s.status,
+                                                : s.receivedAt
+                                                  ? "in_progress"
+                                                  : "not_started",
                                             }
                                           : s,
                                       ),
@@ -2832,7 +3078,9 @@ export function TaskDialog({
                                               completedAt: v || null,
                                               status: v
                                                 ? "completed"
-                                                : s.status,
+                                                : s.receivedAt
+                                                  ? "in_progress"
+                                                  : "not_started",
                                             }
                                           : s,
                                     );
@@ -3039,9 +3287,7 @@ export function TaskDialog({
                       <div className="flex-1 min-w-[200px]">
                         <AssigneePicker
                           label={
-                            language === "vi"
-                              ? "Biên tập viên (BTV)"
-                              : "Editor"
+                            language === "vi" ? "Biên tập viên (BTV)" : "Editor"
                           }
                           value={thietKeBtv.displayName}
                           assigneeId={thietKeBtv.userId}
@@ -3082,9 +3328,7 @@ export function TaskDialog({
                       <div className="flex-1 min-w-[200px]">
                         <AssigneePicker
                           label={
-                            language === "vi"
-                              ? "Người kiểm soát"
-                              : "Controller"
+                            language === "vi" ? "Người kiểm soát" : "Controller"
                           }
                           value={thietKeKiemSoat.displayName}
                           assigneeId={thietKeKiemSoat.userId}
@@ -3509,8 +3753,10 @@ export function TaskDialog({
                           )
                             return;
                           form.setValue("btv2CompleteDate", v ?? "");
-                          if (v)
+                          if (v) {
                             form.setValue("btv2Status", StageStatus.COMPLETED);
+                            setIsBtv2StatusAutoCompleted(true);
+                          }
                         }}
                         placeholder="dd/mm/yyyy"
                         className="bg-background"
@@ -3539,9 +3785,13 @@ export function TaskDialog({
                             : (form.watch("btv2Status") ??
                               StageStatus.NOT_STARTED)
                         }
-                        onValueChange={(val) =>
-                          form.setValue("btv2Status", val)
-                        }
+                        onValueChange={(val) => {
+                          form.setValue("btv2Status", val);
+                          setIsBtv2StatusAutoCompleted(false);
+                          if (val !== StageStatus.COMPLETED) {
+                            setLastManualBtv2Status(val);
+                          }
+                        }}
                         disabled={
                           !!form.watch("btv2CompleteDate") ||
                           (!isNewTask && !canEditMeta)
@@ -3664,8 +3914,10 @@ export function TaskDialog({
                           )
                             return;
                           form.setValue("btv1CompleteDate", v ?? "");
-                          if (v)
+                          if (v) {
                             form.setValue("btv1Status", StageStatus.COMPLETED);
+                            setIsBtv1StatusAutoCompleted(true);
+                          }
                         }}
                         placeholder="dd/mm/yyyy"
                         className="bg-background"
@@ -3694,9 +3946,13 @@ export function TaskDialog({
                             : (form.watch("btv1Status") ??
                               StageStatus.NOT_STARTED)
                         }
-                        onValueChange={(val) =>
-                          form.setValue("btv1Status", val)
-                        }
+                        onValueChange={(val) => {
+                          form.setValue("btv1Status", val);
+                          setIsBtv1StatusAutoCompleted(false);
+                          if (val !== StageStatus.COMPLETED) {
+                            setLastManualBtv1Status(val);
+                          }
+                        }}
                         disabled={
                           !!form.watch("btv1CompleteDate") ||
                           (!isNewTask && !canEditMeta)
@@ -3821,11 +4077,13 @@ export function TaskDialog({
                           )
                             return;
                           form.setValue("docDuyetCompleteDate", v ?? "");
-                          if (v)
+                          if (v) {
                             form.setValue(
                               "docDuyetStatus",
                               StageStatus.COMPLETED,
                             );
+                            setIsDocDuyetStatusAutoCompleted(true);
+                          }
                         }}
                         placeholder="dd/mm/yyyy"
                         className="bg-background"
@@ -3854,9 +4112,13 @@ export function TaskDialog({
                             : (form.watch("docDuyetStatus") ??
                               StageStatus.NOT_STARTED)
                         }
-                        onValueChange={(val) =>
-                          form.setValue("docDuyetStatus", val)
-                        }
+                        onValueChange={(val) => {
+                          form.setValue("docDuyetStatus", val);
+                          setIsDocDuyetStatusAutoCompleted(false);
+                          if (val !== StageStatus.COMPLETED) {
+                            setLastManualDocDuyetStatus(val);
+                          }
+                        }}
                         disabled={
                           !!form.watch("docDuyetCompleteDate") ||
                           (!isNewTask && !canEditMeta)
@@ -4182,7 +4444,10 @@ export function TaskDialog({
                   {...form.register("notes")}
                   placeholder={t.task.notes + "..."}
                   className="min-h-[100px] resize-none"
-                  disabled={!isNewTask && (!isEditing || !(canEditMetaRaw || canEditNotesRaw))}
+                  disabled={
+                    !isNewTask &&
+                    (!isEditing || !(canEditMetaRaw || canEditNotesRaw))
+                  }
                 />
               </div>
             </div>
@@ -4235,11 +4500,13 @@ export function TaskDialog({
                 onClick={() => onOpenChange(false)}>
                 {t.common.cancel}
               </Button>
-              {!isNewTask && (canEditMetaRaw || canEditNotesRaw) && !isEditing && (
-                <Button type="button" onClick={() => setIsEditing(true)}>
-                  {language === "vi" ? "Cập nhật" : "Update"}
-                </Button>
-              )}
+              {!isNewTask &&
+                (canEditMetaRaw || canEditNotesRaw) &&
+                !isEditing && (
+                  <Button type="button" onClick={() => setIsEditing(true)}>
+                    {language === "vi" ? "Cập nhật" : "Update"}
+                  </Button>
+                )}
               {(isNewTask || isEditing) && (
                 <Button
                   type="submit"
