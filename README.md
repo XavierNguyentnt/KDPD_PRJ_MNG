@@ -94,10 +94,6 @@ NODE_ENV=development
 - [attached_assets/DB_Plan.md](./attached_assets/DB_Plan.md) – Kế hoạch DB (tasks, contracts, documents)
 - [CHANGELOG.md](./CHANGELOG.md) – Lịch sử thay đổi
 
-## 🐛 Xử lý lỗi
-
-- **"Database not configured"**: Đặt `DATABASE_URL` trong `.env` và restart server (xem [Docs/NEON_SETUP.md](./Docs/NEON_SETUP.md)).
-- **"Invalid email or password"**: Chạy `KDPD_DB_seed_admin.sql` trên Neon, đăng nhập với **admin@kdpd.local** / **Admin01092016@**. Hoặc dùng email từ seed users với mật khẩu **123456**.
 
 ## 📝 License
 
