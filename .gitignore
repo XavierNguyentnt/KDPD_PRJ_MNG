@@ -14,8 +14,14 @@ vite.config.ts.*
 .env.local
 .env.*.local
 
-# Database backups (may contain secrets/PII)
+# Database backups (may contain secrets/PII — session tokens, Google OAuth tokens, password hashes)
 attached_assets/DB Backup/
+attached_assets/server_backups/
+attached_assets/*.dump
+attached_assets/*.sql
+attached_assets/neon_backup.sql
+backups/
+restore.log
 
 # Google Service Account credentials
 server/credentials.json
