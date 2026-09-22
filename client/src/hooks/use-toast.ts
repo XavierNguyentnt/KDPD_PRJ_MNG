@@ -7,7 +7,9 @@ import type {
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000
-const DEFAULT_TOAST_DURATION = 8000
+// [G20-P0] Chuẩn hóa duration mặc định: 4000ms cho toast bình thường,
+// các toast lỗi quan trọng cần user chú ý nên truyền duration: 6000 riêng tại chỗ gọi.
+const DEFAULT_TOAST_DURATION = 4000
 
 type ToasterToast = ToastProps & {
   id: string

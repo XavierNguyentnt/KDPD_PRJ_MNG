@@ -13,7 +13,14 @@ import {
 } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
 import { Button } from "@/components/ui/button";
-import { Filter, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import { Filter, X, ChevronDown } from "lucide-react";
 import type { User } from "@shared/schema";
 import { compareNamesByLastNameAZ } from "@/lib/utils";
 
@@ -215,6 +222,20 @@ export function TaskFilters({
       .sort((a, b) => compareNamesByLastNameAZ(a.label, b.label));
   }, [users]);
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.staffId && filters.staffId !== "all") count++;
+    if (filters.componentId && filters.componentId !== "all") count++;
+    if (filters.stage && filters.stage !== "all") count++;
+    if (filters.status && filters.status !== "all") count++;
+    if (filters.vote && filters.vote !== "all") count++;
+    if (filters.receivedYear && filters.receivedYear !== "all") count++;
+    if (filters.roundType && filters.roundType !== "all") count++;
+    if (filters.dateFrom) count++;
+    if (filters.dateTo) count++;
+    return count;
+  }, [filters]);
+
   const warnInvalidDateRange = useCallback(() => {
     toast({
       variant: "destructive",
@@ -250,235 +271,303 @@ export function TaskFilters({
     [filters.dateFrom, onFiltersChange, warnInvalidDateRange],
   );
 
+  const StatusControl = (
+    <div className="flex flex-col gap-1 w-full sm:w-auto">
+      <Label className="text-xs text-muted-foreground">
+        {t.filter.status}
+      </Label>
+      <Select
+        value={filters.status}
+        onValueChange={(v) => onFiltersChange({ status: v })}>
+        <SelectTrigger className="w-full sm:w-[170px] h-9 bg-background">
+          <SelectValue placeholder={t.filter.status} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{t.dashboard.allStatus}</SelectItem>
+          <SelectItem value="Not Finished">{t.stats.notFinished}</SelectItem>
+          <SelectItem value="Behind Schedule">
+            {t.dashboard.behindSchedule}
+          </SelectItem>
+          <SelectItem value="Not Started">{t.status.notStarted}</SelectItem>
+          <SelectItem value="In Progress">{t.status.inProgress}</SelectItem>
+          <SelectItem value="Completed">{t.status.completed}</SelectItem>
+          <SelectItem value="Pending">{t.status.pending}</SelectItem>
+          <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const StaffControl = (
+    <div className="flex flex-col gap-1 w-full sm:w-auto">
+      <Label className="text-xs text-muted-foreground">
+        {t.filter.staff}
+      </Label>
+      <Select
+        value={filters.staffId}
+        onValueChange={(v) => onFiltersChange({ staffId: v })}>
+        <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background">
+          <SelectValue placeholder={t.filter.allStaff} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{t.filter.allStaff}</SelectItem>
+          {staffOptions.map((u) => (
+            <SelectItem key={u.id} value={u.id}>
+              {u.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   return (
     <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-3">
       <div className="flex items-center gap-2 text-muted-foreground shrink-0">
         <Filter className="w-3.5 h-3.5" />
         <span className="text-xs font-medium">{t.common.filter}</span>
+        {activeFilterCount > 0 && (
+          <Badge variant="destructive" className="h-5 px-1.5 text-[11px]">
+            {language === "vi"
+              ? `${activeFilterCount} bộ lọc`
+              : `${activeFilterCount} filters`}
+          </Badge>
+        )}
       </div>
 
-      <div className="flex flex-col gap-1 w-full sm:w-auto">
-        <Label className="text-xs text-muted-foreground">
-          {t.filter.staff}
-        </Label>
-        <Select
-          value={filters.staffId}
-          onValueChange={(v) => onFiltersChange({ staffId: v })}>
-          <SelectTrigger className="w-full sm:w-[160px] h-9 bg-background">
-            <SelectValue placeholder={t.filter.allStaff} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.filter.allStaff}</SelectItem>
-            {staffOptions.map((u) => (
-              <SelectItem key={u.id} value={u.id}>
-                {u.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {StatusControl}
+      {StaffControl}
 
-      <div className="flex flex-col gap-1 w-full sm:w-auto">
-        <Label className="text-xs text-muted-foreground">
-          {t.filter.component}
-        </Label>
-        <Select
-          value={filters.componentId}
-          onValueChange={(v) => onFiltersChange({ componentId: v })}>
-          <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background">
-            <SelectValue placeholder={t.filter.allComponents} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.filter.allComponents}</SelectItem>
-            {components.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 text-xs px-3 w-full sm:w-auto shrink-0 self-end">
+            {language === "vi" ? "Bộ lọc nâng cao" : "Advanced filters"}
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          side="bottom"
+          sideOffset={6}
+          className="w-[min(calc(100vw-32px),640px)] p-0 shadow-lg">
+          <div className="p-4 pb-0">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">
+                  {language === "vi" ? "Bộ lọc nâng cao" : "Advanced filters"}
+                </span>
+                {activeFilterCount > 0 && (
+                  <Badge variant="destructive" className="h-5 px-1.5 text-[11px]">
+                    {language === "vi"
+                      ? `${activeFilterCount} đang hoạt động`
+                      : `${activeFilterCount} active`}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <Separator className="-mx-4 mb-3" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-muted-foreground">
+                  {t.filter.component}
+                </Label>
+                <Select
+                  value={filters.componentId}
+                  onValueChange={(v) =>
+                    onFiltersChange({ componentId: v })
+                  }>
+                  <SelectTrigger className="h-9 bg-background">
+                    <SelectValue placeholder={t.filter.allComponents} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t.filter.allComponents}</SelectItem>
+                    {components.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-      <div className="flex flex-col gap-1 w-full sm:w-auto">
-        <Label className="text-xs text-muted-foreground">
-          {t.filter.stage}
-        </Label>
-        <Select
-          value={filters.stage}
-          onValueChange={(v) => onFiltersChange({ stage: v })}>
-          <SelectTrigger className="w-full sm:w-[140px] h-9 bg-background">
-            <SelectValue placeholder={t.filter.allStages} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.filter.allStages}</SelectItem>
-            {stages.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-muted-foreground">
+                  {t.filter.stage}
+                </Label>
+                <Select
+                  value={filters.stage}
+                  onValueChange={(v) => onFiltersChange({ stage: v })}>
+                  <SelectTrigger className="h-9 bg-background">
+                    <SelectValue placeholder={t.filter.allStages} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t.filter.allStages}</SelectItem>
+                    {stages.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-      <div className="flex flex-col gap-1 w-full sm:w-auto">
-        <Label className="text-xs text-muted-foreground">
-          {t.filter.status}
-        </Label>
-        <Select
-          value={filters.status}
-          onValueChange={(v) => onFiltersChange({ status: v })}>
-          <SelectTrigger className="w-full sm:w-[150px] h-9 bg-background">
-            <SelectValue placeholder={t.filter.status} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.dashboard.allStatus}</SelectItem>
-            <SelectItem value="Not Finished">{t.stats.notFinished}</SelectItem>
-            <SelectItem value="Behind Schedule">
-              {t.dashboard.behindSchedule}
-            </SelectItem>
-            <SelectItem value="Not Started">{t.status.notStarted}</SelectItem>
-            <SelectItem value="In Progress">{t.status.inProgress}</SelectItem>
-            <SelectItem value="Completed">{t.status.completed}</SelectItem>
-            <SelectItem value="Pending">{t.status.pending}</SelectItem>
-            <SelectItem value="Cancelled">{t.status.cancelled}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-muted-foreground">
+                  {t.filter.year ??
+                    (language === "vi" ? "Năm nhận việc" : "Received year")}
+                </Label>
+                <Select
+                  value={filters.receivedYear}
+                  onValueChange={(v) =>
+                    onFiltersChange({ receivedYear: v })
+                  }>
+                  <SelectTrigger className="h-9 bg-background">
+                    <SelectValue
+                      placeholder={
+                        t.filter.allYears ??
+                        (language === "vi"
+                          ? "Tất cả năm"
+                          : "All years")
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      {t.filter.allYears ??
+                        (language === "vi"
+                          ? "Tất cả năm"
+                          : "All years")}
+                    </SelectItem>
+                    {yearOptions.map((y) => (
+                      <SelectItem key={y} value={y}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-      <div className="flex flex-col gap-1 w-full sm:w-auto">
-        <Label className="text-xs text-muted-foreground">
-          {t.filter.year ??
-            (language === "vi" ? "Năm nhận việc" : "Received year")}
-        </Label>
-        <Select
-          value={filters.receivedYear}
-          onValueChange={(v) => onFiltersChange({ receivedYear: v })}>
-          <SelectTrigger className="w-full sm:w-[140px] h-9 bg-background">
-            <SelectValue
-              placeholder={
-                t.filter.allYears ??
-                (language === "vi" ? "Tất cả năm" : "All years")
-              }
-            />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">
-              {t.filter.allYears ??
-                (language === "vi" ? "Tất cả năm" : "All years")}
-            </SelectItem>
-            {yearOptions.map((y) => (
-              <SelectItem key={y} value={y}>
-                {y}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+              {showVoteFilter && (
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    {t.filter.vote}
+                  </Label>
+                  <Select
+                    value={filters.vote}
+                    onValueChange={(v) => onFiltersChange({ vote: v })}>
+                    <SelectTrigger className="h-9 bg-background">
+                      <SelectValue placeholder={t.filter.allVotes} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.filter.allVotes}</SelectItem>
+                      <SelectItem value="tot">
+                        {language === "vi" ? "Hoàn thành tốt" : "Good"}
+                      </SelectItem>
+                      <SelectItem value="kha">
+                        {language === "vi" ? "Hoàn thành khá" : "Fair"}
+                      </SelectItem>
+                      <SelectItem value="khong_tot">
+                        {language === "vi" ? "Không tốt" : "Poor"}
+                      </SelectItem>
+                      <SelectItem value="khong_hoan_thanh">
+                        {language === "vi"
+                          ? "Không hoàn thành"
+                          : "Not completed"}
+                      </SelectItem>
+                      <SelectItem value="unrated">
+                        {language === "vi" ? "Chưa đánh giá" : "Unrated"}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-      {showVoteFilter && (
-        <div className="flex flex-col gap-1 w-full sm:w-auto">
-          <Label className="text-xs text-muted-foreground">
-            {t.filter.vote}
-          </Label>
-          <Select
-            value={filters.vote}
-            onValueChange={(v) => onFiltersChange({ vote: v })}>
-            <SelectTrigger className="w-full sm:w-[160px] h-9 bg-background">
-              <SelectValue placeholder={t.filter.allVotes} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.filter.allVotes}</SelectItem>
-              <SelectItem value="tot">
-                {language === "vi" ? "Hoàn thành tốt" : "Good"}
-              </SelectItem>
-              <SelectItem value="kha">
-                {language === "vi" ? "Hoàn thành khá" : "Fair"}
-              </SelectItem>
-              <SelectItem value="khong_tot">
-                {language === "vi" ? "Không tốt" : "Poor"}
-              </SelectItem>
-              <SelectItem value="khong_hoan_thanh">
-                {language === "vi" ? "Không hoàn thành" : "Not completed"}
-              </SelectItem>
-              <SelectItem value="unrated">
-                {language === "vi" ? "Chưa đánh giá" : "Unrated"}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      {showRoundTypeFilter && (
-        <div className="flex flex-col gap-1 w-full sm:w-auto">
-          <Label className="text-xs text-muted-foreground">
-            {t.filter.roundType ?? t.task.roundTypeLabel}
-          </Label>
-          <Select
-            value={filters.roundType}
-            onValueChange={(v) => onFiltersChange({ roundType: v })}>
-            <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background">
-              <SelectValue
-                placeholder={t.filter.allRoundTypes ?? t.task.selectRoundType}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">
-                {t.filter.allRoundTypes ??
-                  (language === "vi" ? "Tất cả loại bông" : "All round types")}
-              </SelectItem>
-              {(roundTypeOptions || []).map((rt) => (
-                <SelectItem key={rt} value={rt}>
-                  {rt}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+              {showRoundTypeFilter && (
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    {t.filter.roundType ?? t.task.roundTypeLabel}
+                  </Label>
+                  <Select
+                    value={filters.roundType}
+                    onValueChange={(v) =>
+                      onFiltersChange({ roundType: v })
+                    }>
+                    <SelectTrigger className="h-9 bg-background">
+                      <SelectValue
+                        placeholder={
+                          t.filter.allRoundTypes ?? t.task.selectRoundType
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        {t.filter.allRoundTypes ??
+                          (language === "vi"
+                            ? "Tất cả loại bông"
+                            : "All round types")}
+                      </SelectItem>
+                      {(roundTypeOptions || []).map((rt) => (
+                        <SelectItem key={rt} value={rt}>
+                          {rt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-      <div className="flex flex-col gap-1 w-full sm:w-auto">
-        <Label className="text-xs text-muted-foreground">
-          {t.filter.dateFrom}
-        </Label>
-        <DateInput
-          value={filters.dateFrom || null}
-          onChange={handleDateFromChange}
-          placeholder="dd/mm/yyyy"
-          className="h-9 w-full sm:w-[120px] bg-background"
-        />
-      </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-muted-foreground">
+                  {t.filter.dateFrom}
+                </Label>
+                <DateInput
+                  value={filters.dateFrom || null}
+                  onChange={handleDateFromChange}
+                  placeholder="dd/mm/yyyy"
+                  className="h-9 w-full bg-background"
+                />
+              </div>
 
-      <div className="flex flex-col gap-1 w-full sm:w-auto">
-        <Label className="text-xs text-muted-foreground">
-          {t.filter.dateTo}
-        </Label>
-        <DateInput
-          value={filters.dateTo || null}
-          onChange={handleDateToChange}
-          placeholder="dd/mm/yyyy"
-          className="h-9 w-full sm:w-[120px] bg-background"
-        />
-      </div>
-      <div className="flex items-end gap-2 w-full sm:w-auto">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-9"
-          onClick={() => onFiltersChange(getDefaultTaskFilters())}
-        >
-          <X className="h-4 w-4" />
-          {language === "vi" ? "Xoá lọc" : "Clear filters"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-9"
-          onClick={() => onFiltersChange({ dateFrom: "", dateTo: "" })}
-          disabled={!filters.dateFrom && !filters.dateTo}
-        >
-          <X className="h-4 w-4" />
-          {language === "vi" ? "Xoá ngày" : "Clear dates"}
-        </Button>
-      </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-muted-foreground">
+                  {t.filter.dateTo}
+                </Label>
+                <DateInput
+                  value={filters.dateTo || null}
+                  onChange={handleDateToChange}
+                  placeholder="dd/mm/yyyy"
+                  className="h-9 w-full bg-background"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 p-3 pt-2 border-t border-border mt-1 bg-muted/30 rounded-b-md">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => onFiltersChange({ dateFrom: "", dateTo: "" })}
+              disabled={!filters.dateFrom && !filters.dateTo}>
+              <X className="h-3.5 w-3.5" />
+              {language === "vi" ? "Xoá ngày" : "Clear dates"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => onFiltersChange(getDefaultTaskFilters())}>
+              <X className="h-3.5 w-3.5" />
+              {language === "vi" ? "Xoá lọc" : "Clear filters"}
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

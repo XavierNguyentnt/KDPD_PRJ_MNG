@@ -59,6 +59,30 @@ export interface Translations {
     reviewCompleted: string;
     viewTable: string;
     viewBoard: string;
+    viewCalendarMonth?: string;
+    viewCalendarWeek?: string;
+    viewCalendarDay?: string;
+    calendarToday?: string;
+    calendarByDueDate?: string;
+    calendarByReceivedAt?: string;
+    calendarOpenMonthInGcal?: string;
+    calendarOpenWeekInGcal?: string;
+    calendarDayDetails?: string;
+    calendarEmptyColumn?: string;
+    calendarMoreTasks?: string;
+    calendarMoreOthers?: string;
+    calendarTasksNoun?: string;
+    emptyTitle?: string;
+    emptySubtitle?: string;
+    emptyCreateCta?: string;
+    emptyResetFilter?: string;
+    markAllReadBtn?: string;
+    notificationEmptyTitle?: string;
+    notificationEmptySubtitle?: string;
+    markReadAria?: string;
+    markUnreadAria?: string;
+    columnPicker?: string;
+    columnPickerDefaults?: string;
   };
   filter: {
     staff: string;
@@ -211,6 +235,30 @@ const translations: Record<Language, Translations> = {
       reviewCompleted: "Đã duyệt hoàn thành",
       viewTable: "Bảng",
       viewBoard: "Bảng Kanban",
+      viewCalendarMonth: "Tháng",
+      viewCalendarWeek: "Tuần",
+      viewCalendarDay: "Ngày",
+      calendarToday: "Hôm nay",
+      calendarByDueDate: "Theo hạn",
+      calendarByReceivedAt: "Ngày nhận",
+      calendarOpenMonthInGcal: "Mở tháng này",
+      calendarOpenWeekInGcal: "Mở tuần này",
+      calendarDayDetails: "Chi tiết trong ngày",
+      calendarEmptyColumn: "Trống",
+      calendarMoreTasks: "công việc",
+      calendarMoreOthers: "mục khác",
+      calendarTasksNoun: "công việc",
+      emptyTitle: "Chưa có công việc nào",
+      emptySubtitle: "Không có công việc phù hợp với bộ lọc hiện tại. Bạn có thể tạo công việc mới hoặc thay đổi bộ lọc.",
+      emptyCreateCta: "Tạo công việc mới",
+      emptyResetFilter: "Xóa bộ lọc",
+      columnPicker: "Cột",
+      columnPickerDefaults: "Mặc định",
+      markAllReadBtn: "Đánh dấu tất cả đã xem",
+      notificationEmptyTitle: "Chưa có thông báo",
+      notificationEmptySubtitle: "Hiện tại chưa có thông báo nào.",
+      markReadAria: "Đánh dấu đã xem",
+      markUnreadAria: "Đánh dấu chưa xem",
     },
     filter: {
       staff: "Nhân sự",
@@ -351,6 +399,30 @@ const translations: Record<Language, Translations> = {
       reviewCompleted: "Review Completed",
       viewTable: "Table",
       viewBoard: "Kanban Board",
+      viewCalendarMonth: "Month",
+      viewCalendarWeek: "Week",
+      viewCalendarDay: "Day",
+      calendarToday: "Today",
+      calendarByDueDate: "Due",
+      calendarByReceivedAt: "Received",
+      calendarOpenMonthInGcal: "Open this month",
+      calendarOpenWeekInGcal: "Open this week",
+      calendarDayDetails: "Day details",
+      calendarEmptyColumn: "Empty",
+      calendarMoreTasks: "tasks",
+      calendarMoreOthers: "more",
+      calendarTasksNoun: "tasks",
+      emptyTitle: "No tasks yet",
+      emptySubtitle: "No tasks match your current filters. Try creating a new task or adjusting filters.",
+      emptyCreateCta: "Create new task",
+      emptyResetFilter: "Clear filters",
+      columnPicker: "Columns",
+      columnPickerDefaults: "Defaults",
+      markAllReadBtn: "Mark all as read",
+      notificationEmptyTitle: "No notifications yet",
+      notificationEmptySubtitle: "There are no notifications yet.",
+      markReadAria: "Mark as read",
+      markUnreadAria: "Mark as unread",
     },
     filter: {
       staff: "Staff",

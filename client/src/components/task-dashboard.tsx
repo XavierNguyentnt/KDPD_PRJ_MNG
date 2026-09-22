@@ -59,6 +59,8 @@ interface TaskDashboardProps {
   tasks: TaskWithAssignmentDetails[];
   onBadgeFilter?: (filter: DashboardBadgeFilter) => void;
   activeBadgeFilter?: DashboardBadgeFilter | null;
+  hideBadges?: boolean;
+  hideCharts?: boolean;
 }
 
 const STATUS_ORDER = ["Not Started", "In Progress", "Completed", "Pending", "Cancelled"];
@@ -145,6 +147,8 @@ export function TaskDashboard({
   tasks,
   onBadgeFilter,
   activeBadgeFilter,
+  hideBadges = false,
+  hideCharts = false,
 }: TaskDashboardProps) {
   const { t, language } = useI18n();
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
@@ -376,104 +380,110 @@ export function TaskDashboard({
 
   return (
     <div className="grid gap-6">
-      {/* Badge thống kê: gradient (Tổng trắng, Hoàn thành xanh lá, Đang tiến hành xanh lam, Quá hạn cam, Không hoàn thành đỏ) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        <Card
-          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900/30 text-slate-700 dark:text-slate-100"
-          onClick={() => onBadgeFilter?.(null)}
-        >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200/60 dark:bg-slate-700/40">
-              <BarChart3 className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.totalTasks}</p>
-              <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.total} +</h3>
-            </div>
-          </CardContent>
-        </Card>
-        <Card
-          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
-          onClick={() =>
-            onBadgeFilter?.(
-              isActive({ type: "status", value: "Completed" })
-                ? null
-                : { type: "status", value: "Completed" },
-            )
-          }
-        >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-200/60 dark:bg-emerald-700/40">
-              <CheckCircle2 className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.completed}</p>
-              <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.completed} +</h3>
-            </div>
-          </CardContent>
-        </Card>
-        <Card
-          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300"
-          onClick={() =>
-            onBadgeFilter?.(
-              isActive({ type: "status", value: "In Progress" })
-                ? null
-                : { type: "status", value: "In Progress" },
-            )
-          }
-        >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-200/60 dark:bg-blue-700/40">
-              <Clock className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.inProgress}</p>
-              <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.inProgress} +</h3>
-            </div>
-          </CardContent>
-        </Card>
-        <Card
-          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300"
-          onClick={() =>
-            onBadgeFilter?.(
-              isActive({ type: "overdue", value: "overdue" }) ? null : { type: "overdue", value: "overdue" }
-            )
-          }
-        >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-200/60 dark:bg-amber-700/40">
-              <AlertCircle className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.notFinished}</p>
-              <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.overdueInProgress} +</h3>
-            </div>
-          </CardContent>
-        </Card>
-        <Card
-          className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300"
-          onClick={() =>
-            onBadgeFilter?.(
-              isActive({ type: "not_completed", value: "not_completed" })
-                ? null
-                : { type: "not_completed", value: "not_completed" }
-            )
-          }
-        >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-200/60 dark:bg-rose-700/40">
-              <AlertCircle className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.notCompleted}</p>
-              <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.notCompleted} +</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {!hideBadges && (
+        <>
+          {/* Badge thống kê: gradient (Tổng trắng, Hoàn thành xanh lá, Đang tiến hành xanh lam, Quá hạn cam, Không hoàn thành đỏ) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+            <Card
+              className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900/30 text-slate-700 dark:text-slate-100"
+              onClick={() => onBadgeFilter?.(null)}
+            >
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200/60 dark:bg-slate-700/40">
+                  <BarChart3 className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.totalTasks}</p>
+                  <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.total} +</h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+              onClick={() =>
+                onBadgeFilter?.(
+                  isActive({ type: "status", value: "Completed" })
+                    ? null
+                    : { type: "status", value: "Completed" },
+                )
+              }
+            >
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-200/60 dark:bg-emerald-700/40">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.completed}</p>
+                  <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.completed} +</h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300"
+              onClick={() =>
+                onBadgeFilter?.(
+                  isActive({ type: "status", value: "In Progress" })
+                    ? null
+                    : { type: "status", value: "In Progress" },
+                )
+              }
+            >
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-200/60 dark:bg-blue-700/40">
+                  <Clock className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.inProgress}</p>
+                  <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.inProgress} +</h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300"
+              onClick={() =>
+                onBadgeFilter?.(
+                  isActive({ type: "overdue", value: "overdue" }) ? null : { type: "overdue", value: "overdue" }
+                )
+              }
+            >
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-200/60 dark:bg-amber-700/40">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.notFinished}</p>
+                  <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.overdueInProgress} +</h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className="overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300"
+              onClick={() =>
+                onBadgeFilter?.(
+                  isActive({ type: "not_completed", value: "not_completed" })
+                    ? null
+                    : { type: "not_completed", value: "not_completed" }
+                )
+              }
+            >
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-200/60 dark:bg-rose-700/40">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">{t.stats.notCompleted}</p>
+                  <h3 className="text-2xl font-bold font-display tabular-nums mt-0.5">{stats.notCompleted} +</h3>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
 
-      {/* Biểu đồ tròn: theo trạng thái + theo nhóm công việc (card tách biệt) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {!hideCharts && (
+        <>
+          {/* Biểu đồ tròn: theo trạng thái + theo nhóm công việc (card tách biệt) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border border-border/50 shadow-sm overflow-hidden">
           <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/30">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -796,6 +806,8 @@ export function TaskDashboard({
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

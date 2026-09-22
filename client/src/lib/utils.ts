@@ -1,5 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import * as XLSX from "xlsx";
+import type { TaskWithAssignmentDetails } from "@shared/schema";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -211,3 +213,495 @@ export function buildExportPrefix(): string {
     now.getDate(),
   )}.[${pad(now.getHours())}.${pad(now.getMinutes())}]`;
 }
+
+/* =========================================================================
+ * [G5-P0] Color helpers — 1 nguồn sự thật thay cho 6 bản copy trong các file page
+ * Sử dụng HSL CSS variables (theo Design System mới) thay vì hardcode tailwind.
+ * Trả về tuple [badgeClasses, textClasses] để dùng className.
+ * ========================================================================= */
+
+export type TaskStatus =
+  | "Not Started"
+  | "Pending"
+  | "In Progress"
+  | "Completed"
+  | "Cancelled"
+  | string;
+
+export type TaskPriority = "Critical" | "High" | "Medium" | "Low" | string;
+
+export interface TaskColorClasses {
+  badge: string; // wrapper className (background + border radius + px/py)
+  text: string;  // text color
+}
+
+/**
+ * Trả về className Badge màu theo Trạng thái công việc.
+ * Sử dụng HSL CSS variables --status-* đã định nghĩa trong index.css.
+ * Ví dụ usage: <Badge className={getTaskStatusColor(task.status).badge}>...</Badge>
+ */
+export function getTaskStatusColor(status: TaskStatus | null | undefined): TaskColorClasses {
+  const s = String(status ?? "").trim();
+  switch (s) {
+    case "Not Started":
+      return {
+        badge: "bg-status-muted/15 border-status-muted/30 border",
+        text:  "text-status-muted-foreground",
+      };
+    case "Pending":
+      return {
+        badge: "bg-status-warning/15 border-status-warning/30 border",
+        text:  "text-[hsl(var(--status-warning))]",
+      };
+    case "In Progress":
+      return {
+        badge: "bg-status-info/15 border-status-info/30 border",
+        text:  "text-[hsl(var(--status-info))]",
+      };
+    case "Completed":
+      return {
+        badge: "bg-status-success/15 border-status-success/30 border",
+        text:  "text-[hsl(var(--status-success))]",
+      };
+    case "Cancelled":
+      return {
+        badge: "bg-status-danger/10 border-status-danger/25 border",
+        text:  "text-[hsl(var(--status-danger))]",
+      };
+    default:
+      return {
+        badge: "bg-muted border-border border",
+        text:  "text-foreground/80",
+      };
+  }
+}
+
+/**
+ * Trả về className Badge màu theo Mức độ Ưu tiên.
+ */
+export function getTaskPriorityColor(priority: TaskPriority | null | undefined): TaskColorClasses {
+  const p = String(priority ?? "").trim();
+  switch (p) {
+    case "Critical":
+      return {
+        badge: "bg-destructive/15 border-destructive/30 border",
+        text:  "text-destructive font-semibold",
+      };
+    case "High":
+      return {
+        badge: "bg-group-admin/15 border-group-admin/30 border",
+        text:  "text-[hsl(var(--group-admin))] font-medium",
+      };
+    case "Medium":
+      return {
+        badge: "bg-group-thuky/25 border-group-thuky/40 border",
+        text:  "text-[hsl(var(--group-thuky))]",
+      };
+    case "Low":
+      return {
+        badge: "bg-status-muted/20 border-status-muted/35 border",
+        text:  "text-muted-foreground",
+      };
+    default:
+      return {
+        badge: "bg-muted border-border border",
+        text:  "text-foreground/70",
+      };
+  }
+}
+
+/* =========================================================================
+ * [G5-P0] Vote color (Đánh giá 4 mức — tiếng Việt keys)
+ * ========================================================================= */
+
+export type VoteKey = "tot" | "kha" | "khong_tot" | "khong_hoan_thanh" | string;
+
+export function getVoteColor(vote: VoteKey | null | undefined): TaskColorClasses & { label: string } {
+  const v = String(vote ?? "").toLowerCase().trim();
+  switch (v) {
+    case "tot":
+      return { ...getTaskStatusColor("Completed"), label: "Hoàn thành tốt" };
+    case "kha":
+      return {
+        badge: "bg-status-info/15 border-status-info/30 border",
+        text:  "text-[hsl(var(--status-info))]",
+        label: "Hoàn thành khá",
+      };
+    case "khong_tot":
+      return {
+        badge: "bg-status-warning/15 border-status-warning/30 border",
+        text:  "text-[hsl(var(--status-warning))]",
+        label: "Không tốt",
+      };
+    case "khong_hoan_thanh":
+      return {
+        ...getTaskStatusColor("Cancelled"),
+        label: "Không hoàn thành",
+      };
+    default:
+      return { badge: "bg-muted", text: "text-muted-foreground", label: v || "—" };
+  }
+}
+
+/* =========================================================================
+ * [G4-P0] Universal Excel export helper.
+ * Gộp 6 bản handleExportTasks từ cv-chung, bien-tap, thiet-ke, cntt,
+ * thu-ky-hop-phan, dashboard thành 1 hàm duy nhất.
+ *
+ * Tham số `opts.extraHeaderFields` & `opts.extraRowFields` dùng để:
+ * - Biên tập thêm: "Loại bông", "Tác phẩm liên quan", "Hợp phần", "GĐ"
+ * - Các nhóm khác nếu cần thêm cột đặc thù.
+ * Tham số `opts.assignmentLabelFn` override mapping stageType → label (Thiết kế/CNTT dùng khác CV-chung).
+ * ========================================================================= */
+
+export interface ExportTasksLocalize {
+  noDataTitle: string;
+  noDataDesc: string;
+  statusMap?: Partial<Record<string, string>>;
+  priorityMap?: Partial<Record<string, string>>;
+}
+
+export interface ExportTasksOptions<
+  T extends TaskWithAssignmentDetails = TaskWithAssignmentDetails,
+> {
+  fileNameSuffix: string;   // VD: "CV_Chung_Tasks", "Bien_Tap_Tasks"
+  localize: ExportTasksLocalize;
+  /** Mặc định 15 headers chuẩn. Thêm cột đặc thù (mảng header strings) */
+  extraHeaderFields?: string[];
+  /** Hàm trả về mảng giá trị extra cho mỗi task (cùng thứ tự với extraHeaderFields) */
+  extraRowFields?: (task: T) => (string | number)[];
+  /** Override label stageType (ví dụ thiết kế: ktv_chinh → "KTV chính", tro_ly_1 → "Trợ lý 1") */
+  assignmentLabelFn?: (stageType: string) => string;
+  /** Inject cột đánh giá (vote). Default = true (đọc task.vote). */
+  includeVoteColumn?: boolean;
+  /** Mảng indices cột ngày (default: các cột 9,10,11,13,14 theo chuẩn base 15 headers) */
+  dateColumnIndices?: number[];
+  /** Indices cột merge khi 1 task có nhiều assignment rows. Default = [0,1,2,3,4,5,6,7,12,13,14] */
+  mergeSharedColumns?: number[];
+}
+
+const DEFAULT_STATUS_VI: Record<string, string> = {
+  "Not Started": "Chưa bắt đầu",
+  "In Progress": "Đang thực hiện",
+  "Completed":   "Hoàn thành",
+  "Pending":     "Tạm dừng",
+  "Cancelled":   "Đã hủy",
+};
+const DEFAULT_PRIORITY_VI: Record<string, string> = {
+  Critical: "Khẩn cấp",
+  High:     "Cao",
+  Medium:   "Trung bình",
+  Low:      "Thấp",
+};
+
+/** Default assignment stageType → label tiếng Việt theo CV-chung */
+export function defaultAssignmentLabel(stageType: string): string {
+  if (stageType === "kiem_soat") return "Người kiểm soát";
+  if (stageType.startsWith("nhan_su_")) return "Nhân sự " + stageType.replace("nhan_su_", "");
+  if (stageType === "primary") return "Người thực hiện";
+  if (stageType === "ktv_chinh") return "KTV chính";
+  if (stageType.startsWith("tro_ly_")) return "Trợ lý " + stageType.replace("tro_ly_", "");
+  if (stageType === "btv1") return "Biên tập viên 1";
+  if (stageType === "btv2") return "Biên tập viên 2";
+  if (stageType === "doc_duyet" || stageType === "duyet") return "Người đọc duyệt";
+  if (stageType === "btv") return "BTV phê duyệt";
+  return stageType;
+}
+
+export function exportTasksToExcel<T extends TaskWithAssignmentDetails>(
+  filteredTasks: T[],
+  opts: ExportTasksOptions<T>,
+): { ok: boolean; rows: number; fileName: string } {
+  const {
+    fileNameSuffix,
+    localize,
+    extraHeaderFields = [],
+    extraRowFields,
+    assignmentLabelFn = defaultAssignmentLabel,
+    includeVoteColumn = true,
+  } = opts;
+
+  if (!filteredTasks || filteredTasks.length === 0) {
+    return { ok: false, rows: 0, fileName: "" };
+  }
+
+  const statusMap  = { ...DEFAULT_STATUS_VI, ...(localize.statusMap ?? {}) };
+  const priorityMap = { ...DEFAULT_PRIORITY_VI, ...(localize.priorityMap ?? {}) };
+
+  const baseHeaders = [
+    "ID",
+    "Tiêu đề",
+    "Nhóm",
+    "Trạng thái",
+    "Mức độ ưu tiên",
+    "Tiến độ (%)",
+    "Mô tả",
+  ];
+  if (includeVoteColumn) baseHeaders.push("Đánh giá");
+  baseHeaders.push(
+    "Nhân sự",
+    "Ngày nhận công việc",
+    "Hạn hoàn thành",
+    "Ngày hoàn thành thực tế",
+    "Ghi chú",
+    "Ngày tạo",
+    "Ngày cập nhật",
+  );
+  const headers = [...baseHeaders, ...extraHeaderFields];
+
+  const sheetData: (string | number)[][] = [headers];
+  const rowBlocks: Array<{ startRow: number; height: number }> = [];
+  const extraLen = extraHeaderFields.length;
+
+  filteredTasks.forEach((task) => {
+    const assignments = Array.isArray(task.assignments) ? (task.assignments as any[]) : [];
+    const persons: Array<{
+      label: string; name: string; received: string; due: string; completed: string;
+    }> = assignments.length
+      ? assignments.map((a: any) => ({
+          label: assignmentLabelFn(a.stageType || ""),
+          name:  a.displayName ?? a.userId ?? "",
+          received: formatDateDDMMYYYY(a.receivedAt),
+          due:      formatDateDDMMYYYY(a.dueDate),
+          completed:formatDateDDMMYYYY(a.completedAt),
+        }))
+      : [{ label: "", name: "", received: "", due: "", completed: "" }];
+
+    const startRow = sheetData.length + 1;
+    rowBlocks.push({ startRow, height: persons.length });
+
+    const voteExtra: string[] = includeVoteColumn ? [getVoteColor((task as any).vote).label] : [];
+    const extraVals: (string | number)[] = extraRowFields ? extraRowFields(task) : Array(extraLen).fill("");
+
+    persons.forEach((p) => {
+      sheetData.push([
+        task.id ?? "",
+        task.title ?? "",
+        task.group ?? "",
+        statusMap[String(task.status ?? "")] ?? String(task.status ?? ""),
+        priorityMap[String(task.priority ?? "")] ?? String(task.priority ?? ""),
+        typeof task.progress === "number" ? task.progress : "",
+        task.description ?? "",
+        ...voteExtra,
+        (p.label ? `${p.label}: ` : "") + (p.name || ""),
+        p.received,
+        p.due,
+        p.completed,
+        (task as any).notes ?? "",
+        formatDateDDMMYYYY(task.createdAt as any),
+        formatDateDDMMYYYY(task.updatedAt as any),
+        ...extraVals,
+      ]);
+    });
+  });
+
+  const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+  const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+
+  // Mặc định merge cols 0..14 không phải nhân sự (ID -> Ngày cập nhật) trừ cột 8 Nhân sự
+  const voteOffset = includeVoteColumn ? 1 : 0;
+  const defaultMerge = [0,1,2,3,4,5,6];
+  if (includeVoteColumn) defaultMerge.push(7);
+  defaultMerge.push(10 + voteOffset, 11 + voteOffset, 12 + voteOffset, 13 + voteOffset);
+  const mergeCols = opts.mergeSharedColumns ?? defaultMerge;
+
+  rowBlocks.forEach((blk) => {
+    if (blk.height <= 1) return;
+    const startR0 = blk.startRow - 1;
+    const endR0 = startR0 + blk.height - 1;
+    mergeCols.forEach((c) => {
+      worksheet["!merges"] = worksheet["!merges"] || [];
+      worksheet["!merges"].push({ s: { r: startR0, c }, e: { r: endR0, c } });
+    });
+  });
+
+  // Header bold + center + border
+  for (let C = range.s.c; C <= range.e.c; ++C) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+    const cell = worksheet[addr];
+    if (cell) {
+      cell.s = {
+        font: { bold: true },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        },
+      };
+    }
+  }
+
+  const dateCols = opts.dateColumnIndices ?? [
+    9 + voteOffset, 10 + voteOffset, 11 + voteOffset, 13 + voteOffset, 14 + voteOffset,
+  ];
+  // Data cells: wrap text + border + date center
+  for (let R = 1; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = worksheet[addr];
+      if (!cell) continue;
+      const isDate = dateCols.includes(C);
+      cell.s = {
+        alignment: {
+          horizontal: isDate ? "center" : "left",
+          vertical: "center",
+          wrapText: true,
+        },
+        border: {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        },
+      };
+    }
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
+  const fileName = `${buildExportPrefix()}_${fileNameSuffix}.xlsx`;
+  XLSX.writeFile(workbook, fileName);
+  return { ok: true, rows: filteredTasks.length, fileName };
+}
+
+/* =========================================================================
+ * [G5-P0] Default Columns cho 6 nhóm nghiệp vụ.
+ * Sử dụng trong TaskTable component khi page gọi Column Picker.
+ * Object keys: `groupCode` (6 nhóm) -> Partial<ColumnVisibilityMap>
+ * ========================================================================= */
+
+export interface TaskColumnVisibilityMap {
+  id: boolean;
+  title: boolean;
+  group: boolean;
+  status: boolean;
+  priority: boolean;
+  progress: boolean;
+  assignee: boolean;
+  description: boolean;
+  vote: boolean;
+  roundType: boolean;
+  receivedDate: boolean;
+  dueDate: boolean;
+  actualCompletedAt: boolean;
+  notes: boolean;
+  createdAt: boolean;
+  updatedAt: boolean;
+  workLink: boolean;
+  contractLink: boolean;
+  ktvChinh: boolean;
+  troLyCount: boolean;
+  btv1: boolean;
+  btv2: boolean;
+  docDuyet: boolean;
+  kiemSoat: boolean;
+  nhanSuCount: boolean;
+  kyThuatVien: boolean;
+  groupTypePill: boolean;
+}
+
+export const DEFAULT_GROUP_COLUMNS: Record<string, Partial<TaskColumnVisibilityMap>> = {
+  // Công việc chung: 6 cột mặc định, ẩn group vì luôn CV-chung
+  cv_chung: {
+    id: true, title: true, group: false, status: true,
+    priority: false, progress: true, assignee: true, description: false,
+    vote: false, dueDate: true, actualCompletedAt: false, notes: false,
+    receivedDate: false, createdAt: false, updatedAt: false,
+  },
+  // Biên tập: 6 cột mặc định gồm BTV1, Loại bông, Work link
+  bien_tap: {
+    id: true, title: true, group: false, status: false, priority: false,
+    progress: true, dueDate: true, roundType: true, workLink: true, btv1: true,
+    description: false, vote: false, receivedDate: false, createdAt: false, updatedAt: false,
+  },
+  // Thiết kế: 6 cột mặc định gồm KTV chính, Số trợ lý
+  thiet_ke: {
+    id: true, title: true, group: false, status: true, priority: false,
+    progress: true, dueDate: true, ktvChinh: true, troLyCount: true,
+    description: false, vote: false, createdAt: false, updatedAt: false,
+  },
+  // CNTT: 6 cột mặc định gồm Kỹ thuật viên, Loại group (CNTT / Quét trùng lặp)
+  cntt: {
+    id: true, title: true, group: false, groupTypePill: true, status: true, priority: false,
+    progress: true, dueDate: true, kyThuatVien: true,
+    description: false, vote: false, createdAt: false, updatedAt: false,
+  },
+  // Thư ký hợp phần - Tab Tasks: thêm Liên kết HĐ (contractLink)
+  thu_ky_hp: {
+    id: true, title: true, group: true, status: true, priority: false,
+    progress: true, dueDate: true, assignee: true, contractLink: true,
+    description: false, vote: false, createdAt: false, updatedAt: false,
+  },
+  // Quản trị / Audit toàn hệ thống: hiện Group cột + đầy đủ tracking
+  admin_audit: {
+    id: true, title: true, group: true, status: true, priority: true,
+    progress: true, assignee: true, dueDate: true, createdAt: true, updatedAt: true,
+  },
+};
+
+/* =========================================================================
+ * [G5-P0] hasGroupPermission predicate — 1 nguồn sự thật thay cho 5 bản
+ * copy ở (cv-chung, bien-tap, thiet-ke, cntt, thu-ky-hop-phan).
+ *
+ * Lưu ý: Trả về true BẤT KỲ khi role là ADMIN hoặc MANAGER (giống pattern
+ * hiện tại trong thiet-ke.tsx & cntt.tsx).
+ * ========================================================================= */
+
+export interface GroupPermissionInput {
+  role: string;                // VD: "admin" | "manager" | "employee" (hoặc UserRole enum string)
+  userId?: string | number;
+  displayName?: string;
+  /** Mã group code được phép (không dấu, không space). VD: ["thietke", "cntt"] */
+  allowedGroupCodes?: string[];
+  /** Tên group tiếng Việt cho phép (có dấu). VD: ["Thiết kế", "CNTT", "Quét trùng lặp"] */
+  allowedGroupNames?: string[];
+  /** Roles cộng tác viên được phép. VD: ["thiet_ke_lead", "secretary"] */
+  allowedRoleCodes?: string[];
+  /** Danh sách groups user đang có (từ auth useAuth user.groups[]) */
+  userGroups?: Array<{ name?: string | null; code?: string | null }>;
+  /** Danh sách roles user đang có (từ auth useAuth user.roles[]) */
+  userRoles?: Array<{ name?: string | null; code?: string | null }>;
+}
+
+function normalizeLike(str: string): string {
+  return String(str ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .trim();
+}
+
+export function hasGroupPermission(input: GroupPermissionInput): boolean {
+  const r = String(input.role ?? "").trim().toUpperCase();
+  // ADMIN / MANAGER luôn pass
+  if (r === "ADMIN" || r === "MANAGER") return true;
+
+  // Nếu có allowedRoleCodes & user.roles khớp -> pass
+  if (input.allowedRoleCodes && input.allowedRoleCodes.length > 0 && input.userRoles) {
+    const normAllowed = input.allowedRoleCodes.map(normalizeLike);
+    for (const ur of input.userRoles) {
+      const nName = normalizeLike(ur.name ?? "");
+      const nCode = normalizeLike(ur.code ?? "");
+      if (normAllowed.includes(nName) || normAllowed.includes(nCode)) return true;
+    }
+  }
+
+  // Match group code hoặc name
+  const hasGroupMatch =
+    (input.allowedGroupCodes?.length ?? 0) + (input.allowedGroupNames?.length ?? 0) === 0
+      ? true
+      : (input.userGroups ?? []).some((g) => {
+          const nCode = normalizeLike(g.code ?? "");
+          const nName = normalizeLike(g.name ?? "");
+          const byCode = (input.allowedGroupCodes ?? []).some(
+            (c) => normalizeLike(c) === nCode || nCode.includes(normalizeLike(c)),
+          );
+          const byName = (input.allowedGroupNames ?? []).some(
+            (name) => normalizeLike(name) === nName || nName.includes(normalizeLike(name)),
+          );
+          return byCode || byName;
+        });
+  return hasGroupMatch;
+}
+

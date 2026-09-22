@@ -2,12 +2,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { useI18n } from "@/hooks/use-i18n";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatDateDDMMYYYY } from "@/lib/utils";
 import { Workflow, BienTapWorkflowHelpers, BienTapStageType, StageStatus } from "@shared/workflow";
-import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Pencil, Trash2, Copy as CopyIcon } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Pencil, Trash2, Copy as CopyIcon, Settings2 } from "lucide-react";
+import { EmptyStateCTA } from "@/components/ui/empty-state-cta";
+import { useState, useEffect } from "react";
 
 export type TaskSortColumn =
   | "id"
@@ -101,6 +105,14 @@ interface TaskTableProps {
   };
   getPriorityColor?: (priority: string) => string;
   getStatusColor?: (status: string) => string;
+  /** Optional: khi 0 task, hiển thị CTA tạo công việc mới */
+  onCreateNew?: () => void;
+  /** Optional: khi 0 task do bộ lọc, hiển thị nút xóa bộ lọc */
+  onResetFilters?: () => void;
+  /** Optional: localStorage key để lưu trạng thái hiển thị cột */
+  columnStorageKey?: string;
+  /** Optional: override nhãn cho các cột trong column picker */
+  columnLabelOverrides?: Partial<Record<keyof NonNullable<TaskTableProps["columns"]> | "customColumns", string>>;
 }
 
 function getBienTapRoundType(task: TaskWithAssignmentDetails): string | null {
@@ -169,7 +181,11 @@ export function TaskTable({
   onSort,
   actions,
   getPriorityColor,
-  getStatusColor 
+  getStatusColor,
+  onCreateNew,
+  onResetFilters,
+  columnStorageKey,
+  columnLabelOverrides,
 }: TaskTableProps) {
   const { t, language } = useI18n();
   const isMobile = useIsMobile();
@@ -370,6 +386,60 @@ export function TaskTable({
     ...columns,
   };
 
+  // Initialize default column visibility
+  const getDefaultVisibility = (): Record<string, boolean> => {
+    const baseKeys = ["id", "title", "group", "assignee", "priority", "status", "dueDate", "progress", "receivedDate", "actualCompletedAt", "vote"];
+    const visibility: Record<string, boolean> = {};
+    baseKeys.forEach((key) => {
+      visibility[key] = defaultColumns[key as keyof typeof defaultColumns] !== false;
+    });
+    if (defaultColumns.customColumns) {
+      defaultColumns.customColumns.forEach((col) => {
+        visibility[`custom-${col.key}`] = true;
+      });
+    }
+    return visibility;
+  };
+
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(getDefaultVisibility);
+  const [defaultVisibility] = useState<Record<string, boolean>>(getDefaultVisibility);
+
+  // Read from localStorage on mount if columnStorageKey is provided
+  useEffect(() => {
+    if (columnStorageKey) {
+      try {
+        const stored = localStorage.getItem(`task-columns-${columnStorageKey}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setColumnVisibility((prev) => ({ ...prev, ...parsed }));
+        }
+      } catch (e) {
+        console.error("Failed to read column visibility from localStorage", e);
+      }
+    }
+  }, [columnStorageKey]);
+
+  // Write to localStorage when columnVisibility changes
+  useEffect(() => {
+    if (columnStorageKey) {
+      try {
+        localStorage.setItem(`task-columns-${columnStorageKey}`, JSON.stringify(columnVisibility));
+      } catch (e) {
+        console.error("Failed to write column visibility to localStorage", e);
+      }
+    }
+  }, [columnVisibility, columnStorageKey]);
+
+  // Helper to check if a column is visible (both default and user-selected)
+  const isColumnVisible = (key: string): boolean => {
+    return columnVisibility[key] !== false;
+  };
+
+  // Reset column visibility to defaults
+  const resetColumnVisibility = () => {
+    setColumnVisibility(getDefaultVisibility());
+  };
+
   const defaultGetPriorityColor = (priority: string) => {
     switch (priority) {
       case 'Critical': return 'bg-red-100 text-red-700';
@@ -411,14 +481,38 @@ export function TaskTable({
     (defaultColumns.actualCompletedAt ? 1 : 0) +
     (defaultColumns.vote ? 1 : 0);
   const customColumnCount = defaultColumns.customColumns?.length || 0;
+
+  // Calculate visible column counts based on user selection (do NOT mutate original counts)
+  const visibleBaseColumnCount =
+    (defaultColumns.id !== false && isColumnVisible("id") ? 1 : 0) +
+    (defaultColumns.title !== false && isColumnVisible("title") ? 1 : 0) +
+    (defaultColumns.group !== false && isColumnVisible("group") ? 1 : 0) +
+    (defaultColumns.assignee !== false && isColumnVisible("assignee") ? 1 : 0) +
+    (defaultColumns.priority !== false && isColumnVisible("priority") ? 1 : 0) +
+    (defaultColumns.status !== false && isColumnVisible("status") ? 1 : 0) +
+    (defaultColumns.dueDate !== false && isColumnVisible("dueDate") ? 1 : 0) +
+    (defaultColumns.progress !== false && isColumnVisible("progress") ? 1 : 0) +
+    (defaultColumns.receivedDate !== false && isColumnVisible("receivedDate") ? 1 : 0) +
+    (defaultColumns.actualCompletedAt !== false && isColumnVisible("actualCompletedAt") ? 1 : 0) +
+    (defaultColumns.vote !== false && isColumnVisible("vote") ? 1 : 0);
+  const visibleCustomColumnCount =
+    defaultColumns.customColumns?.filter((col) => isColumnVisible(`custom-${col.key}`)).length || 0;
+
+  // Calculate left position for title column based on visible id column
+  const visibleTitleColumnLeft =
+    defaultColumns.id !== false && isColumnVisible("id") ? 80 : 0;
   
   if (isMobile) {
     return (
       <div className="w-full space-y-3">
         {tasks.length === 0 ? (
-          <div className="rounded-lg border border-border/50 bg-card p-6 text-center text-sm text-muted-foreground">
-            {t.dashboard.noTasksFound}
-          </div>
+          <EmptyStateCTA
+            variant="default"
+            illustration="scroll"
+            onCreateNew={onCreateNew}
+            onResetFilters={onResetFilters}
+            title={t.dashboard.noTasksFound}
+          />
         ) : (
           tasks.map((task) => {
             const statusLabel =
@@ -459,15 +553,15 @@ export function TaskTable({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      {defaultColumns.id && (
+                      {defaultColumns.id !== false && isColumnVisible("id") && (
                         <span className="font-mono text-[11px] text-muted-foreground">#{task.id}</span>
                       )}
-                      {defaultColumns.group && task.group && (
+                      {defaultColumns.group !== false && isColumnVisible("group") && task.group && (
                         <Badge variant="secondary" className="font-normal text-[11px]">
                           {task.group}
                         </Badge>
                       )}
-                      {defaultColumns.dueDate && (
+                      {defaultColumns.dueDate !== false && isColumnVisible("dueDate") && (
                         <span className="text-[11px] text-muted-foreground whitespace-nowrap">
                           {formatDateDDMMYYYY(task.dueDate) || "—"}
                         </span>
@@ -487,7 +581,7 @@ export function TaskTable({
                     )}
                   </div>
 
-                  {defaultColumns.status && (
+                  {defaultColumns.status !== false && isColumnVisible("status") && (
                     <Badge
                       variant="outline"
                       className={`shrink-0 font-normal border ${statusColorFn(task.status)}`}
@@ -498,19 +592,19 @@ export function TaskTable({
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {defaultColumns.priority && (
+                  {defaultColumns.priority !== false && isColumnVisible("priority") && (
                     <Badge variant="outline" className={`font-normal border-0 ${priorityColorFn(task.priority)}`}>
                       {priorityLabel}
                     </Badge>
                   )}
-                  {defaultColumns.vote && (
+                  {defaultColumns.vote !== false && isColumnVisible("vote") && (
                     <span className="text-xs text-muted-foreground">{getVoteLabel((task as any).vote)}</span>
                   )}
                 </div>
 
-                {defaultColumns.assignee && <div className="mt-3">{renderAssigneeContent(task)}</div>}
+                {defaultColumns.assignee !== false && isColumnVisible("assignee") && <div className="mt-3">{renderAssigneeContent(task)}</div>}
 
-                {defaultColumns.progress && (
+                {defaultColumns.progress !== false && isColumnVisible("progress") && (
                   <div className="mt-3 flex items-center gap-2">
                     <Progress value={progressValue} className="h-2 flex-1" />
                     <span className="text-xs text-muted-foreground w-10 text-right tabular-nums">
@@ -572,322 +666,440 @@ export function TaskTable({
     );
   }
 
+  const columnPickerLabel = (t.dashboard.columnPicker as string) ?? (language === "vi" ? "Cột" : "Columns");
+  const columnPickerDefaultsLabel = (t.dashboard.columnPickerDefaults as string) ?? (language === "vi" ? "Mặc định" : "Defaults");
+
+  const getColumnLabel = (key: string, defaultLabel: string): string => {
+    if (columnLabelOverrides) {
+      const overrideKey = key as keyof typeof columnLabelOverrides;
+      if (columnLabelOverrides[overrideKey]) {
+        return columnLabelOverrides[overrideKey]!;
+      }
+    }
+    return defaultLabel;
+  };
+
   return (
-    <div className="relative w-full overflow-auto max-h-[calc(100dvh-300px)]">
-      <table className="w-full caption-bottom text-sm border-collapse">
-        <thead className="[&_tr]:border-b sticky top-0 z-20">
-          <tr className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm">
-            {defaultColumns.id && (
-              <SortableHead
-                label="ID"
-                column="id"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] min-w-[80px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-              />
-            )}
-            {defaultColumns.title && (
-              <SortableHead
-                label={t.task.title}
-                column="title"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[25%] min-w-[200px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                style={{ left: `${titleColumnLeft}px` }}
-              />
-            )}
-            {defaultColumns.group && (
-              <SortableHead
-                label={t.task.group}
-                column="group"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
-              />
-            )}
-            {defaultColumns.assignee && (
-              <SortableHead
-                label={t.task.assignee}
-                column="assignee"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[260px] min-w-[220px]"
-              />
-            )}
-            {defaultColumns.priority && (
-              <SortableHead
-                label={t.task.priority}
-                column="priority"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
-              />
-            )}
-            {defaultColumns.status && (
-              <SortableHead
-                label={t.task.status}
-                column="status"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
-              />
-            )}
-            {defaultColumns.dueDate && (
-              <SortableHead
-                label={t.task.dueDate}
-                column="dueDate"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
-              />
-            )}
-            {defaultColumns.progress && (
-              <SortableHead
-                label={t.task.progress}
-                column="progress"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[15%]"
-              />
-            )}
-            {defaultColumns.receivedDate && (
-              <SortableHead
-                label={language === "vi" ? "Ngày nhận công việc" : "Received"}
-                column="receivedDate"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
-                title={language === "vi" ? "Ngày đầu tiên nhận công việc trong số các nhân sự" : "Earliest received date among assignees"}
-              />
-            )}
-            {defaultColumns.actualCompletedAt && (
-              <SortableHead
-                label={language === "vi" ? "Ngày hoàn thành thực tế" : "Completed"}
-                column="actualCompletedAt"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
-              />
-            )}
-            {defaultColumns.vote && (
-              <SortableHead
-                label={language === "vi" ? "Đánh giá" : "Evaluation"}
-                column="vote"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
-              />
-            )}
-            {defaultColumns.customColumns?.map((col) => {
-              const sortColumn =
-                col.sortKey ??
-                (col.key === "createdAt" || col.key === "updatedAt"
-                  ? (col.key as TaskSortColumn)
-                  : null);
-              if (col.sortable && sortColumn) {
-                return (
-                  <SortableHead
-                    key={col.key}
-                    label={col.label}
-                    column={sortColumn}
-                    sortBy={sortBy}
-                    sortDir={sortDir}
-                    onSort={onSort}
-                    className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
-                  />
-                );
-              }
-              return (
-                <th
-                  key={col.key}
-                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+    <div className="w-full">
+      <div className="flex justify-end mb-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Settings2 className="w-4 h-4 mr-1.5" />
+              {columnPickerLabel}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[280px] p-0" align="end">
+            <div className="flex items-center justify-between p-3 border-b">
+              <span className="font-medium text-sm">{columnPickerLabel}</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetColumnVisibility}
+                  className="h-7 px-2 text-xs"
                 >
-                  {col.label}
-                </th>
-              );
-            })}
-            {hasActions && (
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px]"></th>
-            )}
-          </tr>
-        </thead>
-        <tbody className="[&_tr:last-child]:border-0">
-          {tasks.length === 0 ? (
-            <tr className="border-b transition-colors">
-              <td 
-                colSpan={
-                  baseColumnCount +
-                  customColumnCount +
-                  (hasActions ? 1 : 0)
-                } 
-                className="p-4 align-middle h-32 text-center text-muted-foreground"
-              >
-                {t.dashboard.noTasksFound}
-              </td>
-            </tr>
-          ) : (
-            tasks.map((task) => (
-              <tr 
-                key={task.id} 
-                className="border-b transition-colors cursor-pointer hover:bg-muted/30"
-                onClick={() => onTaskClick(task)}
-              >
-                {defaultColumns.id && (
-                  <td className="p-4 align-middle font-mono text-xs text-muted-foreground sticky left-0 z-10 bg-card border-r border-border/50 min-w-[80px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
-                    {task.id}
-                  </td>
-                )}
-                {defaultColumns.title && (
-                  <td 
-                    className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[200px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                    style={{ left: `${titleColumnLeft}px` }}
+                  {columnPickerDefaultsLabel}
+                </Button>
+              </div>
+            </div>
+            <div className="max-h-[380px] overflow-y-auto p-2 space-y-1">
+              {[
+                { key: "id", label: getColumnLabel("id", "ID") },
+                { key: "title", label: getColumnLabel("title", t.task.title) },
+                { key: "group", label: getColumnLabel("group", t.task.group) },
+                { key: "assignee", label: getColumnLabel("assignee", t.task.assignee) },
+                { key: "priority", label: getColumnLabel("priority", t.task.priority) },
+                { key: "status", label: getColumnLabel("status", t.task.status) },
+                { key: "dueDate", label: getColumnLabel("dueDate", t.task.dueDate) },
+                { key: "progress", label: getColumnLabel("progress", t.task.progress) },
+                { key: "receivedDate", label: getColumnLabel("receivedDate", language === "vi" ? "Ngày nhận công việc" : "Received") },
+                { key: "actualCompletedAt", label: getColumnLabel("actualCompletedAt", language === "vi" ? "Ngày hoàn thành thực tế" : "Completed") },
+                { key: "vote", label: getColumnLabel("vote", language === "vi" ? "Đánh giá" : "Evaluation") },
+              ].map(({ key, label }) => {
+                if (defaultColumns[key as keyof typeof defaultColumns] === false) return null;
+                return (
+                  <div key={key} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50">
+                    <Checkbox
+                      id={`col-${key}`}
+                      checked={isColumnVisible(key)}
+                      onCheckedChange={(checked) => {
+                        setColumnVisibility((prev) => ({
+                          ...prev,
+                          [key]: checked === true,
+                        }));
+                      }}
+                    />
+                    <label
+                      htmlFor={`col-${key}`}
+                      className="text-sm cursor-pointer flex-1 select-none"
+                    >
+                      {label}
+                    </label>
+                  </div>
+                );
+              })}
+              {defaultColumns.customColumns && defaultColumns.customColumns.length > 0 && (
+                <>
+                  {columnLabelOverrides?.customColumns && (
+                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground mt-2">
+                      {columnLabelOverrides.customColumns}
+                    </div>
+                  )}
+                  {defaultColumns.customColumns.map((col) => (
+                    <div key={`custom-${col.key}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50">
+                      <Checkbox
+                        id={`col-custom-${col.key}`}
+                        checked={isColumnVisible(`custom-${col.key}`)}
+                        onCheckedChange={(checked) => {
+                          setColumnVisibility((prev) => ({
+                            ...prev,
+                            [`custom-${col.key}`]: checked === true,
+                          }));
+                        }}
+                      />
+                      <label
+                        htmlFor={`col-custom-${col.key}`}
+                        className="text-sm cursor-pointer flex-1 select-none"
+                      >
+                        {col.label}
+                      </label>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      <div className="sticky-table-thead relative w-full overflow-auto max-h-[calc(100dvh-300px)]">
+        <table className="w-full caption-bottom text-sm border-collapse">
+          <thead className="[&_tr]:border-b sticky top-0 z-20">
+            <tr className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm">
+              {defaultColumns.id !== false && isColumnVisible("id") && (
+                <SortableHead
+                  label="ID"
+                  column="id"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] min-w-[80px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                />
+              )}
+              {defaultColumns.title !== false && isColumnVisible("title") && (
+                <SortableHead
+                  label={t.task.title}
+                  column="title"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[25%] min-w-[200px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                  style={{ left: `${visibleTitleColumnLeft}px` }}
+                />
+              )}
+              {defaultColumns.group !== false && isColumnVisible("group") && (
+                <SortableHead
+                  label={t.task.group}
+                  column="group"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                />
+              )}
+              {defaultColumns.assignee !== false && isColumnVisible("assignee") && (
+                <SortableHead
+                  label={t.task.assignee}
+                  column="assignee"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[260px] min-w-[220px]"
+                />
+              )}
+              {defaultColumns.priority !== false && isColumnVisible("priority") && (
+                <SortableHead
+                  label={t.task.priority}
+                  column="priority"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                />
+              )}
+              {defaultColumns.status !== false && isColumnVisible("status") && (
+                <SortableHead
+                  label={t.task.status}
+                  column="status"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                />
+              )}
+              {defaultColumns.dueDate !== false && isColumnVisible("dueDate") && (
+                <SortableHead
+                  label={t.task.dueDate}
+                  column="dueDate"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                />
+              )}
+              {defaultColumns.progress !== false && isColumnVisible("progress") && (
+                <SortableHead
+                  label={t.task.progress}
+                  column="progress"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[15%]"
+                />
+              )}
+              {defaultColumns.receivedDate !== false && isColumnVisible("receivedDate") && (
+                <SortableHead
+                  label={language === "vi" ? "Ngày nhận công việc" : "Received"}
+                  column="receivedDate"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
+                  title={language === "vi" ? "Ngày đầu tiên nhận công việc trong số các nhân sự" : "Earliest received date among assignees"}
+                />
+              )}
+              {defaultColumns.actualCompletedAt !== false && isColumnVisible("actualCompletedAt") && (
+                <SortableHead
+                  label={language === "vi" ? "Ngày hoàn thành thực tế" : "Completed"}
+                  column="actualCompletedAt"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
+                />
+              )}
+              {defaultColumns.vote !== false && isColumnVisible("vote") && (
+                <SortableHead
+                  label={language === "vi" ? "Đánh giá" : "Evaluation"}
+                  column="vote"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                />
+              )}
+              {defaultColumns.customColumns?.map((col) => {
+                if (!isColumnVisible(`custom-${col.key}`)) return null;
+                const sortColumn =
+                  col.sortKey ??
+                  (col.key === "createdAt" || col.key === "updatedAt"
+                    ? (col.key as TaskSortColumn)
+                    : null);
+                if (col.sortable && sortColumn) {
+                  return (
+                    <SortableHead
+                      key={col.key}
+                      label={col.label}
+                      column={sortColumn}
+                      sortBy={sortBy}
+                      sortDir={sortDir}
+                      onSort={onSort}
+                      className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
+                    />
+                  );
+                }
+                return (
+                  <th
+                    key={col.key}
+                    className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
                   >
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-medium text-sm">{task.title}</span>
-                      {getBienTapRoundType(task) && (
-                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                          {t.task.roundTypeLabel}: {getBienTapRoundType(task)}
-                        </span>
-                      )}
-                      {task.description && (
-                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                          {task.description}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                )}
-                {defaultColumns.group && (
-                  <td className="p-4 align-middle">
-                    {task.group ? (
-                      <Badge variant="secondary" className="font-normal text-xs">
-                        {task.group}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-xs italic">-</span>
-                    )}
-                  </td>
-                )}
-                {defaultColumns.assignee && renderAssigneeCell(task)}
-                {defaultColumns.priority && (
-                  <td className="p-4 align-middle">
-                    <Badge variant="outline" className={`font-normal border-0 ${priorityColorFn(task.priority)}`}>
-                      {task.priority === 'Low' ? t.priority.low :
-                       task.priority === 'Medium' ? t.priority.medium :
-                       task.priority === 'High' ? t.priority.high :
-                       task.priority === 'Critical' ? t.priority.critical : task.priority}
-                    </Badge>
-                  </td>
-                )}
-                {defaultColumns.status && (
-                  <td className="p-4 align-middle">
-                    <Badge variant="outline" className={`font-normal border ${statusColorFn(task.status)}`}>
-                      {task.status === 'Not Started' ? t.status.notStarted :
-                       task.status === 'In Progress' ? t.status.inProgress :
-                       task.status === 'Completed' ? t.status.completed :
-                       task.status === 'Pending' ? t.status.pending : 
-                       task.status === 'Cancelled' ? t.status.cancelled : task.status}
-                    </Badge>
-                  </td>
-                )}
-                {defaultColumns.dueDate && (
-                  <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
-                    {formatDateDDMMYYYY(task.dueDate) || "-"}
-                  </td>
-                )}
-                {defaultColumns.progress && renderProgressCell(task)}
-                {defaultColumns.receivedDate && (
-                  <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
-                    {formatDateDDMMYYYY((task as TaskWithAssignmentDetails & { receivedAt?: string | Date | null }).receivedAt) || "—"}
-                  </td>
-                )}
-                {defaultColumns.actualCompletedAt && (
-                  <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
-                    {formatDateDDMMYYYY(task.actualCompletedAt) || "—"}
-                  </td>
-                )}
-                {defaultColumns.vote && (
-                  <td className="p-4 align-middle text-sm">
-                    {getVoteLabel((task as TaskWithAssignmentDetails & { vote?: string | null }).vote)}
-                  </td>
-                )}
-                {defaultColumns.customColumns?.map((col) => (
-                  <td key={col.key} className="p-4 align-middle">
-                    {col.render(task)}
-                  </td>
-                ))}
-                {hasActions && (
-                  <td className="p-4 align-middle">
-                    <div className="flex items-center gap-1">
-                      {actions?.onView && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            actions.onView?.(task);
-                          }}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {actions?.onDuplicate && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            actions.onDuplicate?.(task);
-                          }}
-                          title={language === "vi" ? "Tạo bản sao công việc" : "Duplicate task"}
-                        >
-                          <CopyIcon className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {actions?.onEdit && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            actions.onEdit?.(task);
-                          }}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {actions?.onDelete && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            actions.onDelete?.(task);
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                )}
+                    {col.label}
+                  </th>
+                );
+              })}
+              {hasActions && (
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px]"></th>
+              )}
+            </tr>
+          </thead>
+          <tbody className="[&_tr:last-child]:border-0">
+            {tasks.length === 0 ? (
+              <tr className="border-b transition-colors">
+                <td 
+                  colSpan={
+                    visibleBaseColumnCount +
+                    visibleCustomColumnCount +
+                    (hasActions ? 1 : 0)
+                  } 
+                  className="p-4 align-middle"
+                >
+                  <EmptyStateCTA
+                    variant="default"
+                    illustration="scroll"
+                    onCreateNew={onCreateNew}
+                    onResetFilters={onResetFilters}
+                    title={t.dashboard.noTasksFound}
+                    className="!py-6 !px-4 sm:!p-6 border-0 !bg-transparent"
+                  />
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              tasks.map((task) => (
+                <tr 
+                  key={task.id} 
+                  className="border-b transition-colors cursor-pointer hover:bg-muted/30"
+                  onClick={() => onTaskClick(task)}
+                >
+                  {defaultColumns.id !== false && isColumnVisible("id") && (
+                    <td className="p-4 align-middle font-mono text-xs text-muted-foreground sticky left-0 z-10 bg-card border-r border-border/50 min-w-[80px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
+                      {task.id}
+                    </td>
+                  )}
+                  {defaultColumns.title !== false && isColumnVisible("title") && (
+                    <td 
+                      className="p-4 align-middle sticky z-10 bg-card border-r border-border/50 min-w-[200px] shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                      style={{ left: `${visibleTitleColumnLeft}px` }}
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-medium text-sm">{task.title}</span>
+                        {getBienTapRoundType(task) && (
+                          <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            {t.task.roundTypeLabel}: {getBienTapRoundType(task)}
+                          </span>
+                        )}
+                        {task.description && (
+                          <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            {task.description}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                  {defaultColumns.group !== false && isColumnVisible("group") && (
+                    <td className="p-4 align-middle">
+                      {task.group ? (
+                        <Badge variant="secondary" className="font-normal text-xs">
+                          {task.group}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs italic">-</span>
+                      )}
+                    </td>
+                  )}
+                  {defaultColumns.assignee !== false && isColumnVisible("assignee") && renderAssigneeCell(task)}
+                  {defaultColumns.priority !== false && isColumnVisible("priority") && (
+                    <td className="p-4 align-middle">
+                      <Badge variant="outline" className={`font-normal border-0 ${priorityColorFn(task.priority)}`}>
+                        {task.priority === 'Low' ? t.priority.low :
+                         task.priority === 'Medium' ? t.priority.medium :
+                         task.priority === 'High' ? t.priority.high :
+                         task.priority === 'Critical' ? t.priority.critical : task.priority}
+                      </Badge>
+                    </td>
+                  )}
+                  {defaultColumns.status !== false && isColumnVisible("status") && (
+                    <td className="p-4 align-middle">
+                      <Badge variant="outline" className={`font-normal border ${statusColorFn(task.status)}`}>
+                        {task.status === 'Not Started' ? t.status.notStarted :
+                         task.status === 'In Progress' ? t.status.inProgress :
+                         task.status === 'Completed' ? t.status.completed :
+                         task.status === 'Pending' ? t.status.pending : 
+                         task.status === 'Cancelled' ? t.status.cancelled : task.status}
+                      </Badge>
+                    </td>
+                  )}
+                  {defaultColumns.dueDate !== false && isColumnVisible("dueDate") && (
+                    <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDateDDMMYYYY(task.dueDate) || "-"}
+                    </td>
+                  )}
+                  {defaultColumns.progress !== false && isColumnVisible("progress") && renderProgressCell(task)}
+                  {defaultColumns.receivedDate !== false && isColumnVisible("receivedDate") && (
+                    <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDateDDMMYYYY((task as TaskWithAssignmentDetails & { receivedAt?: string | Date | null }).receivedAt) || "—"}
+                    </td>
+                  )}
+                  {defaultColumns.actualCompletedAt !== false && isColumnVisible("actualCompletedAt") && (
+                    <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDateDDMMYYYY(task.actualCompletedAt) || "—"}
+                    </td>
+                  )}
+                  {defaultColumns.vote !== false && isColumnVisible("vote") && (
+                    <td className="p-4 align-middle text-sm">
+                      {getVoteLabel((task as TaskWithAssignmentDetails & { vote?: string | null }).vote)}
+                    </td>
+                  )}
+                  {defaultColumns.customColumns?.map((col) => {
+                    if (!isColumnVisible(`custom-${col.key}`)) return null;
+                    return (
+                      <td key={col.key} className="p-4 align-middle">
+                        {col.render(task)}
+                      </td>
+                    );
+                  })}
+                  {hasActions && (
+                    <td className="p-4 align-middle">
+                      <div className="flex items-center gap-1">
+                        {actions?.onView && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              actions.onView?.(task);
+                            }}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {actions?.onDuplicate && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              actions.onDuplicate?.(task);
+                            }}
+                            title={language === "vi" ? "Tạo bản sao công việc" : "Duplicate task"}
+                          >
+                            <CopyIcon className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {actions?.onEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              actions.onEdit?.(task);
+                            }}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {actions?.onDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              actions.onDelete?.(task);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
   subMonths,
   subWeeks,
 } from "date-fns";
-import { vi } from "date-fns/locale";
+import { enUS, vi } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 
@@ -24,6 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Switch } from "@/components/ui/switch";
+import { EmptyStateCTA } from "@/components/ui/empty-state-cta";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateTask } from "@/hooks/use-tasks";
@@ -299,6 +300,10 @@ export interface TaskCalendarViewProps {
   onTaskClick: (task: TaskWithAssignmentDetails) => void;
   getPriorityColor?: (priority: string) => string;
   getStatusColor?: (status: string) => string;
+  /** Optional: khi 0 task, hiển thị CTA tạo công việc mới */
+  onCreateNew?: () => void;
+  /** Optional: khi 0 task do bộ lọc, hiển thị nút xóa bộ lọc */
+  onResetFilters?: () => void;
 }
 
 export function TaskCalendarView({
@@ -306,10 +311,15 @@ export function TaskCalendarView({
   onTaskClick,
   getPriorityColor = () => "bg-slate-100 text-slate-700",
   getStatusColor = () => "bg-slate-100 text-slate-700",
+  onCreateNew,
+  onResetFilters,
 }: TaskCalendarViewProps) {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const { toast } = useToast();
   const { mutate: updateTask, isPending: isUpdating } = useUpdateTask();
+
+  const dateFnsLocale = language === "vi" ? vi : enUS;
+  const dateFnsLangOpts = { locale: dateFnsLocale };
 
   const [dateField, setDateField] = useState<DateField>("dueDate");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
@@ -686,8 +696,8 @@ export function TaskCalendarView({
     const y = monthStart.getFullYear();
     return language === "vi"
       ? `Tháng ${m}, ${y}`
-      : format(monthStart, "MMMM yyyy");
-  }, [calendarView, selectedDate, weekStart, language, monthStart]);
+      : format(monthStart, "MMMM yyyy", dateFnsLangOpts);
+  }, [calendarView, selectedDate, weekStart, language, monthStart, dateFnsLangOpts]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-4">
@@ -695,7 +705,8 @@ export function TaskCalendarView({
         <Card className="border border-border shadow-sm overflow-hidden">
           <CardHeader className="py-3 px-4 border-b border-border bg-background">
             <CardTitle className="text-sm font-semibold">
-              {language === "vi" ? "Tháng" : "Month"}
+              {t.dashboard.viewCalendarMonth ??
+                (language === "vi" ? "Tháng" : "Month")}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-2">
@@ -707,7 +718,7 @@ export function TaskCalendarView({
               onMonthChange={(m) => setSelectedDate(m)}
               showOutsideDays
               weekStartsOn={1}
-              locale={language === "vi" ? vi : undefined}
+              locale={dateFnsLocale}
               captionLayout="buttons"
               classNames={{
                 months: "flex flex-col",
@@ -741,7 +752,8 @@ export function TaskCalendarView({
         <Card className="border border-border shadow-sm overflow-hidden">
           <CardHeader className="py-3 px-4 border-b border-border bg-background">
             <CardTitle className="text-sm font-semibold">
-              {language === "vi" ? "Chi tiết trong ngày" : "Day details"}
+              {t.dashboard.calendarDayDetails ??
+                (language === "vi" ? "Chi tiết trong ngày" : "Day details")}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -751,15 +763,30 @@ export function TaskCalendarView({
               </div>
               <div className="text-xs text-muted-foreground">
                 {tasksInSelectedDate.length}{" "}
-                {language === "vi" ? "công việc" : "tasks"}
+                {t.dashboard.calendarTasksNoun ??
+                  (language === "vi" ? "công việc" : "tasks")}
               </div>
             </div>
             <ScrollArea className="h-[320px]">
               <div className="p-3 space-y-2">
                 {tasksInSelectedDate.length === 0 ? (
-                  <div className="text-sm text-muted-foreground text-center py-8">
-                    {language === "vi" ? "Không có công việc." : "No tasks."}
-                  </div>
+                  <EmptyStateCTA
+                    variant="compact"
+                    illustration="calendar"
+                    onCreateNew={onCreateNew}
+                    onResetFilters={onResetFilters}
+                    title={
+                      language === "vi"
+                        ? "Không có công việc"
+                        : "No tasks"
+                    }
+                    subtitle={
+                      language === "vi"
+                        ? "Ngày này chưa có công việc. Tạo công việc mới hoặc đổi ngày khác."
+                        : "No tasks on this day. Try creating one or pick another day."
+                    }
+                    className="border-0 !bg-transparent !p-2"
+                  />
                 ) : (
                   tasksInSelectedDate.map((task) => {
                     const dateKey =
@@ -1112,14 +1139,16 @@ export function TaskCalendarView({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="text-sm font-semibold">
-                {language === "vi" ? "Lịch" : "Calendar"}
+                {t.dashboard.calendar ??
+                  (language === "vi" ? "Lịch" : "Calendar")}
               </div>
               <Button
                 type="button"
                 variant="outline"
                 className="h-9"
                 onClick={() => setSelectedDate(new Date())}>
-                {language === "vi" ? "Hôm nay" : "Today"}
+                {t.dashboard.calendarToday ??
+                  (language === "vi" ? "Hôm nay" : "Today")}
               </Button>
               <div className="flex items-center">
                 <Button
@@ -1153,6 +1182,48 @@ export function TaskCalendarView({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => {
+                  const u = new URL(
+                    "https://calendar.google.com/calendar/u/0/r",
+                  );
+                  if (calendarView === "day" && selectedDateKey) {
+                    const dt = dateKeyToLocalDate(selectedDateKey);
+                    if (dt) {
+                      u.pathname = "/calendar/u/0/r/day";
+                      u.searchParams.set(
+                        "date",
+                        format(dt, "yyyyMMdd"),
+                      );
+                    }
+                  } else if (calendarView === "week") {
+                    const dt = weekStart;
+                    u.pathname = "/calendar/u/0/r/week";
+                    u.searchParams.set("date", format(dt, "yyyyMMdd"));
+                  } else {
+                    const dt = monthStart;
+                    u.pathname = "/calendar/u/0/r/month";
+                    u.searchParams.set("date", format(dt, "yyyyMMdd"));
+                  }
+                  window.open(u.toString(), "_blank", "noopener,noreferrer");
+                }}>
+                <ExternalLink className="h-4 w-4 mr-1.5" />
+                <span className="text-xs sm:text-sm">
+                  {calendarView === "week"
+                    ? t.dashboard.calendarOpenWeekInGcal ??
+                      (language === "vi" ? "Mở tuần này" : "Open this week")
+                    : calendarView === "month"
+                    ? t.dashboard.calendarOpenMonthInGcal ??
+                      (language === "vi" ? "Mở tháng này" : "Open this month")
+                    : t.dashboard.calendarDayDetails ??
+                      (language === "vi" ? "Mở đúng ngày" : "Open selected day")}
+                </span>
+              </Button>
+
               <ToggleGroup
                 type="single"
                 value={calendarView}
@@ -1164,21 +1235,33 @@ export function TaskCalendarView({
                 className="bg-muted/30 rounded-full p-1 border border-border/60">
                 <ToggleGroupItem
                   value="month"
-                  aria-label="Month"
+                  aria-label={
+                    t.dashboard.viewCalendarMonth ??
+                    (language === "vi" ? "Tháng" : "Month")
+                  }
                   className="rounded-full px-3">
-                  {language === "vi" ? "Tháng" : "Month"}
+                  {t.dashboard.viewCalendarMonth ??
+                    (language === "vi" ? "Tháng" : "Month")}
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="week"
-                  aria-label="Week"
+                  aria-label={
+                    t.dashboard.viewCalendarWeek ??
+                    (language === "vi" ? "Tuần" : "Week")
+                  }
                   className="rounded-full px-3">
-                  {language === "vi" ? "Tuần" : "Week"}
+                  {t.dashboard.viewCalendarWeek ??
+                    (language === "vi" ? "Tuần" : "Week")}
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="day"
-                  aria-label="Day"
+                  aria-label={
+                    t.dashboard.viewCalendarDay ??
+                    (language === "vi" ? "Ngày" : "Day")
+                  }
                   className="rounded-full px-3">
-                  {language === "vi" ? "Ngày" : "Day"}
+                  {t.dashboard.viewCalendarDay ??
+                    (language === "vi" ? "Ngày" : "Day")}
                 </ToggleGroupItem>
               </ToggleGroup>
 
@@ -1193,17 +1276,23 @@ export function TaskCalendarView({
                 className="bg-muted/30 rounded-full p-1 border border-border/60">
                 <ToggleGroupItem
                   value="dueDate"
-                  aria-label={language === "vi" ? "Theo hạn" : "By due date"}
+                  aria-label={
+                    t.dashboard.calendarByDueDate ??
+                    (language === "vi" ? "Theo hạn" : "By due date")
+                  }
                   className="rounded-full px-3">
-                  {language === "vi" ? "Theo hạn" : "Due"}
+                  {t.dashboard.calendarByDueDate ??
+                    (language === "vi" ? "Theo hạn" : "Due")}
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="receivedAt"
                   aria-label={
-                    language === "vi" ? "Theo ngày nhận" : "By received date"
+                    t.dashboard.calendarByReceivedAt ??
+                    (language === "vi" ? "Theo ngày nhận" : "By received date")
                   }
                   className="rounded-full px-3">
-                  {language === "vi" ? "Ngày nhận" : "Received"}
+                  {t.dashboard.calendarByReceivedAt ??
+                    (language === "vi" ? "Ngày nhận" : "Received")}
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
@@ -1223,7 +1312,7 @@ export function TaskCalendarView({
                 onMonthChange={(m) => setSelectedDate(m)}
                 showOutsideDays
                 weekStartsOn={1}
-                locale={language === "vi" ? vi : undefined}
+                locale={dateFnsLocale}
                 captionLayout="buttons"
                 modifiers={modifiers}
                 className="p-2"
@@ -1300,8 +1389,8 @@ export function TaskCalendarView({
                                   setCalendarView("day");
                                 }}>
                                 {language === "vi"
-                                  ? `${count - 3} mục khác`
-                                  : `${count - 3} more`}
+                                  ? `${count - 3} ${t.dashboard.calendarMoreOthers ?? "mục khác"}`
+                                  : `${count - 3} ${t.dashboard.calendarMoreOthers ?? "more"}`}
                               </button>
                             ) : null}
                           </div>
@@ -1325,9 +1414,7 @@ export function TaskCalendarView({
                         key={d.toISOString()}
                         className="px-1 flex items-center gap-2">
                         <div className="text-[11px] font-medium text-muted-foreground">
-                          {language === "vi"
-                            ? format(d, "EEE")
-                            : format(d, "EEE")}
+                          {format(d, "EEE", dateFnsLangOpts)}
                         </div>
                         <div
                           className={cn(
@@ -1378,7 +1465,8 @@ export function TaskCalendarView({
                         <div className="p-2 space-y-1">
                           {list.length === 0 ? (
                             <div className="text-xs text-muted-foreground px-1 py-2">
-                              {language === "vi" ? "Trống" : "Empty"}
+                              {t.dashboard.calendarEmptyColumn ??
+                                (language === "vi" ? "Trống" : "Empty")}
                             </div>
                           ) : (
                             list
@@ -1395,8 +1483,8 @@ export function TaskCalendarView({
                           {list.length > 8 ? (
                             <div className="text-xs text-muted-foreground px-1 py-1">
                               {language === "vi"
-                                ? `+${list.length - 8} công việc`
-                                : `+${list.length - 8} tasks`}
+                                ? `+${list.length - 8} ${t.dashboard.calendarMoreTasks ?? "công việc"}`
+                                : `+${list.length - 8} ${t.dashboard.calendarMoreTasks ?? "tasks"}`}
                             </div>
                           ) : null}
                         </div>
@@ -1414,22 +1502,30 @@ export function TaskCalendarView({
                     <div className="font-medium">
                       {selectedDate
                         ? language === "vi"
-                          ? format(selectedDate, "EEEE dd/MM/yyyy")
-                          : format(selectedDate, "EEEE MMM dd, yyyy")
+                          ? format(selectedDate, "EEEE dd/MM/yyyy", dateFnsLangOpts)
+                          : format(selectedDate, "EEEE MMM dd, yyyy", dateFnsLangOpts)
                         : "—"}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {tasksInSelectedDate.length}{" "}
-                      {language === "vi" ? "công việc" : "tasks"}
+                      {t.dashboard.calendarTasksNoun ??
+                        (language === "vi" ? "công việc" : "tasks")}
                     </div>
                   </div>
                   <div className="p-3 space-y-2">
                     {tasksInSelectedDate.length === 0 ? (
-                      <div className="text-sm text-muted-foreground text-center py-8">
-                        {language === "vi"
-                          ? "Không có công việc."
-                          : "No tasks."}
-                      </div>
+                      <EmptyStateCTA
+                        variant="compact"
+                        illustration="calendar"
+                        onCreateNew={onCreateNew}
+                        onResetFilters={onResetFilters}
+                        title={
+                          language === "vi"
+                            ? "Không có công việc"
+                            : "No tasks"
+                        }
+                        className="border-0 !bg-transparent !p-2"
+                      />
                     ) : (
                       tasksInSelectedDate.map((t) => (
                         <DraggableTaskChip

@@ -4,7 +4,7 @@ import { useTasks } from "@/hooks/use-tasks";
 import { useUsers } from "@/hooks/use-works-and-components";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { CardGridSkeleton } from "@/components/ui/skeletons";
 import { api } from "@shared/routes";
 
 function normalizeDisplayName(s: string) {
@@ -148,11 +148,7 @@ export default function Team() {
   }, [tasks, users, language]);
 
   if (isLoading) {
-    return (
-      <div className="h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <CardGridSkeleton cards={6} withHeader cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" />;
   }
 
   return (

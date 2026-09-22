@@ -1,5 +1,4 @@
-import { useMemo, useState } from "react";
-import * as XLSX from "xlsx";
+import { useCallback, useMemo, useState } from "react";
 import {
   useTasks,
   useRefreshTasks,
@@ -10,6 +9,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
+import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import {
   useWorks,
   useComponents,
@@ -21,18 +21,9 @@ import {
   toggleTaskStatsBadgeInFilters,
 } from "@/components/task-stats";
 import { TaskDialog } from "@/components/task-dialog";
-import {
-  TaskTable,
-  sortTasks,
-  type TaskSortColumn,
-} from "@/components/task-table";
+import { TaskTable } from "@/components/task-table";
 import { TaskKanbanBoard } from "@/components/task-kanban-board";
-import {
-  TaskFilters,
-  getDefaultTaskFilters,
-  applyTaskFilters,
-  type TaskFilterState,
-} from "@/components/task-filters";
+import { TaskFilters } from "@/components/task-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +40,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Loader2,
   RefreshCw,
   Search,
   AlertTriangle,
@@ -57,13 +47,14 @@ import {
   LayoutGrid,
   List,
 } from "lucide-react";
+import { TaskTableSkeleton } from "@/components/ui/skeletons";
 import { Task } from "@shared/schema";
 import type { TaskWithAssignmentDetails as TTask } from "@shared/schema";
 import { format } from "date-fns";
 import {
-  normalizeSearch,
-  buildExportPrefix,
-  formatDateDDMMYYYY,
+  exportTasksToExcel,
+  getTaskStatusColor,
+  getTaskPriorityColor,
 } from "@/lib/utils";
 
 function handleExportTasks(
@@ -71,193 +62,21 @@ function handleExportTasks(
   language: string,
   toast: (opts: any) => any,
 ) {
-  if (filteredTasks.length === 0) {
-    toast({
-      title: language === "vi" ? "Không có dữ liệu" : "No data",
-      description:
-        language === "vi"
-          ? "Không có công việc để xuất Excel."
-          : "No tasks to export.",
-    });
-    return;
-  }
-
-  const viStatus = (s: string | null | undefined): string => {
-    switch (s) {
-      case "Not Started":
-        return "Chưa bắt đầu";
-      case "In Progress":
-        return "Đang thực hiện";
-      case "Completed":
-        return "Hoàn thành";
-      case "Pending":
-        return "Tạm dừng";
-      case "Cancelled":
-        return "Đã hủy";
-      default:
-        return s ?? "";
-    }
-  };
-  const viPriority = (p: string | null | undefined): string => {
-    switch (p) {
-      case "Critical":
-        return "Khẩn cấp";
-      case "High":
-        return "Cao";
-      case "Medium":
-        return "Trung bình";
-      case "Low":
-        return "Thấp";
-      default:
-        return p ?? "";
-    }
-  };
-  const viVote = (v: string | null | undefined): string => {
-    if (!v) return "";
-    const s = v.toLowerCase();
-    if (s === "tot") return "Hoàn thành tốt";
-    if (s === "kha") return "Hoàn thành khá";
-    if (s === "khong_tot") return "Không tốt";
-    if (s === "khong_hoan_thanh") return "Không hoàn thành";
-    return v;
-  };
-  const getAssignmentLabel = (stageType: string): string => {
-    if (stageType === "kiem_soat") return "Người kiểm soát";
-    if (stageType.startsWith("nhan_su_"))
-      return "Nhân sự " + stageType.replace("nhan_su_", "");
-    if (stageType === "primary") return "Người thực hiện";
-    if (stageType === "ktv_chinh") return "KTV chính";
-    return stageType;
-  };
-
-  const headers = [
-    "ID",
-    "Tiêu đề",
-    "Nhóm",
-    "Trạng thái",
-    "Mức độ ưu tiên",
-    "Tiến độ (%)",
-    "Mô tả",
-    "Đánh giá",
-    "Nhân sự",
-    "Ngày nhận công việc",
-    "Hạn hoàn thành",
-    "Ngày hoàn thành thực tế",
-    "Ghi chú",
-    "Ngày tạo",
-    "Ngày cập nhật",
-  ];
-  const sheetData: any[][] = [headers];
-  const rowBlocks: Array<{ startRow: number; height: number }> = [];
-
-  filteredTasks.forEach((task) => {
-    const assignments = Array.isArray(task.assignments) ? task.assignments : [];
-    const persons: Array<{
-      label: string;
-      name: string;
-      received: string;
-      due: string;
-      completed: string;
-    }> = [];
-    assignments.forEach((a: any) => {
-      persons.push({
-        label: getAssignmentLabel(a.stageType || ""),
-        name: a.displayName ?? a.userId ?? "",
-        received: formatDateDDMMYYYY(a.receivedAt as any),
-        due: formatDateDDMMYYYY(a.dueDate as any),
-        completed: formatDateDDMMYYYY(a.completedAt as any),
-      });
-    });
-    if (persons.length === 0) {
-      persons.push({
-        label: "",
-        name: "",
-        received: "",
-        due: "",
-        completed: "",
-      });
-    }
-
-    const startRow = sheetData.length + 1;
-    rowBlocks.push({ startRow, height: persons.length });
-
-    persons.forEach((p) => {
-      sheetData.push([
-        task.id,
-        task.title ?? "",
-        task.group ?? "",
-        viStatus(task.status),
-        viPriority(task.priority),
-        typeof task.progress === "number" ? task.progress : "",
-        task.description ?? "",
-        viVote((task as any).vote),
-        (p.label ? `${p.label}: ` : "") + (p.name || ""),
-        p.received,
-        p.due,
-        p.completed,
-        (task as any).notes ?? "",
-        formatDateDDMMYYYY(task.createdAt as any),
-        formatDateDDMMYYYY(task.updatedAt as any),
-      ]);
-    });
+  const noData = language === "vi" ? "Không có dữ liệu" : "No data";
+  const noDesc = language === "vi"
+    ? "Không có công việc để xuất Excel."
+    : "No tasks to export.";
+  const result = exportTasksToExcel(filteredTasks, {
+    fileNameSuffix: "CV_Chung_Tasks",
+    localize: { noDataTitle: noData, noDataDesc: noDesc },
   });
-
-  const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-  const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
-  const mergeColsShared = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14];
-  rowBlocks.forEach((blk) => {
-    if (blk.height <= 1) return;
-    const startR0 = blk.startRow - 1;
-    const endR0 = startR0 + blk.height - 1;
-    mergeColsShared.forEach((c) => {
-      worksheet["!merges"] = worksheet["!merges"] || [];
-      worksheet["!merges"].push({ s: { r: startR0, c }, e: { r: endR0, c } });
-    });
-  });
-  for (let C = range.s.c; C <= range.e.c; ++C) {
-    const addr = XLSX.utils.encode_cell({ r: 0, c: C });
-    const cell = worksheet[addr];
-    if (cell) {
-      cell.s = {
-        font: { bold: true },
-        alignment: { horizontal: "center", vertical: "center", wrapText: true },
-        border: {
-          top: { style: "thin" },
-          bottom: { style: "thin" },
-          left: { style: "thin" },
-          right: { style: "thin" },
-        },
-      };
-    }
+  if (!result.ok) {
+    toast({ title: noData, description: noDesc });
   }
-  const dateCols = [9, 10, 11, 13, 14];
-  for (let R = 1; R <= range.e.r; ++R) {
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const addr = XLSX.utils.encode_cell({ r: R, c: C });
-      const cell = worksheet[addr];
-      if (!cell) continue;
-      const isDate = dateCols.includes(C);
-      cell.s = {
-        alignment: {
-          horizontal: isDate ? "center" : "left",
-          vertical: "center",
-          wrapText: true,
-        },
-        border: {
-          top: { style: "thin" },
-          bottom: { style: "thin" },
-          left: { style: "thin" },
-          right: { style: "thin" },
-        },
-      };
-    }
-  }
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
-
-  const prefix = buildExportPrefix();
-  XLSX.writeFile(workbook, `${prefix}_CV_Chung_Tasks.xlsx`);
 }
+
+const getTaskStatusBadgeClass = (s: string) => getTaskStatusColor(s).badge;
+const getTaskPriorityBadgeClass = (p: string) => getTaskPriorityColor(p).badge;
 
 export default function CVChungPage() {
   const { data: tasks, isLoading, isError } = useTasks();
@@ -270,24 +89,16 @@ export default function CVChungPage() {
   const { t, language } = useI18n();
   const { toast } = useToast();
 
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<TaskFilterState>(
-    getDefaultTaskFilters,
-  );
-  const [sortBy, setSortBy] = useState<TaskSortColumn | null>("receivedDate");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedTask, setSelectedTask] = useState<TTask | null>(null);
   const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
   const [deleteTaskConfirmOpen, setDeleteTaskConfirmOpen] = useState(false);
   const [deleteTaskTarget, setDeleteTaskTarget] = useState<TTask | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
   const { data: works = [] } = useWorks();
   const { data: components = [] } = useComponents();
   const { data: users = [] } = useTaskFilterStaffUsers();
 
-  const worksForFilter = useMemo(() => works, [works]);
   const stages = useMemo(
     () =>
       Array.from(
@@ -300,173 +111,48 @@ export default function CVChungPage() {
     [components],
   );
 
-  // Filter tasks for "Công việc chung" group only (DB có thể lưu "CV chung" hoặc "Công việc chung")
-  const CV_CHUNG_GROUP_NAMES = ["Công việc chung", "CV chung"];
   const datasetForList = includeArchivedForList ? tasksAll : tasks;
+  const INCLUDED_GROUPS = ["Công việc chung", "CV chung"];
 
-  const yearOptions = useMemo(() => {
-    if (!datasetForList) return [];
-    let list = datasetForList.filter(
-      (t) => t.group && CV_CHUNG_GROUP_NAMES.includes(t.group),
-    );
-    if (role === UserRole.EMPLOYEE) {
-      const uid = user?.id ?? null;
-      if (uid) {
-        list = list.filter(
-          (t) =>
-            (t as any).createdBy === uid ||
-            t.assigneeId === uid ||
-            (Array.isArray(t.assignments)
-              ? t.assignments.some((a: any) => a?.userId === uid)
-              : false),
-        );
-      } else {
-        const exact = (user?.displayName ?? "").trim();
-        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
-      }
-    }
-    const years = new Set<string>();
-    for (const t of list) {
-      const r = (t as any).receivedAt ?? null;
-      const s =
-        typeof r === "string"
-          ? r.slice(0, 10)
-          : r instanceof Date
-            ? r.toISOString().slice(0, 10)
-            : "";
-      const y = s ? s.slice(0, 4) : "";
-      if (y) years.add(y);
-    }
-    return Array.from(years).sort((a, b) => Number(b) - Number(a));
-  }, [datasetForList, role, user?.id, user?.displayName]);
-
-  const filteredTasks = useMemo(() => {
-    if (!datasetForList) return [];
-    let list = datasetForList.filter(
-      (t) => t.group && CV_CHUNG_GROUP_NAMES.includes(t.group),
-    );
-
-    if (role === UserRole.EMPLOYEE) {
-      const uid = user?.id ?? null;
-      if (uid) {
-        list = list.filter(
-          (t) =>
-            (t as any).createdBy === uid ||
-            t.assigneeId === uid ||
-            (Array.isArray(t.assignments)
-              ? t.assignments.some((a: any) => a?.userId === uid)
-              : false),
-        );
-      } else {
-        const exact = (user?.displayName ?? "").trim();
-        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
-      }
-    }
-
-    if (search.trim()) {
-      const q = normalizeSearch(search.trim());
-      list = list.filter(
-        (t) =>
-          normalizeSearch(t.title ?? "").includes(q) ||
-          normalizeSearch(t.description ?? "").includes(q) ||
-          normalizeSearch(t.assignee ?? "").includes(q) ||
-          normalizeSearch(t.id ?? "").includes(q),
-      );
-    }
-
-    list = applyTaskFilters(list, filters, worksForFilter);
-    return sortTasks(list, sortBy, sortDir);
-  }, [
-    datasetForList,
-    role,
-    user?.displayName,
+  const {
     search,
+    setSearch,
     filters,
-    worksForFilter,
+    setFilters,
     sortBy,
     sortDir,
-  ]);
-  const tasksForStats = useMemo(() => {
-    if (!datasetForList) return [];
-    let list = datasetForList.filter(
-      (t) => t.group && CV_CHUNG_GROUP_NAMES.includes(t.group),
-    );
-    if (role === UserRole.EMPLOYEE) {
-      const uid = user?.id ?? null;
-      if (uid) {
-        list = list.filter(
-          (t) =>
-            (t as any).createdBy === uid ||
-            t.assigneeId === uid ||
-            (Array.isArray(t.assignments)
-              ? t.assignments.some((a: any) => a?.userId === uid)
-              : false),
-        );
-      } else {
-        const exact = (user?.displayName ?? "").trim();
-        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
-      }
-    }
-    if (search.trim()) {
-      const q = normalizeSearch(search.trim());
-      list = list.filter(
-        (t) =>
-          normalizeSearch(t.title ?? "").includes(q) ||
-          normalizeSearch(t.description ?? "").includes(q) ||
-          normalizeSearch(t.assignee ?? "").includes(q) ||
-          normalizeSearch(t.id ?? "").includes(q),
-      );
-    }
-    const filtersForStats: TaskFilterState = { ...filters, status: "all", vote: "all" };
-    return applyTaskFilters(list, filtersForStats, worksForFilter);
-  }, [datasetForList, role, user?.id, user?.displayName, search, filters, worksForFilter]);
+    handleSort,
+    viewMode,
+    setViewMode,
+    filteredTasks,
+    tasksForStats,
+    availableYears,
+  } = useTaskListControls({
+    tasks: datasetForList,
+    role,
+    userId: user?.id,
+    userDisplayName: user?.displayName,
+    works,
+    includedGroups: INCLUDED_GROUPS,
+  });
+  const yearOptions = availableYears;
+
   const activeStatsKey = useMemo(
     () => getTaskStatsBadgeKeyFromFilters(filters),
     [filters.status, filters.vote],
   );
 
-  const handleSort = (column: TaskSortColumn) => {
-    setSortBy((prev) => {
-      if (prev === column) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-      else setSortDir("asc");
-      return column;
-    });
-  };
+  const getPriorityColor = getTaskPriorityBadgeClass;
+  const getStatusColor = getTaskStatusBadgeClass;
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "High":
-        return "bg-orange-100 text-orange-700 hover:bg-orange-100/80";
-      case "Critical":
-        return "bg-red-100 text-red-700 hover:bg-red-100/80";
-      case "Medium":
-        return "bg-blue-100 text-blue-700 hover:bg-blue-100/80";
-      default:
-        return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
-    }
-  };
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return "bg-green-100 text-green-700 hover:bg-green-100/80";
-      case "In Progress":
-        return "bg-blue-50 text-blue-700 hover:bg-blue-50/80 border-blue-200";
-      case "Pending":
-        return "bg-amber-100 text-amber-700 hover:bg-amber-100/80";
-      case "Cancelled":
-        return "bg-red-100 text-red-700 hover:bg-red-100/80";
-      default:
-        return "bg-slate-100 text-slate-700 hover:bg-slate-100/80";
-    }
-  };
+  const handleCreateNew = useCallback(() => setIsCreateDialogOpen(true), []);
+  const handleResetFilters = useCallback(() => {
+    setSearch("");
+    setFilters({ status: "all", vote: "all" } as any);
+  }, [setSearch, setFilters]);
 
   if (isLoading) {
-    return (
-      <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-muted-foreground font-medium">{t.common.loading}</p>
-      </div>
-    );
+    return <TaskTableSkeleton />;
   }
 
   if (isError) {
@@ -623,6 +309,8 @@ export default function CVChungPage() {
             onSort={handleSort}
             getPriorityColor={getPriorityColor}
             getStatusColor={getStatusColor}
+            onCreateNew={handleCreateNew}
+            onResetFilters={handleResetFilters}
             actions={{
               onView: (task) => {
                 setSelectedTask(task);
@@ -637,6 +325,7 @@ export default function CVChungPage() {
                 setDeleteTaskConfirmOpen(true);
               },
             }}
+            columnStorageKey="cv-chung"
             columns={{
               id: true,
               title: true,
@@ -661,6 +350,8 @@ export default function CVChungPage() {
             getPriorityColor={getPriorityColor}
             getStatusColor={getStatusColor}
             noGroupLabel={language === "vi" ? "(Không nhóm)" : "(No group)"}
+            onCreateNew={handleCreateNew}
+            onResetFilters={handleResetFilters}
           />
         )}
       </section>

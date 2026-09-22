@@ -6,6 +6,12 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,7 +54,7 @@ import {
   maxDateString,
 } from "@/lib/utils";
 import React, { useEffect, useMemo, useState } from "react";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, FileText, Users, Link2, History } from "lucide-react";
 import {
   Tooltip,
   TooltipTrigger,
@@ -2621,9 +2627,30 @@ export function TaskDialog({
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="overflow-y-auto flex-1 min-h-0 px-6 pb-4 space-y-6">
-            <div className="space-y-2">
-              <Label>{t.task.title} *</Label>
+          <div className="overflow-y-auto flex-1 min-h-0 px-6 pb-4 space-y-0">
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-4 gap-1 w-full">
+                <TabsTrigger value="overview" className="flex items-center justify-center gap-1.5">
+                  <FileText className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Tổng quan</span>
+                </TabsTrigger>
+                <TabsTrigger value="assignments" className="flex items-center justify-center gap-1.5">
+                  <Users className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Phân công & Quy trình</span>
+                </TabsTrigger>
+                <TabsTrigger value="links" className="flex items-center justify-center gap-1.5">
+                  <Link2 className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Liên kết</span>
+                </TabsTrigger>
+                <TabsTrigger value="summary" className="flex items-center justify-center gap-1.5">
+                  <History className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Tổng kết</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="mt-0 space-y-6">
+                <div className="space-y-2">
+                  <Label>{t.task.title} *</Label>
               <Input
                 {...form.register("title")}
                 placeholder={t.task.title + "..."}
@@ -2735,8 +2762,11 @@ export function TaskDialog({
               </div>
             </div>
 
-            {/* Liên kết tài liệu dịch thuật: Biên tập, Công việc chung, Thiết kế, CNTT */}
-            {isWorkLinkGroup && (
+              </TabsContent>
+
+              <TabsContent value="links" className="mt-0 space-y-6">
+                {/* Liên kết tài liệu dịch thuật: Biên tập, Công việc chung, Thiết kế, CNTT */}
+                {isWorkLinkGroup && (
               <div className="space-y-4 pt-4 border-t border-border/50">
                 <h3 className="text-base font-semibold">
                   Thông tin của tài liệu dịch thuật
@@ -2797,10 +2827,12 @@ export function TaskDialog({
                   )}
                 </div>
               </div>
-            )}
+              )}
+              </TabsContent>
 
-            {/* Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần: nhiều nhân sự (Nhân sự 1, 2, ... Người kiểm soát) */}
-            {(form.watch("group") === "Công việc chung" ||
+              <TabsContent value="assignments" className="mt-0 space-y-6">
+                {/* Công việc chung / CNTT / Quét trùng lặp / Thư ký hợp phần: nhiều nhân sự (Nhân sự 1, 2, ... Người kiểm soát) */}
+                {(form.watch("group") === "Công việc chung" ||
               form.watch("group") === "CNTT" ||
               form.watch("group") === "Quét trùng lặp" ||
               form.watch("group") === "Thư ký hợp phần") && (
@@ -4370,10 +4402,12 @@ export function TaskDialog({
                   })()}
                 </div>
               </div>
-            ) : null}
+              ) : null}
+              </TabsContent>
 
-            <div className="space-y-4 pt-4 border-t border-border/50">
-              {(() => {
+              <TabsContent value="summary" className="mt-0 space-y-6">
+                <div className="space-y-4 pt-4 border-t border-border/50">
+                  {(() => {
                 const group = form.watch("group");
                 let value = 0;
                 if (group === "Biên tập") {
@@ -4450,7 +4484,9 @@ export function TaskDialog({
                   }
                 />
               </div>
-            </div>
+              </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           <DialogFooter className="flex justify-between shrink-0 px-6 py-4 border-t bg-muted/30">

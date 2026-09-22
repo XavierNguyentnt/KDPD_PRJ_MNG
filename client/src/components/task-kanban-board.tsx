@@ -18,11 +18,22 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useI18n } from "@/hooks/use-i18n";
 import { useUpdateTask } from "@/hooks/use-tasks";
 import { useToast } from "@/hooks/use-toast";
-import { formatDateDDMMYYYY } from "@/lib/utils";
-import { GripVertical, Loader2 } from "lucide-react";
+import { formatDateDDMMYYYY, cn } from "@/lib/utils";
+import { AlertTriangle, GripVertical, Loader2 } from "lucide-react";
+import { EmptyStateCTA } from "@/components/ui/empty-state-cta";
 
 const COLUMN_PREFIX = "status-column-";
 const TASK_PREFIX = "task-";
+
+const DEFAULT_WIP_LIMITS: Readonly<Record<string, number>> = {
+  "Not Started": Infinity,
+  "In Progress": 8,
+  Pending: 5,
+  Completed: Infinity,
+  Cancelled: Infinity,
+};
+
+export type WipLimitMap = Record<string, number>;
 
 export interface TaskKanbanBoardProps {
   tasks: TaskWithAssignmentDetails[];
@@ -31,6 +42,12 @@ export interface TaskKanbanBoardProps {
   getStatusColor?: (status: string) => string;
   /** Nhóm hiển thị dưới dạng "Không nhóm" khi task.group rỗng */
   noGroupLabel?: string;
+  /** Override WIP limit cho từng status. Status không khai báo dùng DEFAULT_WIP_LIMITS hoặc Infinity. */
+  wipLimits?: Partial<WipLimitMap>;
+  /** Optional: khi 0 task, hiển thị CTA tạo công việc mới */
+  onCreateNew?: () => void;
+  /** Optional: khi 0 task do bộ lọc, hiển thị nút xóa bộ lọc */
+  onResetFilters?: () => void;
 }
 
 export function TaskKanbanBoard({
@@ -39,6 +56,9 @@ export function TaskKanbanBoard({
   getPriorityColor = () => "bg-slate-100 text-slate-700",
   getStatusColor = () => "bg-slate-100 text-slate-700",
   noGroupLabel = "(Không nhóm)",
+  wipLimits,
+  onCreateNew,
+  onResetFilters,
 }: TaskKanbanBoardProps) {
   const { t, language } = useI18n();
   const { mutate: updateTask, isPending: isUpdating } = useUpdateTask();
@@ -49,6 +69,16 @@ export function TaskKanbanBoard({
     () => ["Not Started", "In Progress", "Completed", "Pending", "Cancelled"],
     [],
   );
+
+  const effectiveWipLimits = useMemo<WipLimitMap>(() => {
+    const merged: WipLimitMap = { ...DEFAULT_WIP_LIMITS };
+    const overrides = wipLimits ?? {};
+    for (const key of Object.keys(overrides)) {
+      const v = overrides[key];
+      if (typeof v === "number") merged[key] = v;
+    }
+    return merged;
+  }, [wipLimits]);
 
   const getStatusLabel = useCallback(
     (status: string) => {
@@ -62,6 +92,14 @@ export function TaskKanbanBoard({
       return map[status] ?? status;
     },
     [t],
+  );
+
+  const getWipLimit = useCallback(
+    (status: string): number => {
+      if (status in effectiveWipLimits) return effectiveWipLimits[status]!;
+      return Infinity;
+    },
+    [effectiveWipLimits],
   );
 
   const columns = useMemo(() => {
@@ -121,6 +159,25 @@ export function TaskKanbanBoard({
         );
         const task = tasks.find((x) => x.id === taskId);
         if (!task || task.status === targetStatus) return;
+        const targetTasks =
+          columns.find(([s]) => s === targetStatus)?.[1] ?? [];
+        const willCount =
+          targetTasks.filter((x) => x.id !== taskId).length + 1;
+        const limit = getWipLimit(targetStatus);
+        if (Number.isFinite(limit) && willCount > limit) {
+          toast({
+            variant: "destructive",
+            title:
+              t.common.error ??
+              (language === "vi" ? "Cảnh báo" : "Warning"),
+            description:
+              language === "vi"
+                ? `Cột "${getStatusLabel(targetStatus)}" đã đạt WIP limit ${limit}. Không thể thêm công việc mới.`
+                : `Column "${targetStatus}" would exceed WIP limit of ${limit}. Move rejected.`,
+            duration: 6000,
+          });
+          return;
+        }
         updateTask(
           { id: taskId, status: targetStatus },
           {
@@ -144,7 +201,7 @@ export function TaskKanbanBoard({
         );
       }
     },
-    [tasks, updateTask, toast, t, language],
+    [tasks, columns, updateTask, toast, t, language, getWipLimit, getStatusLabel],
   );
 
   const handleTaskClick = useCallback(
@@ -155,15 +212,16 @@ export function TaskKanbanBoard({
     [onTaskClick],
   );
 
-  // Hiển thị đầy đủ 5 cột trạng thái ngay cả khi chưa có công việc ở một số cột
   const hasAnyTask = tasks.length > 0;
   if (!hasAnyTask) {
     return (
-      <div className="flex items-center justify-center rounded-lg border border-border bg-muted/20 min-h-[320px] p-8">
-        <p className="text-sm text-muted-foreground">
-          {t.dashboard.noTasksFound}
-        </p>
-      </div>
+      <EmptyStateCTA
+        variant="default"
+        illustration="kanban"
+        onCreateNew={onCreateNew}
+        onResetFilters={onResetFilters}
+        title={t.dashboard.noTasksFound}
+      />
     );
   }
 
@@ -177,6 +235,11 @@ export function TaskKanbanBoard({
         <div className="flex gap-4 p-4 min-h-[420px]">
           {columns.map(([statusName, columnTasks]) => {
             const columnId = COLUMN_PREFIX + encodeURIComponent(statusName);
+            const wipLimit = getWipLimit(statusName);
+            const count = columnTasks.length;
+            const overWip = Number.isFinite(wipLimit) && count > wipLimit;
+            const atWip =
+              !overWip && Number.isFinite(wipLimit) && count === wipLimit;
             return (
               <KanbanColumn
                 key={columnId}
@@ -187,6 +250,10 @@ export function TaskKanbanBoard({
                 getPriorityColor={getPriorityColor}
                 getStatusColor={getStatusColor}
                 isUpdating={isUpdating}
+                count={count}
+                wipLimit={wipLimit}
+                overWip={overWip}
+                atWip={atWip}
               />
             );
           })}
@@ -205,6 +272,10 @@ function KanbanColumn({
   getPriorityColor,
   getStatusColor,
   isUpdating,
+  count,
+  wipLimit,
+  overWip,
+  atWip,
 }: {
   id: string;
   title: string;
@@ -213,22 +284,74 @@ function KanbanColumn({
   getPriorityColor: (p: string) => string;
   getStatusColor: (s: string) => string;
   isUpdating: boolean;
+  count: number;
+  wipLimit: number;
+  overWip: boolean;
+  atWip: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  const hasWip = Number.isFinite(wipLimit);
+  const wipText = hasWip ? `${count} / ${wipLimit}` : String(count);
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex-shrink-0 w-[300px] rounded-lg border-2 bg-muted/30 transition-colors ${
-        isOver ? "border-primary bg-primary/5" : "border-border"
-      }`}>
-      <div className="p-3 border-b border-border flex items-center justify-between">
-        <span className="font-semibold text-sm">{title}</span>
-        <Badge variant="secondary" className="text-xs">
-          {tasks.length}
+      className={cn(
+        "flex-shrink-0 w-[300px] rounded-lg border-2 transition-colors",
+        isOver && !overWip && "border-primary bg-primary/5",
+        isOver && overWip && "border-destructive bg-destructive/5",
+        !isOver && overWip && "border-destructive/60 bg-destructive/[0.04]",
+        !isOver && atWip && "border-accent/60 bg-accent/5",
+        !isOver && !overWip && !atWip && "border-border bg-muted/30",
+      )}>
+      <div
+        className={cn(
+          "p-3 border-b flex items-center justify-between gap-2",
+          overWip
+            ? "border-destructive/30 bg-destructive/[0.05]"
+            : atWip
+            ? "border-accent/30 bg-accent/[0.05]"
+            : "border-border",
+        )}>
+        <div className="flex items-center gap-2 min-w-0">
+          {overWip ? (
+            <AlertTriangle
+              className="w-4 h-4 text-destructive shrink-0"
+              strokeWidth={2.2}
+            />
+          ) : atWip ? (
+            <AlertTriangle
+              className="w-4 h-4 text-accent shrink-0 opacity-85"
+              strokeWidth={2.0}
+            />
+          ) : null}
+          <span className="font-semibold text-sm truncate">{title}</span>
+        </div>
+        <Badge
+          className={cn(
+            "text-xs shrink-0 tabular-nums border",
+            overWip
+              ? "bg-destructive text-destructive-foreground border-destructive/40 shadow-sm"
+              : atWip
+              ? "bg-accent/15 text-accent-foreground border-accent/40"
+              : "bg-secondary text-secondary-foreground border-transparent",
+          )}>
+          {wipText}
         </Badge>
       </div>
       <div className="p-2 min-h-[320px] flex flex-col gap-2">
+        {hasWip && overWip && (
+          <div className="flex items-center gap-1.5 rounded-md bg-destructive/10 border border-destructive/20 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+            <span>Vượt WIP limit. Không thể thêm công việc.</span>
+          </div>
+        )}
+        {hasWip && !overWip && atWip && (
+          <div className="flex items-center gap-1.5 rounded-md bg-accent/10 border border-accent/20 px-2.5 py-1.5 text-[11px] font-medium text-accent-foreground">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+            <span>Đạt WIP limit. Cân nhắc hoàn thành trước.</span>
+          </div>
+        )}
         {isUpdating && (
           <div className="flex items-center justify-center py-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mr-2" />

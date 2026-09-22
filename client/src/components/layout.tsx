@@ -65,6 +65,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import EmptyStateCTA from "@/components/ui/empty-state-cta";
 import {
   Select,
   SelectContent,
@@ -141,7 +142,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   );
   const [hasFocusedCurrent, setHasFocusedCurrent] = useState(false);
 
-  // Refs for click outside detection
+  // Refs for layout structure
   const sidebarRef = useRef<HTMLElement>(null);
   const mainContentRef = useRef<HTMLElement>(null);
 
@@ -157,37 +158,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // Auto-hide sidebar when clicking on main content (desktop only)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Only on desktop (md and up) and when sidebar is open
-      if (window.innerWidth >= 768 && sidebarOpen) {
-        const target = event.target as HTMLElement;
-        // Check if click is outside sidebar and inside main content
-        if (
-          sidebarRef.current &&
-          mainContentRef.current &&
-          !sidebarRef.current.contains(target) &&
-          mainContentRef.current.contains(target)
-        ) {
-          // Don't hide if clicking on interactive elements (buttons, dropdowns, links, etc.)
-          const isInteractiveElement = target.closest(
-            'button, [role="button"], a, input, select, textarea, [role="menu"], [role="menuitem"], [role="dialog"], [role="combobox"]',
-          );
-          // Don't hide if clicking on header area (where menu button is)
-          const isHeaderArea = target.closest("header");
-          if (!isInteractiveElement && !isHeaderArea) {
-            setSidebarOpen(false);
-          }
-        }
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [sidebarOpen]);
+  // [G3 REMOVED] Sidebar tự đóng khi click outside đã bị loại bỏ.
+  // Lý do: Cản người dùng khi muốn mở rộng sidebar làm việc dài hạn.
 
   useEffect(() => {
     const onScroll = () => {
@@ -241,7 +213,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [notifications, taskById]);
 
   const latestNotifications = useMemo(
-    () => notificationList.slice(0, 5),
+    () => notificationList.slice(0, 10),
     [notificationList],
   );
   const notificationGroups = useMemo(() => {
@@ -445,7 +417,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-colors duration-200
                       ${
                         isActive
-                          ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 shadow-sm"
+                          ? "bg-primary/12 text-primary dark:bg-primary/25 shadow-sm"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       }
                     `}>
@@ -508,7 +480,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         ref={mainContentRef}
         className="flex flex-col min-h-[100dvh] min-w-0">
         {/* Header */}
-        <header className="h-16 border-b border-border/50 bg-card/50 backdrop-blur-xl px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
+        <header className="h-16 px-4 sm:px-8 flex items-center justify-between sticky-app-header">
           <div className="flex items-center gap-4">
             {/* Mobile menu button */}
             <Button
@@ -627,10 +599,47 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t.dashboard.unreadNotification}
                   </p>
+                  <div className="flex justify-end mt-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={isMarkingAllRead || (unreadCount?.count ?? 0) === 0}
+                      onClick={() => {
+                        markAllNotificationsRead(undefined, {
+                          onSuccess: (r) => {
+                            toast({
+                              title:
+                                language === "vi"
+                                  ? "Đã đánh dấu tất cả là đã đọc"
+                                  : "Marked all as read",
+                              description:
+                                language === "vi"
+                                  ? `Đã cập nhật ${r.updated} thông báo.`
+                                  : `Updated ${r.updated} notifications.`,
+                            });
+                          },
+                          onError: (err) => {
+                            toast({
+                              title: language === "vi" ? "Thao tác thất bại" : "Failed",
+                              description:
+                                err instanceof Error ? err.message : "Failed",
+                              variant: "destructive",
+                            });
+                          },
+                        });
+                      }}>
+                      {(t.dashboard as any).markAllReadBtn ?? (language === "vi" ? "Đánh dấu tất cả đã xem" : "Mark all as read")}
+                    </Button>
+                  </div>
                 </div>
                 {latestNotifications.length === 0 ? (
-                  <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                    {t.dashboard.noTasksFound}
+                  <div className="px-3 py-4">
+                    <EmptyStateCTA
+                      variant="compact"
+                      illustration="scroll"
+                      title={(t.dashboard as any).notificationEmptyTitle ?? (language === "vi" ? "Chưa có thông báo" : "No notifications yet")}
+                    />
                   </div>
                 ) : (
                   <div className="max-h-[320px] overflow-auto">
@@ -649,9 +658,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           }}>
                           <div className="flex items-start gap-2">
                             <span
-                              className={`mt-1 h-2 w-2 rounded-full ${n.isRead ? "bg-muted-foreground/40" : "bg-amber-500"}`}
+                              className={`mt-1 h-2 w-2 rounded-full shrink-0 ${n.isRead ? "bg-muted-foreground/40" : "bg-amber-500"}`}
                             />
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium truncate">
                                 {n.title}
                               </p>
@@ -700,6 +709,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                 </p>
                               )}
                             </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0 -mt-0.5 text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (n.isRead) {
+                                  markNotificationUnread(n.id);
+                                } else {
+                                  markNotificationRead(n.id);
+                                }
+                              }}
+                              aria-label={
+                                n.isRead
+                                  ? ((t.dashboard as any).markUnreadAria ?? (language === "vi" ? "Đánh dấu chưa xem" : "Mark as unread"))
+                                  : ((t.dashboard as any).markReadAria ?? (language === "vi" ? "Đánh dấu đã xem" : "Mark as read"))
+                              }>
+                              {n.isRead ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
                           </div>
                         </button>
                       );
@@ -762,7 +795,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content — Protend-style: consistent padding, light bg for dashboard feel */}
-        <div className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/20 min-h-0 animate-enter">
+        <div className="flex-1 max-sm:p-3 sm:p-6 lg:p-8 bg-muted/20 min-h-0 animate-enter">
           {children}
         </div>
 
@@ -864,8 +897,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <div className="mt-4 max-h-[420px] overflow-auto border rounded-lg">
             {filteredNotifications.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground text-center">
-                {t.dashboard.noTasksFound}
+              <div className="p-6">
+                <EmptyStateCTA
+                  variant="compact"
+                  illustration="scroll"
+                  title={t.dashboard.notificationEmptyTitle ?? (language === "vi" ? "Chưa có thông báo" : "No notifications yet")}
+                />
               </div>
             ) : (
               <ul className="divide-y divide-border">
