@@ -228,6 +228,22 @@ export const api = {
         200: z.object({ message: z.string() }),
       },
     },
+    reorder: {
+      method: "PATCH" as const,
+      path: "/api/tasks/reorder",
+      input: z.object({
+        updates: z.array(
+          z.object({
+            id: z.string(),
+            posOrder: z.number().int(),
+          }),
+        ),
+      }),
+      responses: {
+        200: z.object({ message: z.string(), updated: z.number() }),
+        400: errorSchemas.validation,
+      },
+    },
   },
 
   notifications: {

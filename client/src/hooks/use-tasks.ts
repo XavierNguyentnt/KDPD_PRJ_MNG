@@ -195,3 +195,25 @@ export function useRefreshTasks() {
     },
   });
 }
+
+export function useReorderTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (updates: { id: string; posOrder: number }[]) => {
+      const res = await fetch(api.tasks.reorder.path, {
+        method: api.tasks.reorder.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to reorder tasks");
+      return api.tasks.reorder.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === api.tasks.list.path,
+      });
+    },
+  });
+}

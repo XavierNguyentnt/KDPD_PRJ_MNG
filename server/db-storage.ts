@@ -408,6 +408,24 @@ export async function updateTaskInDb(
   return rows[0];
 }
 
+export async function reorderTasksInDb(
+  updates: { id: string; posOrder: number }[],
+): Promise<number> {
+  if (!updates.length) return 0;
+  const dbo = requireDb();
+  const now = new Date();
+  let total = 0;
+  for (const u of updates) {
+    const rows = await dbo
+      .update(tasks)
+      .set({ posOrder: u.posOrder, updatedAt: now } as Partial<InsertTask>)
+      .where(eq(tasks.id, u.id))
+      .returning({ id: tasks.id });
+    if (rows.length) total++;
+  }
+  return total;
+}
+
 export async function deleteTaskFromDb(id: string): Promise<void> {
   const existing = await getTaskFromDbById(id);
   if (!existing) throw new Error(`Task ${id} not found`);

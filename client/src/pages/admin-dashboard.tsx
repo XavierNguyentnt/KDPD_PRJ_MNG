@@ -50,7 +50,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import AdminUsersPage from "@/pages/admin-users";
+import AdminUsersPage, {
+  type UserBadgeFilterKey,
+} from "@/pages/admin-users";
 import { GroupPageHero } from "@/components/group-page-hero";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import type {
@@ -78,6 +80,13 @@ import {
   BarChart3,
   PieChart as PieIcon,
   Sparkles,
+  UserCheck,
+  UserX,
+  ShieldCheck,
+  ClipboardList,
+  Edit3,
+  UserPlus,
+  Briefcase,
 } from "lucide-react";
 
 async function fetchTranslationContractsForAdmin(): Promise<
@@ -254,6 +263,61 @@ export default function AdminDashboardPage() {
 
   const roleColors = ["#2563eb", "#f97316", "#10b981"];
 
+  const userStats = useMemo(() => {
+    const users = allUsers.filter((u: any) => Boolean(u?.id));
+    const total = users.length;
+    const active = users.filter((u: any) => Boolean(u?.isActive)).length;
+    const inactive = total - active;
+    const isManagerUser = (u: any) =>
+      (u?.roles ?? []).some(
+        (r: any) =>
+          r?.code?.toLowerCase() === "manager" ||
+          r?.name === "Manager" ||
+          r?.name === "Quản lý" ||
+          (r?.name &&
+            (String(r.name).includes("Trưởng ban") ||
+              String(r.name).includes("Phó trưởng ban"))) ||
+          (r?.code &&
+            (String(r.code).replace(/\t/g, "").trim() === "tbtk" ||
+              String(r.code).replace(/\t/g, "").trim() === "ptbtk")),
+      );
+    const isThuKyUser = (u: any) =>
+      (u?.roles ?? []).some(
+        (r: any) =>
+          r?.code === "prj_secretary" || r?.name === "Thư ký hợp phần",
+      ) ||
+      (u?.groups ?? []).some(
+        (g: any) =>
+          g?.code === "thu_ky_hop_phan" || g?.name === "Thư ký hợp phần",
+      );
+    const isEditorUser = (u: any) =>
+      (u?.roles ?? []).some(
+        (r: any) => r?.code === "editor" || r?.name === "Biên tập viên",
+      ) ||
+      (u?.groups ?? []).some(
+        (g: any) => g?.code === "bien_tap" || g?.name === "Biên tập",
+      );
+    const isPartnerUser = (u: any) =>
+      (u?.roles ?? []).some(
+        (r: any) => r?.code === "partner" || r?.name === "Đối tác",
+      );
+    const managers = users.filter(isManagerUser).length;
+    const thuKy = users.filter(isThuKyUser).length;
+    const bienTap = users.filter(isEditorUser).length;
+    const congTacVien = users.filter(isPartnerUser).length;
+    const nhanVienDuAn = total - congTacVien;
+    return {
+      total,
+      active,
+      inactive,
+      managers,
+      thuKy,
+      bienTap,
+      congTacVien,
+      nhanVienDuAn,
+    };
+  }, [allUsers]);
+
   const recentActivity = useMemo(() => {
     const list = [...(tasks ?? [])];
     list.sort((a, b) => {
@@ -342,6 +406,10 @@ export default function AdminDashboardPage() {
     return availableGroups[0] || "Công việc chung";
   }, [availableGroups]);
 
+  const [activeTab, setActiveTab] = useState<string>("overview");
+  const [activeUserBadge, setActiveUserBadge] =
+    useState<UserBadgeFilterKey>("all");
+
   if (role !== UserRole.ADMIN) {
     return (
       <div className="p-6">
@@ -371,17 +439,154 @@ export default function AdminDashboardPage() {
         }}
       />
 
-      <section>
-        <TaskStatsBadgesOnly
-          tasks={tasksForStats}
-          activeKey={activeStatsKey}
-          onSelectKey={(key) =>
-            setFilters((prev) => toggleTaskStatsBadgeInFilters(prev, key))
-          }
-        />
-      </section>
+      {activeTab !== "users" && (
+        <section>
+          <TaskStatsBadgesOnly
+            tasks={tasksForStats}
+            activeKey={activeStatsKey}
+            onSelectKey={(key) => {
+              setActiveTab("tasks");
+              setFilters((prev) =>
+                toggleTaskStatsBadgeInFilters(prev, key),
+              );
+              window.setTimeout(
+                () =>
+                  document
+                    .getElementById("admin-task-list")
+                    ?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    }),
+                80,
+              );
+            }}
+          />
+        </section>
+      )}
 
-      <Tabs defaultValue="overview">
+      {activeTab === "users" && (
+        <section>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8 gap-4">
+            {(
+              [
+                {
+                  key: "all" as const,
+                  label: "Tổng người dùng",
+                  value: userStats.total,
+                  icon: Users,
+                  iconBg: "bg-slate-200/60",
+                  iconColor: "text-slate-700",
+                },
+                {
+                  key: "active" as const,
+                  label: "Đang hoạt động",
+                  value: userStats.active,
+                  icon: UserCheck,
+                  iconBg: "bg-emerald-200/60",
+                  iconColor: "text-emerald-700",
+                },
+                {
+                  key: "inactive" as const,
+                  label: "Không hoạt động",
+                  value: userStats.inactive,
+                  icon: UserX,
+                  iconBg: "bg-rose-200/60",
+                  iconColor: "text-rose-700",
+                },
+                {
+                  key: "staff" as const,
+                  label: "Nhân viên dự án",
+                  value: userStats.nhanVienDuAn,
+                  icon: Briefcase,
+                  iconBg: "bg-sky-200/60",
+                  iconColor: "text-sky-700",
+                },
+                {
+                  key: "manager" as const,
+                  label: "Quản lý",
+                  value: userStats.managers,
+                  icon: ShieldCheck,
+                  iconBg: "bg-indigo-200/60",
+                  iconColor: "text-indigo-700",
+                },
+                {
+                  key: "secretary" as const,
+                  label: "Thư ký hợp phần",
+                  value: userStats.thuKy,
+                  icon: ClipboardList,
+                  iconBg: "bg-amber-200/60",
+                  iconColor: "text-amber-700",
+                },
+                {
+                  key: "editor" as const,
+                  label: "Biên tập viên",
+                  value: userStats.bienTap,
+                  icon: Edit3,
+                  iconBg: "bg-blue-200/60",
+                  iconColor: "text-blue-700",
+                },
+                {
+                  key: "partner" as const,
+                  label: "Cộng tác viên",
+                  value: userStats.congTacVien,
+                  icon: UserPlus,
+                  iconBg: "bg-teal-200/60",
+                  iconColor: "text-teal-700",
+                },
+              ] as Array<{
+                key: UserBadgeFilterKey;
+                label: string;
+                value: number;
+                icon: React.ComponentType<{ className?: string }>;
+                iconBg: string;
+                iconColor: string;
+              }>
+            ).map(({ key, label, value, icon: Icon, iconBg, iconColor }) => (
+              <Card
+                key={key}
+                className={`overflow-hidden border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${
+                  activeUserBadge === key ? "ring-2 ring-primary/30" : ""
+                }`}
+                onClick={() => {
+                  const next: UserBadgeFilterKey =
+                    activeUserBadge === key ? "all" : key;
+                  setActiveTab("users");
+                  setActiveUserBadge(next);
+                  window.setTimeout(
+                    () =>
+                      document
+                        .getElementById("admin-users-card")
+                        ?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        }),
+                    80,
+                  );
+                }}>
+                <CardContent className="p-5 flex items-center gap-4">
+                  <div
+                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconBg}`}>
+                    <Icon className={`h-6 w-6 ${iconColor}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                      {label}
+                    </p>
+                    <h3 className="text-2xl font-bold tabular-nums mt-0.5">
+                      {value}
+                    </h3>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v)}
+        defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">
             <Sparkles className="h-4 w-4 mr-1.5" />
@@ -652,7 +857,7 @@ export default function AdminDashboardPage() {
         </TabsContent>
 
         <TabsContent value="tasks">
-          <section className="section-card">
+          <section id="admin-task-list" className="section-card">
             <div className="section-header">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
@@ -938,7 +1143,14 @@ export default function AdminDashboardPage() {
         </TabsContent>
 
         <TabsContent value="users">
-          <AdminUsersPage />
+          <div id="admin-users-card">
+            <AdminUsersPage
+              showBadges={false}
+              wideMode
+              badgeFilter={activeUserBadge}
+              onBadgeFilterChange={(next) => setActiveUserBadge(next)}
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

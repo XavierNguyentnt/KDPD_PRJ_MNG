@@ -241,6 +241,7 @@ export const tasks = pgTable("tasks", {
   relatedWorkId: uuid("related_work_id").references(() => works.id),
   relatedContractId: uuid("related_contract_id"),
   vote: text("vote"),
+  posOrder: integer("pos_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

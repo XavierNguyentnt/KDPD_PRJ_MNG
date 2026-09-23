@@ -319,14 +319,21 @@ export default function BienTapPage() {
             <TaskStatsBadgesOnly
               tasks={tasksForStats}
               activeKey={activeStatsKey}
-              onSelectKey={(key) =>
-                setFilters((prev) => toggleTaskStatsBadgeInFilters(prev, key))
-              }
+              onSelectKey={(key) => {
+                setFilters((prev) => toggleTaskStatsBadgeInFilters(prev, key));
+                window.setTimeout(
+                  () =>
+                    document
+                      .getElementById("bientap-task-list")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                  60,
+                );
+              }}
             />
           </section>
 
           {/* Task List */}
-          <section className="section-card">
+          <section id="bientap-task-list" className="section-card">
             <div className="section-header">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>

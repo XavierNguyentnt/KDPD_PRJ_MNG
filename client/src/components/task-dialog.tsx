@@ -55,7 +55,7 @@ import {
   maxDateString,
 } from "@/lib/utils";
 import React, { useEffect, useMemo, useState } from "react";
-import { Loader2, AlertCircle, FileText, Users, Link2, History } from "lucide-react";
+import { Loader2, AlertCircle, FileText, Users, Link2 } from "lucide-react";
 import {
   Tooltip,
   TooltipTrigger,
@@ -2630,7 +2630,7 @@ export function TaskDialog({
           className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="overflow-y-auto flex-1 min-h-0 px-6 pb-4 space-y-0">
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-4 gap-1 w-full">
+              <TabsList className="grid grid-cols-2 md:grid-cols-3 mb-4 gap-1 w-full">
                 <TabsTrigger value="overview" className="flex items-center justify-center gap-1.5">
                   <FileText className="h-4 w-4 shrink-0" />
                   <span className="truncate">Tổng quan</span>
@@ -2642,10 +2642,6 @@ export function TaskDialog({
                 <TabsTrigger value="links" className="flex items-center justify-center gap-1.5">
                   <Link2 className="h-4 w-4 shrink-0" />
                   <span className="truncate">Liên kết</span>
-                </TabsTrigger>
-                <TabsTrigger value="summary" className="flex items-center justify-center gap-1.5">
-                  <History className="h-4 w-4 shrink-0" />
-                  <span className="truncate">Tổng kết</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -2666,7 +2662,7 @@ export function TaskDialog({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <Label>{t.task.status}</Label>
                 <Select
@@ -2725,25 +2721,27 @@ export function TaskDialog({
                 form.watch("group") !== "CNTT" &&
                 form.watch("group") !== "Quét trùng lặp" &&
                 form.watch("group") !== "Thư ký hợp phần" && (
-                  <AssigneePicker
-                    label={t.task.assignee as string}
-                    value={form.watch("assignee") ?? ""}
-                    assigneeId={form.watch("assigneeId") ?? null}
-                    onChange={(assignee, assigneeId) => {
-                      form.setValue("assignee", assignee);
-                      form.setValue("assigneeId", assigneeId);
-                    }}
-                    disabled={!canEditMeta}
-                    placeholder={
-                      language === "vi"
-                        ? "Tìm theo tên hoặc email nhân sự..."
-                        : "Search by name or email..."
-                    }
-                    autoFocus={shouldFocusAssignee}
-                  />
+                  <div className="sm:col-span-2">
+                    <AssigneePicker
+                      label={t.task.assignee as string}
+                      value={form.watch("assignee") ?? ""}
+                      assigneeId={form.watch("assigneeId") ?? null}
+                      onChange={(assignee, assigneeId) => {
+                        form.setValue("assignee", assignee);
+                        form.setValue("assigneeId", assigneeId);
+                      }}
+                      disabled={!canEditMeta}
+                      placeholder={
+                        language === "vi"
+                          ? "Tìm theo tên hoặc email nhân sự..."
+                          : "Search by name or email..."
+                      }
+                      autoFocus={shouldFocusAssignee}
+                    />
+                  </div>
                 )}
 
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-2">
                 <Label>{t.task.group}</Label>
                 <Select
                   disabled={!canEditMeta || !isNewTask}
@@ -2760,6 +2758,87 @@ export function TaskDialog({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* ===== MERGED FROM TAB "Tổng kết" (Summary) ===== */}
+            <div className="space-y-4 pt-4 mt-2 border-t border-border/60">
+              {(() => {
+                const group = form.watch("group");
+                let value = 0;
+                if (group === "Biên tập") {
+                  const w = BienTapWorkflowHelpers.createWorkflow(1);
+                  const r = w.rounds[0];
+                  r.stages[0].status = form.watch("btv2CompleteDate")
+                    ? StageStatus.COMPLETED
+                    : ((form.watch("btv2Status") as StageStatus) ??
+                      StageStatus.NOT_STARTED);
+                  r.stages[1].status = form.watch("btv1CompleteDate")
+                    ? StageStatus.COMPLETED
+                    : ((form.watch("btv1Status") as StageStatus) ??
+                      StageStatus.NOT_STARTED);
+                  r.stages[2].status = form.watch("docDuyetCompleteDate")
+                    ? StageStatus.COMPLETED
+                    : ((form.watch("docDuyetStatus") as StageStatus) ??
+                      StageStatus.NOT_STARTED);
+                  value = BienTapWorkflowHelpers.calculateProgress(w);
+                } else if (group === "Thiết kế") {
+                  const slots = [
+                    thietKeKtvChinh.userId ? thietKeKtvChinh : null,
+                    ...thietKeTroLyList.filter((s) => s.userId),
+                  ].filter(Boolean) as Array<{ completeDate?: string | null }>;
+                  const n = slots.length;
+                  const m = slots.filter(
+                    (s) =>
+                      s.completeDate != null &&
+                      String(s.completeDate).trim() !== "",
+                  ).length;
+                  value = n === 0 ? 0 : Math.round((100 / n) * m);
+                } else if (
+                  group === "Công việc chung" ||
+                  group === "CNTT" ||
+                  group === "Quét trùng lặp" ||
+                  group === "Thư ký hợp phần"
+                ) {
+                  const staff = multiAssigneesList.filter(
+                    (s) => s.label !== "Người kiểm soát" && s.userId,
+                  );
+                  const n = staff.length;
+                  const m = staff.filter(
+                    (s) => !!s.completedAt || s.status === "completed",
+                  ).length;
+                  value = n === 0 ? 0 : Math.round((100 / n) * m);
+                } else {
+                  value =
+                    form.watch("actualCompletedAt") != null &&
+                    String(form.watch("actualCompletedAt")).trim() !== ""
+                      ? 100
+                      : 0;
+                }
+                return (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center gap-2">
+                      <Label>{t.task.progress}</Label>
+                      <span className="text-sm font-medium text-muted-foreground shrink-0">
+                        {value}%
+                      </span>
+                    </div>
+                    <Progress value={value} className="h-2 w-full" />
+                  </div>
+                );
+              })()}
+
+              <div className="space-y-2">
+                <Label>{t.task.notes}</Label>
+                <Textarea
+                  {...form.register("notes")}
+                  placeholder={t.task.notes + "..."}
+                  className="min-h-[100px] resize-none"
+                  disabled={
+                    !isNewTask &&
+                    (!isEditing || !(canEditMetaRaw || canEditNotesRaw))
+                  }
+                />
               </div>
             </div>
 
@@ -4482,88 +4561,6 @@ export function TaskDialog({
                 </div>
               </div>
               ) : null}
-              </TabsContent>
-
-              <TabsContent value="summary" className="mt-0 space-y-6">
-                <div className="space-y-4 pt-4 border-t border-border/50">
-                  {(() => {
-                const group = form.watch("group");
-                let value = 0;
-                if (group === "Biên tập") {
-                  const w = BienTapWorkflowHelpers.createWorkflow(1);
-                  const r = w.rounds[0];
-                  r.stages[0].status = form.watch("btv2CompleteDate")
-                    ? StageStatus.COMPLETED
-                    : ((form.watch("btv2Status") as StageStatus) ??
-                      StageStatus.NOT_STARTED);
-                  r.stages[1].status = form.watch("btv1CompleteDate")
-                    ? StageStatus.COMPLETED
-                    : ((form.watch("btv1Status") as StageStatus) ??
-                      StageStatus.NOT_STARTED);
-                  r.stages[2].status = form.watch("docDuyetCompleteDate")
-                    ? StageStatus.COMPLETED
-                    : ((form.watch("docDuyetStatus") as StageStatus) ??
-                      StageStatus.NOT_STARTED);
-                  value = BienTapWorkflowHelpers.calculateProgress(w);
-                } else if (group === "Thiết kế") {
-                  const slots = [
-                    thietKeKtvChinh.userId ? thietKeKtvChinh : null,
-                    ...thietKeTroLyList.filter((s) => s.userId),
-                  ].filter(Boolean) as Array<{ completeDate?: string | null }>;
-                  const n = slots.length;
-                  const m = slots.filter(
-                    (s) =>
-                      s.completeDate != null &&
-                      String(s.completeDate).trim() !== "",
-                  ).length;
-                  value = n === 0 ? 0 : Math.round((100 / n) * m);
-                } else if (
-                  group === "Công việc chung" ||
-                  group === "CNTT" ||
-                  group === "Quét trùng lặp" ||
-                  group === "Thư ký hợp phần"
-                ) {
-                  const staff = multiAssigneesList.filter(
-                    (s) => s.label !== "Người kiểm soát" && s.userId,
-                  );
-                  const n = staff.length;
-                  const m = staff.filter(
-                    (s) => !!s.completedAt || s.status === "completed",
-                  ).length;
-                  value = n === 0 ? 0 : Math.round((100 / n) * m);
-                } else {
-                  value =
-                    form.watch("actualCompletedAt") != null &&
-                    String(form.watch("actualCompletedAt")).trim() !== ""
-                      ? 100
-                      : 0;
-                }
-                return (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center gap-2">
-                      <Label>{t.task.progress}</Label>
-                      <span className="text-sm font-medium text-muted-foreground shrink-0">
-                        {value}%
-                      </span>
-                    </div>
-                    <Progress value={value} className="h-2 w-full" />
-                  </div>
-                );
-              })()}
-
-              <div className="space-y-2">
-                <Label>{t.task.notes}</Label>
-                <Textarea
-                  {...form.register("notes")}
-                  placeholder={t.task.notes + "..."}
-                  className="min-h-[100px] resize-none"
-                  disabled={
-                    !isNewTask &&
-                    (!isEditing || !(canEditMetaRaw || canEditNotesRaw))
-                  }
-                />
-              </div>
-              </div>
               </TabsContent>
             </Tabs>
           </div>

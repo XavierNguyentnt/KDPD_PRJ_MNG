@@ -25,11 +25,14 @@ import {
   MoreVertical,
   Eye,
   EyeOff,
+  Download,
+  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useTasks, UserRole } from "@/hooks/use-tasks";
 import { useI18n } from "@/hooks/use-i18n";
+import { usePwaInstallPrompt } from "@/hooks/use-pwa-install-prompt";
 import {
   useNotifications,
   useUnreadNotificationCount,
@@ -64,6 +67,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import EmptyStateCTA from "@/components/ui/empty-state-cta";
 import {
@@ -125,6 +138,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [selectedTask, setSelectedTask] =
     useState<TaskWithAssignmentDetails | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const {
+    installPromptOpen,
+    setInstallPromptOpen,
+    handleInstall,
+    handleDismiss,
+  } = usePwaInstallPrompt();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -1540,6 +1559,53 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         }}
         onOpenTask={(t) => setSelectedTask(t as any)}
       />
+
+      <AlertDialog
+        open={installPromptOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setInstallPromptOpen(false);
+            try {
+              localStorage.setItem(
+                "kdpd_pwa_install_dismissed_at",
+                String(Date.now()),
+              );
+            } catch {
+              // ignore
+            }
+          } else {
+            setInstallPromptOpen(true);
+          }
+        }}>
+        <AlertDialogContent className="max-w-md">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+            <div className="flex h-14 w-14 flex-none items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white shadow-lg shadow-amber-500/30">
+              <Smartphone className="h-7 w-7" />
+            </div>
+            <AlertDialogHeader className="flex-1 text-left sm:pt-1">
+              <AlertDialogTitle className="text-xl leading-tight">
+                {language === "vi"
+                  ? "Cài KDPD vào màn hình chính"
+                  : "Install KDPD to your Home Screen"}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="pt-2 text-[14px] leading-relaxed">
+                {language === "vi"
+                  ? "Truy cập nhanh hơn, hoạt động ngoại tuyến và nhận thông báo đẩy theo thời gian thực — giống hệt một ứng dụng gốc."
+                  : "Faster access, offline support, and real-time push notifications — just like a native app."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+          </div>
+          <AlertDialogFooter className="sm:space-x-2">
+            <AlertDialogCancel onClick={handleDismiss}>
+              {language === "vi" ? "Để sau" : "Later"}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleInstall}>
+              <Download className="-ml-1 mr-2 h-4 w-4" />
+              {language === "vi" ? "Cài đặt ngay" : "Install now"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

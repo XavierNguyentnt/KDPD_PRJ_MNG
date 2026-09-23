@@ -59,4 +59,15 @@ export async function ensureDbExtensions(): Promise<void> {
       error,
     );
   }
+
+  try {
+    await pool.query(
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pos_order integer NOT NULL DEFAULT 0",
+    );
+  } catch (error) {
+    console.warn(
+      "Failed to ensure tasks.pos_order column (optional):",
+      error,
+    );
+  }
 }

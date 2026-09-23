@@ -59,6 +59,7 @@ import {
   ClipboardList,
   UserPlus,
   Search,
+  Briefcase,
 } from "lucide-react";
 import { cn, formatDateDDMMYYYY } from "@/lib/utils";
 import { api } from "@shared/routes";
@@ -189,7 +190,27 @@ function getPasswordRequirementState(password: string) {
   return { ok, lengthOk, upperOk, lowerOk, numberOk, specialOk };
 }
 
-export default function AdminUsersPage() {
+export type UserBadgeFilterKey =
+  | "all"
+  | "active"
+  | "inactive"
+  | "staff"
+  | "manager"
+  | "secretary"
+  | "editor"
+  | "partner";
+
+export default function AdminUsersPage({
+  showBadges = true,
+  wideMode = false,
+  badgeFilter: badgeFilterProp,
+  onBadgeFilterChange,
+}: {
+  showBadges?: boolean;
+  wideMode?: boolean;
+  badgeFilter?: UserBadgeFilterKey;
+  onBadgeFilterChange?: (next: UserBadgeFilterKey) => void;
+}) {
   const { role } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -584,18 +605,18 @@ export default function AdminUsersPage() {
     const thuKy = users.filter(isThuKyUser).length;
     const bienTap = users.filter(isEditorUser).length;
     const congTacVien = users.filter(isPartnerUser).length;
-    return { total, active, inactive, managers, thuKy, bienTap, congTacVien };
+    const nhanVienDuAn = total - congTacVien;
+    return { total, active, inactive, managers, thuKy, bienTap, congTacVien, nhanVienDuAn };
   })();
 
-  const [badgeFilter, setBadgeFilter] = useState<
-    | "all"
-    | "active"
-    | "inactive"
-    | "manager"
-    | "secretary"
-    | "editor"
-    | "partner"
-  >("all");
+  const [badgeFilterInternal, setBadgeFilterInternal] =
+    useState<UserBadgeFilterKey>("all");
+  const badgeFilter: UserBadgeFilterKey =
+    badgeFilterProp ?? badgeFilterInternal;
+  const setBadgeFilter = (next: UserBadgeFilterKey) => {
+    if (onBadgeFilterChange) onBadgeFilterChange(next);
+    else setBadgeFilterInternal(next);
+  };
   const [search, setSearch] = useState("");
 
   const filteredUsers = users
@@ -616,6 +637,10 @@ export default function AdminUsersPage() {
           return u.isActive;
         case "inactive":
           return !u.isActive;
+        case "staff":
+          return !(roles ?? []).some(
+            (r) => r.code === "partner" || r.name === "Đối tác",
+          );
         case "manager":
           return roles.some(
             (r) =>
@@ -656,129 +681,153 @@ export default function AdminUsersPage() {
     });
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div
+      className={cn(
+        "space-y-6",
+        !wideMode && "max-w-5xl mx-auto",
+        wideMode && "w-full max-w-none mx-0",
+      )}>
       <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
-          <Card
-            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "all" ? "ring-2 ring-primary/30" : ""}`}
-            onClick={() => setBadgeFilter("all")}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200/60">
-                <Users className="h-6 w-6 text-slate-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
-                  Tổng người dùng
-                </p>
-                <h3 className="text-2xl font-bold tabular-nums">
-                  {stats.total}
-                </h3>
-              </div>
-            </CardContent>
-          </Card>
-          <Card
-            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "active" ? "ring-2 ring-primary/30" : ""}`}
-            onClick={() => setBadgeFilter("active")}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-200/60">
-                <UserCheck className="h-6 w-6 text-emerald-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
-                  Đang hoạt động
-                </p>
-                <h3 className="text-2xl font-bold tabular-nums">
-                  {stats.active}
-                </h3>
-              </div>
-            </CardContent>
-          </Card>
-          <Card
-            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "inactive" ? "ring-2 ring-primary/30" : ""}`}
-            onClick={() => setBadgeFilter("inactive")}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-200/60">
-                <UserX className="h-6 w-6 text-rose-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
-                  Không hoạt động
-                </p>
-                <h3 className="text-2xl font-bold tabular-nums">
-                  {stats.inactive}
-                </h3>
-              </div>
-            </CardContent>
-          </Card>
-          <Card
-            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "manager" ? "ring-2 ring-primary/30" : ""}`}
-            onClick={() => setBadgeFilter("manager")}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-200/60">
-                <ShieldCheck className="h-6 w-6 text-indigo-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
-                  Quản lý
-                </p>
-                <h3 className="text-2xl font-bold tabular-nums">
-                  {stats.managers}
-                </h3>
-              </div>
-            </CardContent>
-          </Card>
-          <Card
-            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "secretary" ? "ring-2 ring-primary/30" : ""}`}
-            onClick={() => setBadgeFilter("secretary")}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-200/60">
-                <ClipboardList className="h-6 w-6 text-amber-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
-                  Thư ký hợp phần
-                </p>
-                <h3 className="text-2xl font-bold tabular-nums">
-                  {stats.thuKy}
-                </h3>
-              </div>
-            </CardContent>
-          </Card>
-          <Card
-            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "editor" ? "ring-2 ring-primary/30" : ""}`}
-            onClick={() => setBadgeFilter("editor")}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-200/60">
-                <Edit3 className="h-6 w-6 text-blue-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
-                  Biên tập viên
-                </p>
-                <h3 className="text-2xl font-bold tabular-nums">
-                  {stats.bienTap}
-                </h3>
-              </div>
-            </CardContent>
-          </Card>
-          <Card
-            className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "partner" ? "ring-2 ring-primary/30" : ""}`}
-            onClick={() => setBadgeFilter("partner")}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-200/60">
-                <UserPlus className="h-6 w-6 text-teal-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider opacity-90">
-                  Cộng tác viên
-                </p>
-                <h3 className="text-2xl font-bold tabular-nums">
-                  {stats.congTacVien}
-                </h3>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {showBadges && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8 gap-4">
+            <Card
+              className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "all" ? "ring-2 ring-primary/30" : ""}`}
+              onClick={() => setBadgeFilter("all")}>
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200/60">
+                  <Users className="h-6 w-6 text-slate-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                    Tổng người dùng
+                  </p>
+                  <h3 className="text-2xl font-bold tabular-nums">
+                    {stats.total}
+                  </h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "active" ? "ring-2 ring-primary/30" : ""}`}
+              onClick={() => setBadgeFilter("active")}>
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-200/60">
+                  <UserCheck className="h-6 w-6 text-emerald-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                    Đang hoạt động
+                  </p>
+                  <h3 className="text-2xl font-bold tabular-nums">
+                    {stats.active}
+                  </h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "inactive" ? "ring-2 ring-primary/30" : ""}`}
+              onClick={() => setBadgeFilter("inactive")}>
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-200/60">
+                  <UserX className="h-6 w-6 text-rose-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                    Không hoạt động
+                  </p>
+                  <h3 className="text-2xl font-bold tabular-nums">
+                    {stats.inactive}
+                  </h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "staff" ? "ring-2 ring-primary/30" : ""}`}
+              onClick={() => setBadgeFilter("staff")}>
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-200/60">
+                  <Briefcase className="h-6 w-6 text-sky-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                    Nhân viên dự án
+                  </p>
+                  <h3 className="text-2xl font-bold tabular-nums">
+                    {stats.nhanVienDuAn}
+                  </h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "manager" ? "ring-2 ring-primary/30" : ""}`}
+              onClick={() => setBadgeFilter("manager")}>
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-200/60">
+                  <ShieldCheck className="h-6 w-6 text-indigo-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                    Quản lý
+                  </p>
+                  <h3 className="text-2xl font-bold tabular-nums">
+                    {stats.managers}
+                  </h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "secretary" ? "ring-2 ring-primary/30" : ""}`}
+              onClick={() => setBadgeFilter("secretary")}>
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-200/60">
+                  <ClipboardList className="h-6 w-6 text-amber-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                    Thư ký hợp phần
+                  </p>
+                  <h3 className="text-2xl font-bold tabular-nums">
+                    {stats.thuKy}
+                  </h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "editor" ? "ring-2 ring-primary/30" : ""}`}
+              onClick={() => setBadgeFilter("editor")}>
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-200/60">
+                  <Edit3 className="h-6 w-6 text-blue-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                    Biên tập viên
+                  </p>
+                  <h3 className="text-2xl font-bold tabular-nums">
+                    {stats.bienTap}
+                  </h3>
+                </div>
+              </CardContent>
+            </Card>
+            <Card
+              className={`overflow-hidden border border-border/50 shadow-sm cursor-pointer ${badgeFilter === "partner" ? "ring-2 ring-primary/30" : ""}`}
+              onClick={() => setBadgeFilter("partner")}>
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-200/60">
+                  <UserPlus className="h-6 w-6 text-teal-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-90">
+                    Cộng tác viên
+                  </p>
+                  <h3 className="text-2xl font-bold tabular-nums">
+                    {stats.congTacVien}
+                  </h3>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative max-w-md w-full">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

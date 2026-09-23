@@ -2890,18 +2890,27 @@ export default function ThuKyHopPhanPage() {
             }}
           />
 
-          <div className="grid gap-6">
+          <div className="grid gap-6 mt-6">
             <TaskStatsBadgesOnly
               tasks={tasksForStats}
               activeKey={activeStatsKey}
-              onSelectKey={(key) =>
+              onSelectKey={(key) => {
                 setTaskFilters((prev) =>
                   toggleTaskStatsBadgeInFilters(prev, key),
-                )
-              }
+                );
+                window.setTimeout(
+                  () =>
+                    document
+                      .getElementById("thuky-task-list")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                  60,
+                );
+              }}
             />
           </div>
-          <div className="rounded-xl border border-border bg-card overflow-hidden mt-6">
+          <div
+            id="thuky-task-list"
+            className="rounded-xl border border-border bg-card overflow-hidden mt-6">
             <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-muted/30">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-64">
@@ -2959,7 +2968,7 @@ export default function ThuKyHopPhanPage() {
                   role === UserRole.EMPLOYEE) && (
                   <Button size="sm" onClick={() => setIsCreateTaskOpen(true)}>
                     <Plus className="w-4 h-4 mr-2" />
-                    Thêm công việc
+                    {language === "vi" ? "Tạo mới" : "Create new"}
                   </Button>
                 )}
               </div>

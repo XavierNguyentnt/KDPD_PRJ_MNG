@@ -4,6 +4,7 @@ import {
   getTaskFromDbById,
   createTaskInDb,
   updateTaskInDb,
+  reorderTasksInDb,
   deleteTaskFromDb,
 } from "./db-storage";
 
@@ -12,6 +13,7 @@ export interface IStorage {
   getTask(id: string): Promise<Task | undefined>;
   createTask(task: Omit<Task, "id">): Promise<Task>;
   updateTask(id: string, updates: UpdateTaskRequest): Promise<Task>;
+  reorderTasks(updates: { id: string; posOrder: number }[]): Promise<number>;
   deleteTask(id: string): Promise<void>;
   refreshTasks(): Promise<void>;
 }
@@ -32,6 +34,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateTask(id: string, updates: UpdateTaskRequest): Promise<Task> {
     return updateTaskInDb(id, updates);
+  }
+
+  async reorderTasks(updates: { id: string; posOrder: number }[]): Promise<number> {
+    return reorderTasksInDb(updates);
   }
 
   async deleteTask(id: string): Promise<void> {

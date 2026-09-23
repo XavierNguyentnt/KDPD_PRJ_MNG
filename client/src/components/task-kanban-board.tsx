@@ -1,24 +1,32 @@
-import { memo, useCallback, useMemo, useRef } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   PointerSensor,
   useSensor,
   useSensors,
   useDroppable,
-  useDraggable,
+  DragOverlay,
   pointerWithin,
   rectIntersection,
   type DragEndEvent,
   type DragCancelEvent,
   type DragStartEvent,
+  closestCenter,
 } from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useI18n } from "@/hooks/use-i18n";
-import { useUpdateTask } from "@/hooks/use-tasks";
+import { useUpdateTask, useReorderTasks } from "@/hooks/use-tasks";
 import { useToast } from "@/hooks/use-toast";
 import { formatDateDDMMYYYY, cn } from "@/lib/utils";
 import { AlertTriangle, GripVertical, Loader2 } from "lucide-react";
@@ -64,8 +72,10 @@ export function TaskKanbanBoard({
 }: TaskKanbanBoardProps) {
   const { t, language } = useI18n();
   const { mutate: updateTask, isPending: isUpdating } = useUpdateTask();
+  const { mutate: reorderTasks, isPending: isReordering } = useReorderTasks();
   const { toast } = useToast();
   const lastDragEndAtRef = useRef(0);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   const STATUS_ORDER = useMemo(
     () => ["Not Started", "In Progress", "Completed", "Pending", "Cancelled"],
@@ -104,6 +114,12 @@ export function TaskKanbanBoard({
     [effectiveWipLimits],
   );
 
+  const taskById = useMemo(() => {
+    const map = new Map<string, TaskWithAssignmentDetails>();
+    for (const task of tasks) map.set(task.id, task);
+    return map;
+  }, [tasks]);
+
   const columns = useMemo(() => {
     const byStatus = new Map<string, TaskWithAssignmentDetails[]>();
     STATUS_ORDER.forEach((s) => byStatus.set(s, []));
@@ -113,6 +129,17 @@ export function TaskKanbanBoard({
           ? task.status
           : task.status || "Not Started";
       byStatus.set(key, [...(byStatus.get(key) ?? []), task]);
+    }
+    // Sort within column by posOrder ascending, then createdAt desc as tiebreaker
+    for (const [_k, arr] of byStatus) {
+      arr.sort((a, b) => {
+        const pa = typeof (a as any).posOrder === "number" ? (a as any).posOrder : 0;
+        const pb = typeof (b as any).posOrder === "number" ? (b as any).posOrder : 0;
+        if (pa !== pb) return pa - pb;
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      });
     }
     const unknownStatuses = Array.from(byStatus.keys()).filter(
       (s) => !STATUS_ORDER.includes(s),
@@ -130,6 +157,20 @@ export function TaskKanbanBoard({
     return ordered;
   }, [tasks, STATUS_ORDER]);
 
+  const columnsByColumnId = useMemo(() => {
+    const map = new Map<string, [string, TaskWithAssignmentDetails[]]>();
+    for (const pair of columns) {
+      map.set(COLUMN_PREFIX + encodeURIComponent(pair[0]), pair);
+    }
+    return map;
+  }, [columns]);
+
+  const taskStatusById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const task of tasks) map.set(task.id, task.status);
+    return map;
+  }, [tasks]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -141,26 +182,37 @@ export function TaskKanbanBoard({
       function customCollisionDetection(args: any) {
         const pointer = pointerWithin(args);
         if (pointer) return pointer;
+        const closest = closestCenter(args);
+        if (closest) return closest;
         return rectIntersection(args);
       },
     [],
   );
 
-  const handleDragStart = useCallback((_event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     lastDragEndAtRef.current = 0;
+    const id = String(event.active.id);
+    if (id.startsWith(TASK_PREFIX)) {
+      setActiveTaskId(id.slice(TASK_PREFIX.length));
+    } else {
+      setActiveTaskId(null);
+    }
   }, []);
 
   const handleDragCancel = useCallback((_event: DragCancelEvent) => {
     lastDragEndAtRef.current = Date.now();
+    setActiveTaskId(null);
   }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       lastDragEndAtRef.current = Date.now();
       const { active, over } = event;
-      if (!over) return;
       const activeIdStr = String(active.id);
-      const overIdStr = String(over.id);
+      const overIdStr = over ? String(over.id) : "";
+      setActiveTaskId(null);
+      if (!over) return;
+
       if (
         activeIdStr.startsWith(TASK_PREFIX) &&
         overIdStr.startsWith(COLUMN_PREFIX)
@@ -213,9 +265,72 @@ export function TaskKanbanBoard({
             },
           },
         );
+        return;
+      }
+
+      if (
+        activeIdStr.startsWith(TASK_PREFIX) &&
+        overIdStr.startsWith(TASK_PREFIX)
+      ) {
+        const activeTaskIdOnly = activeIdStr.slice(TASK_PREFIX.length);
+        const overTaskIdOnly = overIdStr.slice(TASK_PREFIX.length);
+        if (activeTaskIdOnly === overTaskIdOnly) return;
+        const statusA = taskStatusById.get(activeTaskIdOnly);
+        const statusB = taskStatusById.get(overTaskIdOnly);
+        if (!statusA || statusA !== statusB) return;
+
+        const columnEntry = columns.find(([s]) => s === statusA);
+        if (!columnEntry) return;
+        const ids = columnEntry[1].map((t) => TASK_PREFIX + t.id);
+        const oldIndex = ids.indexOf(activeIdStr);
+        const newIndex = ids.indexOf(overIdStr);
+        if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+        const newIds = arrayMove(ids, oldIndex, newIndex);
+        const updates = newIds.map((prefixedId, posOrder) => {
+          const taskId = prefixedId.slice(TASK_PREFIX.length);
+          return { id: taskId, posOrder };
+        });
+        const actuallyChanged = updates.filter((u, idx) => {
+          const origIndex = ids.indexOf(TASK_PREFIX + u.id);
+          return origIndex !== idx;
+        });
+        if (actuallyChanged.length === 0) return;
+        reorderTasks(updates, {
+          onSuccess: () => {
+            if (language !== "vi") {
+              toast({
+                title: t.common.success,
+                description: "Column order updated.",
+              });
+            }
+          },
+          onError: (err) => {
+            toast({
+              title: t.common.error,
+              description:
+                err.message ||
+                (language === "vi"
+                  ? "Không thể sắp xếp lại công việc."
+                  : "Failed to update column order."),
+              variant: "destructive",
+            });
+          },
+        });
+        return;
       }
     },
-    [tasks, columns, updateTask, toast, t, language, getWipLimit, getStatusLabel],
+    [
+      tasks,
+      columns,
+      taskStatusById,
+      updateTask,
+      reorderTasks,
+      toast,
+      t,
+      language,
+      getWipLimit,
+      getStatusLabel,
+    ],
   );
 
   const handleTaskClick = useCallback(
@@ -225,6 +340,9 @@ export function TaskKanbanBoard({
     },
     [onTaskClick],
   );
+
+  const isBusy = isUpdating || isReordering;
+  const activeTask = activeTaskId ? taskById.get(activeTaskId) ?? null : null;
 
   const hasAnyTask = tasks.length > 0;
   if (!hasAnyTask) {
@@ -255,16 +373,18 @@ export function TaskKanbanBoard({
             const overWip = Number.isFinite(wipLimit) && count > wipLimit;
             const atWip =
               !overWip && Number.isFinite(wipLimit) && count === wipLimit;
+            const sortableIds = columnTasks.map((t) => TASK_PREFIX + t.id);
             return (
               <KanbanColumn
                 key={columnId}
                 id={columnId}
                 title={getStatusLabel(statusName)}
                 tasks={columnTasks}
+                sortableIds={sortableIds}
                 onTaskClick={handleTaskClick}
                 getPriorityColor={getPriorityColor}
                 getStatusColor={getStatusColor}
-                isUpdating={isUpdating}
+                isUpdating={isBusy}
                 count={count}
                 wipLimit={wipLimit}
                 overWip={overWip}
@@ -275,6 +395,15 @@ export function TaskKanbanBoard({
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
+      <DragOverlay dropAnimation={{ duration: 200, easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)" }}>
+        {activeTask ? (
+          <KanbanDragCard
+            task={activeTask}
+            getPriorityColor={getPriorityColor}
+            getStatusColor={getStatusColor}
+          />
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
@@ -283,6 +412,7 @@ function KanbanColumnBase({
   id,
   title,
   tasks,
+  sortableIds,
   onTaskClick,
   getPriorityColor,
   getStatusColor,
@@ -295,6 +425,7 @@ function KanbanColumnBase({
   id: string;
   title: string;
   tasks: TaskWithAssignmentDetails[];
+  sortableIds: string[];
   onTaskClick: (task: TaskWithAssignmentDetails) => void;
   getPriorityColor: (p: string) => string;
   getStatusColor: (s: string) => string;
@@ -308,13 +439,6 @@ function KanbanColumnBase({
   const hasWip = Number.isFinite(wipLimit);
   const wipText = hasWip ? `${count} / ${wipLimit}` : String(count);
 
-  /**
-   * 3-TIER WIP VISUAL (bannerless, space-efficient, friendly):
-   *  Tier 1 — Under (< 80% capacity)        = neutral
-   *  Tier 2 — Approaching (80% ~ 100%) = amber/awareness
-   *  Tier 3 — Over  (> 100%)           = rose/gentle reminder
-   *  Tier 0 — No limit (Infinity)          = neutral (no progress)
-   */
   const wipRatio = hasWip ? count / (wipLimit as number) : 0;
   const wipTier: 0 | 1 | 2 | 3 = !hasWip
     ? 0
@@ -327,9 +451,6 @@ function KanbanColumnBase({
     ? 0
     : Math.min(100, Math.round(wipRatio * 100));
 
-  /** Shared color keys for Progress / Badge / Borders:
-   *  Tier 2 uses status-warning (amber) family, Tier 3 status-danger (rose/red)
-   */
   const tierProgressIndicatorClass =
     wipTier === 3
       ? "bg-status-danger"
@@ -342,7 +463,6 @@ function KanbanColumnBase({
       ref={setNodeRef}
       className={cn(
         "flex-shrink-0 w-[300px] rounded-lg border-2 transition-colors overflow-hidden",
-        // ── Border / outer tint (drag over states + static tiers)
         isOver && wipTier === 3 && "border-destructive bg-destructive/5",
         isOver && wipTier === 2 && "border-status-warning/80 bg-status-warning/5",
         isOver && (wipTier === 1 || wipTier === 0) && "border-primary bg-primary/5",
@@ -350,18 +470,15 @@ function KanbanColumnBase({
         !isOver && wipTier === 2 && "border-status-warning/55 bg-status-warning/[0.045]",
         !isOver && (wipTier === 1 || wipTier === 0) && "border-border bg-muted/25",
       )}>
-      {/* COLUMN HEADER (title + icon + count badge) */}
       <div
         className={cn(
           "p-3 border-b flex flex-col gap-2.5",
-          // Subtle header gradient tint by tier
           wipTier === 3 && "border-status-danger/25 bg-gradient-to-b from-status-danger/15 to-status-danger/[0.07]",
           wipTier === 2 && "border-status-warning/25 bg-gradient-to-b from-status-warning/14 to-status-warning/[0.06]",
           (wipTier === 1 || wipTier === 0) && "border-border bg-muted/30",
         )}>
         <div className="flex items-center justify-between gap-2 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            {/* Tier 2/3 only: gentle visual icon (NO TEXT BANNER!) */}
             {wipTier === 3 ? (
               <AlertTriangle
                 className="w-4 h-4 text-status-danger shrink-0"
@@ -375,7 +492,6 @@ function KanbanColumnBase({
             ) : null}
             <span className="font-semibold text-sm truncate">{title}</span>
           </div>
-          {/* Badge count: 3-tier chromatic tiered */}
           <Badge
             className={cn(
               "text-xs shrink-0 tabular-nums border font-semibold",
@@ -390,7 +506,6 @@ function KanbanColumnBase({
           </Badge>
         </div>
 
-        {/* ── Capacity progress bar (tiered color, NO LABEL) */}
         {hasWip && (
           <div
           aria-hidden="true" className="w-full">
@@ -407,7 +522,6 @@ function KanbanColumnBase({
         )}
       </div>
 
-      {/* BODY: tasks stack (NO TEXT BANNERS — removed old warning copy! Icon was at L340-L351, save 40px/cột vertical space reclaimed) */}
       <div
         className={cn(
           "p-2 min-h-[320px] flex flex-col gap-2",
@@ -420,15 +534,17 @@ function KanbanColumnBase({
             <span className="text-xs">Updating...</span>
           </div>
         )}
-        {tasks.map((task) => (
-          <KanbanCard
-            key={task.id}
-            task={task}
-            onTaskClick={onTaskClick}
-            getPriorityColor={getPriorityColor}
-            getStatusColor={getStatusColor}
-          />
-        ))}
+        <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+          {tasks.map((task) => (
+            <KanbanCard
+              key={task.id}
+              task={task}
+              onTaskClick={onTaskClick}
+              getPriorityColor={getPriorityColor}
+              getStatusColor={getStatusColor}
+            />
+          ))}
+        </SortableContext>
       </div>
     </div>
   );
@@ -442,6 +558,7 @@ const KanbanColumn = memo(KanbanColumnBase, (prev, next) =>
   prev.atWip === next.atWip &&
   prev.isUpdating === next.isUpdating &&
   prev.tasks === next.tasks &&
+  prev.sortableIds === next.sortableIds &&
   prev.onTaskClick === next.onTaskClick &&
   prev.getPriorityColor === next.getPriorityColor &&
   prev.getStatusColor === next.getStatusColor,
@@ -467,19 +584,25 @@ function KanbanCardBase({
   getStatusColor: (s: string) => string;
 }) {
   const { language, t } = useI18n();
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({
-      id: TASK_PREFIX + task.id,
-      data: { task },
-    });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: TASK_PREFIX + task.id,
+    data: { task },
+  });
 
-  const cardStyle = useMemo(
-    () =>
-      transform
-        ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-        : undefined,
-    [transform?.x, transform?.y],
-  );
+  const cardStyle = useMemo(() => {
+    return {
+      transform: CSS.Transform.toString(transform as any),
+      transition: transition ?? undefined,
+      opacity: isDragging ? 0.4 : 1,
+    } as React.CSSProperties;
+  }, [transform, transition, isDragging]);
 
   const handleClick = useMemo(
     () => (onTaskClick ? () => onTaskClick(task) : undefined),
@@ -496,7 +619,7 @@ function KanbanCardBase({
       ref={setNodeRef}
       style={cardStyle}
       className={`touch-none select-none cursor-grab active:cursor-grabbing rounded-lg border bg-card text-card-foreground shadow-sm transition-shadow ${
-        isDragging ? "relative z-50 shadow-lg ring-2 ring-primary/20" : ""
+        isDragging ? "shadow-lg ring-2 ring-primary/20" : ""
       }`}
       {...listeners}
       {...attributes}
@@ -548,3 +671,61 @@ const KanbanCard = memo(KanbanCardBase, (prev, next) =>
   prev.getPriorityColor === next.getPriorityColor &&
   prev.getStatusColor === next.getStatusColor,
 );
+
+function KanbanDragCard({
+  task,
+  getPriorityColor,
+  getStatusColor,
+}: {
+  task: TaskWithAssignmentDetails;
+  getPriorityColor: (p: string) => string;
+  getStatusColor: (s: string) => string;
+}) {
+  const { language, t } = useI18n();
+  const statusLabelKey = STATUS_LABEL_KEYS[task.status];
+  const statusText = statusLabelKey
+    ? (t.status as any)[statusLabelKey] ?? task.status
+    : task.status;
+  return (
+    <Card className="w-[300px] rotate-2 opacity-95 shadow-2xl border-primary/40 bg-card z-[100]">
+      <CardContent className="p-3">
+        <div className="flex items-start gap-2">
+          <div className="p-0.5 rounded text-muted-foreground">
+            <GripVertical className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium line-clamp-2">
+              {task.title ?? ""}
+            </p>
+            <div className="flex flex-wrap gap-1 mt-2">
+              <Badge
+                variant="ghost"
+                className={`text-xs ${getStatusColor(task.status)}`}>
+                {statusText}
+              </Badge>
+              <Badge
+                variant="ghost"
+                className={`text-xs ${getPriorityColor(task.priority ?? "")}`}>
+                {task.priority ?? "—"}
+              </Badge>
+            </div>
+            {task.dueDate && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {language === "vi" ? "Hạn: " : "Due: "}
+                {formatDateDDMMYYYY(task.dueDate)}
+              </p>
+            )}
+            <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+              <Progress value={task.progress ?? 0} className="h-1.5" />
+            </div>
+            {task.assignee && (
+              <p className="text-xs text-muted-foreground mt-1 truncate">
+                {task.assignee}
+              </p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

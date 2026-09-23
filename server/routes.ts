@@ -587,6 +587,7 @@ export async function registerRoutes(
         relatedWorkId: oldTask.relatedWorkId ?? null,
         relatedContractId: oldTask.relatedContractId ?? null,
         vote: null,
+        posOrder: 0,
         createdAt: now,
         updatedAt: now,
       });
@@ -1154,6 +1155,7 @@ export async function registerRoutes(
         relatedWorkId: input.relatedWorkId ?? null,
         relatedContractId: input.relatedContractId ?? null,
         vote: voteValue as string | null,
+        posOrder: 0,
         createdAt: now,
         updatedAt: now,
       };
@@ -1336,6 +1338,35 @@ export async function registerRoutes(
       const message =
         error instanceof Error ? error.message : "Failed to refresh tasks";
       res.status(500).json({ message });
+    }
+  });
+
+  app.patch(api.tasks.reorder.path, requireAuth, async (req, res) => {
+    try {
+      const parsed = api.tasks.reorder.input.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "Invalid reorder payload",
+          errors: parsed.error.flatten(),
+        });
+      }
+      const { updates } = parsed.data;
+      const deduped: { id: string; posOrder: number }[] = [];
+      const seen = new Set<string>();
+      for (const u of updates) {
+        if (seen.has(u.id)) continue;
+        seen.add(u.id);
+        deduped.push(u);
+      }
+      const count = await storage.reorderTasks(deduped);
+      invalidateTasksListCache();
+      res.json({ message: `Reordered ${count} tasks`, updated: count });
+    } catch (error) {
+      console.error("Error reordering tasks:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to reorder tasks";
+      const statusCode = message.includes("authentication") ? 503 : 500;
+      res.status(statusCode).json({ message });
     }
   });
 
