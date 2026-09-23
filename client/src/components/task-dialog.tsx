@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { WorkflowView } from "@/components/workflow-view";
+import { WorkflowBTPanel } from "@/components/workflow-bt-panel";
 import {
   Workflow,
   BienTapWorkflowHelpers,
@@ -4373,6 +4374,84 @@ export function TaskDialog({
                 return undefined;
               })()}
             />
+
+            {/* Workflow BT Panel: Rich visual stepper + role-mapped cards for Biên tập tasks (Tab 2 Quy trình) */}
+            {form.watch("group") === "Biên tập" ? (
+              <div className="space-y-2 pt-5 border-t border-border/50">
+                <Label className="text-base font-semibold inline-flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-group-bientap" />
+                  {language === "vi" ? "Quy trình 3 giai đoạn biên tập" : "3-step Editing Workflow"}
+                </Label>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  {language === "vi"
+                    ? "BTV 2 → BTV 1 → Người đọc duyệt · Đánh dấu hoàn thành bằng cách nhập Ngày xong ở form bên dưới."
+                    : "Editor 2 → Editor 1 → Proofreader · Mark complete via Completed Date fields below."}
+                </p>
+                <div className="pt-1">
+                  {(() => {
+                    let workflow: Workflow | null = null;
+                    try {
+                      if (!isNewTask && task && task.workflow) {
+                        workflow = (
+                          typeof task.workflow === "string"
+                            ? JSON.parse(task.workflow)
+                            : task.workflow
+                        ) as Workflow;
+                      }
+                      if (!workflow) {
+                        const w = BienTapWorkflowHelpers.createWorkflow(1);
+                        const r = w.rounds[0];
+                        r.roundType = form.watch("roundType") || r.roundType;
+                        r.stages[0].assignee = form.watch("btv2") || null;
+                        r.stages[0].startDate = form.watch("btv2ReceiveDate") || null;
+                        r.stages[0].dueDate = form.watch("btv2DueDate") || null;
+                        r.stages[0].completedDate = form.watch("btv2CompleteDate") || null;
+                        r.stages[0].cancelReason = form.watch("btv2CancelReason") || null;
+                        r.stages[0].status = form.watch("btv2CompleteDate")
+                          ? StageStatus.COMPLETED
+                          : ((form.watch("btv2Status") as StageStatus) ?? StageStatus.NOT_STARTED);
+                        r.stages[0].progress = form.watch("btv2CompleteDate") ? 100 : 0;
+
+                        r.stages[1].assignee = form.watch("btv1") || null;
+                        r.stages[1].startDate = form.watch("btv1ReceiveDate") || null;
+                        r.stages[1].dueDate = form.watch("btv1DueDate") || null;
+                        r.stages[1].completedDate = form.watch("btv1CompleteDate") || null;
+                        r.stages[1].cancelReason = form.watch("btv1CancelReason") || null;
+                        r.stages[1].status = form.watch("btv1CompleteDate")
+                          ? StageStatus.COMPLETED
+                          : ((form.watch("btv1Status") as StageStatus) ?? StageStatus.NOT_STARTED);
+                        r.stages[1].progress = form.watch("btv1CompleteDate") ? 100 : 0;
+
+                        r.stages[2].assignee = form.watch("docDuyet") || null;
+                        r.stages[2].startDate = form.watch("docDuyetReceiveDate") || null;
+                        r.stages[2].dueDate = form.watch("docDuyetDueDate") || null;
+                        r.stages[2].completedDate = form.watch("docDuyetCompleteDate") || null;
+                        r.stages[2].cancelReason = form.watch("docDuyetCancelReason") || null;
+                        r.stages[2].status = form.watch("docDuyetCompleteDate")
+                          ? StageStatus.COMPLETED
+                          : ((form.watch("docDuyetStatus") as StageStatus) ?? StageStatus.NOT_STARTED);
+                        r.stages[2].progress = form.watch("docDuyetCompleteDate") ? 100 : 0;
+                        workflow = w;
+                      }
+                    } catch (e) {
+                      workflow = null;
+                    }
+                    return (
+                      <WorkflowBTPanel
+                        workflow={workflow}
+                        vote={form.watch("vote") ?? null}
+                        roundType={
+                          (form.watch("roundType") ||
+                            (workflow?.rounds?.find((x) => x.roundNumber === workflow.currentRound) ||
+                              workflow?.rounds?.[0])?.roundType) ?? undefined
+                        }
+                        language={language as "vi" | "en"}
+                      />
+                    );
+                  })()}
+                </div>
+              </div>
+            ) : null}
 
             {/* Workflow View for Biên tập tasks (chỉ khi không hiển thị form Biên tập để tránh trùng) */}
             {!isNewTask &&

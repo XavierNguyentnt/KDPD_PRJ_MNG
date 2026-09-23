@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { TaskTableSkeleton } from "@/components/ui/skeletons";
 import { GroupPageHero } from "@/components/group-page-hero";
+import { WorkflowStepper } from "@/components/workflow-stepper";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
 import {
@@ -527,6 +528,17 @@ export default function BienTapPage() {
                   actualCompletedAt: true,
                   vote: true,
                   group: false,
+                  customColumns: [
+                    {
+                      key: "workflow",
+                      label: language === "vi" ? "Quy trình" : "Workflow",
+                      render: (task) => {
+                        if (!task.workflow) return <span className="text-[11px] text-muted-foreground/70">—</span>;
+                        return <WorkflowStepper workflow={task.workflow as any} size="sm" orientation="horizontal" />;
+                      },
+                      sortable: false,
+                    },
+                  ],
                 }}
               />
             ) : (

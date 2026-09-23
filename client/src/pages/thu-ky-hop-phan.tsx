@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect, Fragment } from "react";
+import { useCallback, useMemo, useState, useEffect, Fragment, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import {
   useQuery,
@@ -17,6 +17,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
 import { useTaskListControls } from "@/hooks/use-task-list-controls";
+import { useThuKyTasksTab } from "@/hooks/use-thu-ky-tasks-tab";
+import { useThuKyWorksTab } from "@/hooks/use-thu-ky-works-tab";
+import { useThuKyContractsTab } from "@/hooks/use-thu-ky-contracts-tab";
 import {
   useUsers,
   useTaskFilterStaffUsers,
@@ -131,6 +134,13 @@ import {
 import { TaskTableSkeleton, CardGridSkeleton, FullPageSkeleton } from "@/components/ui/skeletons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { WorksImport } from "@/components/works-import";
+const Pipeline8StepperLazy = lazy(
+  () =>
+    import("@/components/pipeline-8-stepper").then((m) => ({
+      default: m.Pipeline8Stepper,
+    })),
+);
+import { getPipelineStepperPropsForWork } from "@/components/pipeline-8-stepper";
 import { DateInput } from "@/components/ui/date-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { WorkPicker } from "@/components/work-picker";
@@ -792,67 +802,6 @@ export default function ThuKyHopPhanPage() {
     useState<string>("0");
   const [componentCodeEdited, setComponentCodeEdited] = useState(false);
 
-  const [tasksPage, setTasksPage] = useState(1);
-  const [isExportingTasks, setIsExportingTasks] = useState(false);
-  const [tcViewMode, setTcViewMode] = useState<"table" | "card">("table");
-  const [pcViewMode, setPcViewMode] = useState<"table" | "card">("table");
-  const [worksPage, setWorksPage] = useState(1);
-  const [tcPage, setTcPage] = useState(1);
-  const [pcPage, setPcPage] = useState(1);
-  const [tcQuickFilter, setTcQuickFilter] = useState<
-    "all" | "valid" | "completed" | "expired" | "expiring"
-  >("all");
-  const [pcQuickFilter, setPcQuickFilter] = useState<
-    "all" | "valid" | "completed" | "expired" | "expiring"
-  >("all");
-  const [worksSearch, setWorksSearch] = useState("");
-  const [worksComponentFilter, setWorksComponentFilter] =
-    useState<string>("all");
-  const [worksStageFilter, setWorksStageFilter] = useState<string>("all");
-  const [worksProgressFilter, setWorksProgressFilter] =
-    useState<WorksProgressFilter>("all");
-  const [worksSortColumns, setWorksSortColumns] = useState<
-    Array<{ column: WorkSortColumn; dir: "asc" | "desc" }>
-  >([]);
-  const [selectedWorkIds, setSelectedWorkIds] = useState<string[]>([]);
-  const [bulkDeleteWorksOpen, setBulkDeleteWorksOpen] = useState(false);
-  const [tcSearch, setTcSearch] = useState("");
-  const [tcTranslatorSearch, setTcTranslatorSearch] = useState("");
-  const [tcComponentFilter, setTcComponentFilter] = useState<string>("all");
-  const [tcStageFilter, setTcStageFilter] = useState<string>("all");
-  const [tcSortColumns, setTcSortColumns] = useState<
-    Array<{ column: TranslationContractSortColumn; dir: "asc" | "desc" }>
-  >([]);
-  const [pcSearch, setPcSearch] = useState("");
-  const [pcComponentFilter, setPcComponentFilter] = useState<string>("all");
-  const [pcStageFilter, setPcStageFilter] = useState<string>("all");
-  const [pcSortColumns, setPcSortColumns] = useState<
-    Array<{ column: ProofreadingContractSortColumn; dir: "asc" | "desc" }>
-  >([]);
-  const [tcColumnVis, setTcColumnVis] = useState({
-    contractNumber: true,
-    translators: true,
-    overviewValue: true,
-    translationValue: true,
-    contractValue: true,
-    settlementValue: true,
-    outstanding: true,
-  });
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("tcColumnVis");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setTcColumnVis((s) => ({ ...s, ...parsed }));
-      }
-    } catch {}
-  }, []);
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("tcColumnVis", JSON.stringify(tcColumnVis));
-    } catch {}
-  }, [tcColumnVis]);
-
   const [selectedTask, setSelectedTask] =
     useState<TaskWithAssignmentDetails | null>(null);
   const [taskDialogMode, setTaskDialogMode] = useState<"view" | "edit">("view");
@@ -1057,195 +1006,12 @@ export default function ThuKyHopPhanPage() {
     [proofreadingContracts, allowedComponentIds],
   );
 
-  const taskStages = useMemo(
-    () =>
-      Array.from(
-        new Set(worksScoped.map((w) => w.stage).filter(Boolean)),
-      ) as string[],
-    [worksScoped],
-  );
-  const taskComponentOptions = useMemo(
-    () => componentsList.map((c) => ({ id: c.id, name: c.name })),
-    [componentsList],
-  );
-
-  // Get unique stages from works for filtering
-  const worksStages = useMemo(
-    () =>
-      Array.from(
-        new Set(worksScoped.map((w) => w.stage).filter(Boolean)),
-      ).sort() as string[],
-    [worksScoped],
-  );
-
-  // Reset page to 1 when filters change
-  useEffect(() => {
-    setWorksPage(1);
-  }, [
-    worksComponentFilter,
-    worksStageFilter,
-    worksProgressFilter,
-    worksSearch,
-  ]);
-
-  useEffect(() => {
-    setTcPage(1);
-  }, [tcComponentFilter, tcStageFilter, tcSearch]);
-
-  useEffect(() => {
-    setPcPage(1);
-  }, [pcComponentFilter, pcStageFilter, pcSearch]);
-
-  const tasksScoped = useMemo(() => {
-    if (!tasks) return [];
-    let list = tasks.filter((t) => t.group === "Thư ký hợp phần");
-    if (allowedComponentIds.length > 0) {
-      const allowedWorkIds = new Set(worksScoped.map((w) => w.id));
-      const allowedTcIds = new Set(tcScoped.map((c) => c.id));
-      const allowedPcIds = new Set(pcScoped.map((c) => c.id));
-      list = list.filter(
-        (t) =>
-          (!t.relatedWorkId && !t.relatedContractId) ||
-          (t.relatedWorkId && allowedWorkIds.has(t.relatedWorkId)) ||
-          (t.relatedContractId &&
-            (allowedTcIds.has(t.relatedContractId) ||
-              allowedPcIds.has(t.relatedContractId))),
-      );
-    }
-    if (role === UserRole.EMPLOYEE) {
-      const uid = user?.id ?? null;
-      if (uid) {
-        list = list.filter(
-          (t) =>
-            (t as any).createdBy === uid ||
-            t.assigneeId === uid ||
-            (Array.isArray(t.assignments)
-              ? t.assignments.some((a: any) => a?.userId === uid)
-              : false) ||
-            t.assignee?.includes((user?.displayName ?? "").split(" ")[0]),
-        );
-      } else {
-        list = list.filter((t) =>
-          t.assignee?.includes((user?.displayName ?? "").split(" ")[0]),
-        );
-      }
-    }
-    return list;
-  }, [
-    tasks,
-    allowedComponentIds,
-    worksScoped,
-    tcScoped,
-    pcScoped,
-    role,
-    user?.displayName,
-    user?.id,
-  ]);
-
-  const {
-    search: tasksSearch,
-    setSearch: setTasksSearch,
-    filters: taskFilters,
-    setFilters: setTaskFilters,
-    sortBy: taskSortBy,
-    sortDir: taskSortDir,
-    handleSort: handleTaskSort,
-    viewMode: taskViewMode,
-    setViewMode: setTaskViewMode,
-    filteredTasks,
-    tasksForStats,
-    availableYears: taskYearOptions,
-  } = useTaskListControls({
-    tasks: tasksScoped,
-    role,
-    userId: user?.id,
-    userDisplayName: user?.displayName,
-    works: worksScoped,
-    includedGroups: null,
-  });
-  const activeStatsKey = useMemo(
-    () => getTaskStatsBadgeKeyFromFilters(taskFilters),
-    [taskFilters.status, taskFilters.vote],
-  );
-
-  const handleWorksSort = (column: WorkSortColumn, e?: React.MouseEvent) => {
-    setWorksSortColumns((prev) => {
-      const existingIndex = prev.findIndex((s) => s.column === column);
-      if (existingIndex >= 0) {
-        // Column exists: toggle direction or remove
-        if (prev[existingIndex].dir === "asc") {
-          // Change to desc
-          const newCols = [...prev];
-          newCols[existingIndex] = { column, dir: "desc" };
-          return newCols;
-        } else {
-          // Remove from list
-          return prev.filter((s) => s.column !== column);
-        }
-      } else {
-        // Add new column to the list (always add, not replace)
-        return [...prev, { column, dir: "asc" }];
-      }
-    });
-  };
-
-  const handleTcSort = (
-    column: TranslationContractSortColumn,
-    e?: React.MouseEvent,
-  ) => {
-    setTcSortColumns((prev) => {
-      const existingIndex = prev.findIndex((s) => s.column === column);
-      if (existingIndex >= 0) {
-        if (prev[existingIndex].dir === "asc") {
-          const newCols = [...prev];
-          newCols[existingIndex] = { column, dir: "desc" };
-          return newCols;
-        } else {
-          return prev.filter((s) => s.column !== column);
-        }
-      } else {
-        // Add new column to the list (always add, not replace)
-        return [...prev, { column, dir: "asc" }];
-      }
-    });
-  };
-
-  const handlePcSort = (
-    column: ProofreadingContractSortColumn,
-    e?: React.MouseEvent,
-  ) => {
-    setPcSortColumns((prev) => {
-      const existingIndex = prev.findIndex((s) => s.column === column);
-      if (existingIndex >= 0) {
-        if (prev[existingIndex].dir === "asc") {
-          const newCols = [...prev];
-          newCols[existingIndex] = { column, dir: "desc" };
-          return newCols;
-        } else {
-          return prev.filter((s) => s.column !== column);
-        }
-      } else {
-        // Add new column to the list (always add, not replace)
-        return [...prev, { column, dir: "asc" }];
-      }
-    });
-  };
-
   const componentNameById = useMemo(
     () => new Map(componentsList.map((c) => [c.id, c.name])),
     [componentsList],
   );
   const getComponentName = (id: string | null) =>
     id ? (componentNameById.get(id) ?? "—") : "—";
-  const workById = useMemo(() => new Map(works.map((w) => [w.id, w])), [works]);
-  const tcById = useMemo(
-    () => new Map(tcScoped.map((c) => [c.id, c])),
-    [tcScoped],
-  );
-  const pcById = useMemo(
-    () => new Map(pcScoped.map((c) => [c.id, c])),
-    [pcScoped],
-  );
   const workTitleById = useMemo(
     () =>
       new Map(
@@ -1259,426 +1025,186 @@ export default function ThuKyHopPhanPage() {
   const getWorkTitle = (id: string | null) =>
     id ? (workTitleById.get(id) ?? "—") : "—";
 
-  const proofreadingCompletionByWorkId = useMemo(() => {
-    const map = new Map<string, string>();
-    proofreadingContracts.forEach((c) => {
-      if (!c.actualCompletionDate || !c.workId) return;
-      const date =
-        typeof c.actualCompletionDate === "string"
-          ? c.actualCompletionDate.slice(0, 10)
-          : new Date(c.actualCompletionDate as any).toISOString().slice(0, 10);
-      const prev = map.get(c.workId);
-      if (!prev || date > prev) map.set(c.workId, date);
-    });
-    return map;
-  }, [proofreadingContracts]);
+  const tcById = useMemo(
+    () => new Map(tcScoped.map((c) => [c.id, c])),
+    [tcScoped],
+  );
+  const pcById = useMemo(
+    () => new Map(pcScoped.map((c) => [c.id, c])),
+    [pcScoped],
+  );
 
-  const editingCompletionByWorkId = useMemo(() => {
-    const map = new Map<string, string>();
-    tasks
-      .filter((t) => t.group === "Biên tập" && t.relatedWorkId)
-      .forEach((t) => {
-        const wf = t.workflow;
-        let roundType = "";
-        if (typeof wf === "string") {
-          try {
-            const parsed = JSON.parse(wf) as {
-              rounds?: Array<{ roundType?: string | null }>;
-            };
-            roundType = parsed?.rounds?.[0]?.roundType ?? "";
-          } catch {
-            roundType = "";
-          }
-        } else if (typeof wf === "object" && wf) {
-          const parsed = wf as {
-            rounds?: Array<{ roundType?: string | null }>;
-          };
-          roundType = parsed?.rounds?.[0]?.roundType ?? "";
-        }
-        if (!roundType.toLowerCase().includes("bông chuyển in")) return;
-        const v = t.actualCompletedAt;
-        if (!v) return;
-        const date = typeof v === "string" ? new Date(v) : v;
-        if (!date || Number.isNaN(date.getTime())) return;
-        const dateStr = date.toISOString().slice(0, 10);
-        const key = t.relatedWorkId as string;
-        const prev = map.get(key);
-        if (!prev || dateStr > prev) map.set(key, dateStr);
-      });
-    return map;
-  }, [tasks]);
-
-  const tcByWorkId = useMemo(() => {
-    const map = new Map<string, TranslationContract[]>();
-    tcScoped.forEach((c) => {
-      if (!c.workId) return;
-      const list = map.get(c.workId) ?? [];
-      list.push(c);
-      map.set(c.workId, list);
-    });
-    return map;
-  }, [tcScoped]);
-
-  const pcByWorkId = useMemo(() => {
-    const map = new Map<string, ProofreadingContract[]>();
-    pcScoped.forEach((c) => {
-      if (!c.workId) return;
-      const list = map.get(c.workId) ?? [];
-      list.push(c);
-      map.set(c.workId, list);
-    });
-    return map;
-  }, [pcScoped]);
-
-  const bienTapTasksByWorkId = useMemo(() => {
-    const map = new Map<string, TaskWithAssignmentDetails[]>();
-    (tasks || [])
-      .filter((t) => t.group === "Biên tập" && t.relatedWorkId)
-      .forEach((t) => {
-        const key = t.relatedWorkId as string;
-        const list = map.get(key) ?? [];
-        list.push(t);
-        map.set(key, list);
-      });
-    return map;
-  }, [tasks]);
-
-  const thietKeTasksByWorkId = useMemo(() => {
-    const map = new Map<string, TaskWithAssignmentDetails[]>();
-    (tasks || [])
-      .filter((t) => t.group === "Thiết kế" && t.relatedWorkId)
-      .forEach((t) => {
-        const key = t.relatedWorkId as string;
-        const list = map.get(key) ?? [];
-        list.push(t);
-        map.set(key, list);
-      });
-    return map;
-  }, [tasks]);
-
-  // Filter and sort ALL data from DB (before pagination)
-  // Order: Filter -> Sort -> Paginate (in paginatedWorks)
-  const filteredWorks = useMemo(() => {
-    let list = worksScoped;
-
-    // Step 1: Filter by component
-    if (worksComponentFilter && worksComponentFilter !== "all") {
-      list = list.filter((w) => w.componentId === worksComponentFilter);
-    }
-
-    // Step 2: Filter by stage
-    if (worksStageFilter && worksStageFilter !== "all") {
-      list = list.filter((w) => w.stage === worksStageFilter);
-    }
-
-    // Step 3: Filter by work progress
-    if (worksProgressFilter && worksProgressFilter !== "all") {
-      list = list.filter((w) => {
-        const tcList = tcByWorkId.get(w.id) ?? [];
-        const pcList = pcByWorkId.get(w.id) ?? [];
-        if (worksProgressFilter === "signed_contract") return tcList.length > 0;
-        if (worksProgressFilter === "progress_check")
-          return tcList.some((c) => !!c.progressCheckDate);
-        if (worksProgressFilter === "expert_review")
-          return tcList.some((c) => !!c.expertReviewDate);
-        if (worksProgressFilter === "project_acceptance")
-          return tcList.some((c) => !!c.projectAcceptanceDate);
-        if (worksProgressFilter === "settlement")
-          return tcList.some((c) => c.settlementValue != null);
-        if (worksProgressFilter === "proofreading_completed")
-          return (
-            pcList.length > 0 && pcList.every((p) => !!p.actualCompletionDate)
-          );
-        if (worksProgressFilter === "editing_completed")
-          return !!editingCompletionByWorkId.get(w.id);
-        if (worksProgressFilter === "design_completed") {
-          const tkList = thietKeTasksByWorkId.get(w.id) ?? [];
-          return (
-            tkList.length > 0 && tkList.every((t) => t.status === "Completed")
-          );
-        }
-        return true;
-      });
-    }
-
-    // Step 4: Filter by search
-    if (worksSearch.trim()) {
-      const q = normalizeSearch(worksSearch.trim());
-      list = list.filter(
-        (w) =>
-          (w.titleVi && normalizeSearch(w.titleVi).includes(q)) ||
-          (w.stage &&
-            (normalizeSearch(formatStageDisplay(w.stage)).includes(q) ||
-              normalizeSearch(w.stage).includes(q))) ||
-          (w.documentCode && normalizeSearch(w.documentCode).includes(q)) ||
-          normalizeSearch(getComponentName(w.componentId)).includes(q),
-      );
-    }
-
-    // Step 5: Apply sorting to ALL filtered data (not just current page)
-    return sortWorks(list, worksSortColumns, getComponentName);
-  }, [
+  const contractsHook = useThuKyContractsTab({
+    tcScoped,
+    pcScoped,
     worksScoped,
-    worksSearch,
-    worksComponentFilter,
-    worksStageFilter,
-    worksProgressFilter,
-    worksSortColumns,
+    proofreadingContracts,
     componentsList,
+    getComponentName,
+    getWorkTitle,
+    getTranslatorName,
+    getProofreaderName,
+    PAGE_SIZE,
+    fetchFinanceSummary,
+    fetchFinanceSummaryPc,
+    fetchContractPayments,
+    fetchPaymentsByPcId,
+  });
+  const {
+    tcViewMode,
+    setTcViewMode,
+    pcViewMode,
+    setPcViewMode,
+    tcPage,
+    setTcPage,
+    pcPage,
+    setPcPage,
+    tcQuickFilter,
+    setTcQuickFilter,
+    pcQuickFilter,
+    setPcQuickFilter,
+    tcSearch,
+    setTcSearch,
+    tcTranslatorSearch,
+    setTcTranslatorSearch,
+    tcComponentFilter,
+    setTcComponentFilter,
+    tcStageFilter,
+    setTcStageFilter,
+    tcSortColumns,
+    setTcSortColumns,
+    pcSearch,
+    setPcSearch,
+    pcComponentFilter,
+    setPcComponentFilter,
+    pcStageFilter,
+    setPcStageFilter,
+    pcSortColumns,
+    setPcSortColumns,
+    tcColumnVis,
+    setTcColumnVis,
+    filteredTc,
+    tcStats,
+    tcDisplayList,
+    proofreadingCompletionByTcId,
+    paginatedTc,
+    totalTcPages,
+    outstandingById,
+    paymentInfoById,
+    filteredPc,
+    pcStats,
+    pcDisplayList,
+    paginatedPc,
+    totalPcPages,
+    pcOutstandingById,
+    pcPaymentInfoById,
+    handleTcSort,
+    handlePcSort,
+  } = contractsHook;
+
+  const worksHook = useThuKyWorksTab({
+    worksScoped,
+    componentsList,
+    tcScoped,
+    pcScoped,
+    tasks,
+    proofreadingContracts,
+    getComponentName,
+    getTranslatorName,
+    tcColumnVis,
+    PAGE_SIZE,
+    formatStageDisplay,
+    fetchFinanceSummary,
+  });
+  const {
+    state: worksState,
+    derived: worksDerived,
+    handlers: worksHandlers,
+  } = worksHook;
+  const {
+    worksPage,
+    setWorksPage,
+    worksViewMode,
+    setWorksViewMode,
+    worksSearch,
+    setWorksSearch,
+    worksComponentFilter,
+    setWorksComponentFilter,
+    worksStageFilter,
+    setWorksStageFilter,
+    worksProgressFilter,
+    setWorksProgressFilter,
+    worksSortColumns,
+    setWorksSortColumns,
+    selectedWorkIds,
+    setSelectedWorkIds,
+    bulkDeleteWorksOpen,
+    setBulkDeleteWorksOpen,
+  } = worksState;
+  const {
+    worksStages,
+    workById,
+    proofreadingCompletionByWorkId,
+    editingCompletionByWorkId,
     tcByWorkId,
     pcByWorkId,
-    editingCompletionByWorkId,
+    bienTapTasksByWorkId,
     thietKeTasksByWorkId,
-  ]);
+    filteredWorks,
+    paginatedWorks,
+    totalWorksPages,
+    paginatedWorkIds,
+    selectedWorkSet,
+    allSelectedOnPage,
+    someSelectedOnPage,
+    workTcIdsForOutstanding,
+    outstandingByTcIdForWorks,
+    getWorkContractNumbers,
+    getWorkTranslators,
+    sumTcMoneyForWork,
+    getOutstandingForWork,
+    worksTableColSpan,
+    workPipelineCtx,
+  } = worksDerived;
+  const { handleWorksSort } = worksHandlers;
 
-  // Filter and sort ALL data from DB (before pagination)
-  // Order: Filter -> Sort -> Paginate (in paginatedTc)
-  const filteredTc = useMemo(() => {
-    let list = tcScoped;
-
-    // Step 1: Filter by component
-    if (tcComponentFilter && tcComponentFilter !== "all") {
-      list = list.filter((c) => c.componentId === tcComponentFilter);
-    }
-
-    // Step 2: Filter by stage (via work)
-    if (tcStageFilter && tcStageFilter !== "all") {
-      const workIdsWithStage = new Set(
-        worksScoped.filter((w) => w.stage === tcStageFilter).map((w) => w.id),
-      );
-      list = list.filter((c) => c.workId && workIdsWithStage.has(c.workId));
-    }
-
-    // Step 3: Filter by search
-    if (tcSearch.trim()) {
-      const q = normalizeSearch(tcSearch.trim());
-      list = list.filter(
-        (c) =>
-          (c.contractNumber && normalizeSearch(c.contractNumber).includes(q)) ||
-          normalizeSearch(getComponentName(c.componentId)).includes(q) ||
-          normalizeSearch(getWorkTitle(c.workId)).includes(q),
-      );
-    }
-    if (tcTranslatorSearch.trim()) {
-      const q = normalizeSearch(tcTranslatorSearch.trim());
-      list = list.filter((c) => {
-        const name = getTranslatorName(c.id);
-        if (!name || name === "—") return false;
-        return normalizeSearch(name).includes(q);
-      });
-    }
-
-    // Step 4: Apply sorting to ALL filtered data (not just current page)
-    return sortTranslationContracts(list, tcSortColumns, getComponentName);
-  }, [
+  const tasksHook = useThuKyTasksTab({
+    tasks,
+    worksScoped,
+    allowedComponentIds,
+    role,
+    userId: user?.id,
+    userDisplayName: user?.displayName,
     tcScoped,
-    tcSearch,
-    tcTranslatorSearch,
-    tcComponentFilter,
-    tcStageFilter,
-    tcSortColumns,
-    worksScoped,
-    componentsList,
-    getTranslatorName,
-  ]);
-
-  const tcStats = useMemo(() => {
-    const today = new Date();
-    const total = filteredTc.length;
-    const completed = filteredTc.filter((c) => !!c.actualCompletionDate).length;
-    const valid = filteredTc.filter((c) => {
-      if (c.actualCompletionDate) return false;
-      const due = getTcDueDate(c);
-      if (!due) return true;
-      return due >= today;
-    }).length;
-    const expired = filteredTc.filter((c) => {
-      if (c.actualCompletionDate) return false;
-      const due = getTcDueDate(c);
-      if (!due) return false;
-      return due < today;
-    }).length;
-    const expiring = filteredTc.filter((c) => {
-      if (c.actualCompletionDate) return false;
-      const due = getTcDueDate(c);
-      if (!due) return false;
-      const d = daysUntil(today, due);
-      return d >= 1 && d <= 90;
-    }).length;
-    return { total, valid, completed, expired, expiring };
-  }, [filteredTc]);
-
-  const applyTcQuickFilter = useMemo(() => {
-    return (list: TranslationContract[], key: typeof tcQuickFilter) => {
-      const today = new Date();
-      if (key === "all") return list;
-      if (key === "completed")
-        return list.filter((c) => !!c.actualCompletionDate);
-      if (key === "valid")
-        return list.filter((c) => {
-          if (c.actualCompletionDate) return false;
-          const due = getTcDueDate(c);
-          if (!due) return true;
-          return due >= today;
-        });
-      if (key === "expired")
-        return list.filter((c) => {
-          if (c.actualCompletionDate) return false;
-          const due = getTcDueDate(c);
-          if (!due) return false;
-          return due < today;
-        });
-      if (key === "expiring")
-        return list.filter((c) => {
-          if (c.actualCompletionDate) return false;
-          const due = getTcDueDate(c);
-          if (!due) return false;
-          const d = daysUntil(today, due);
-          return d >= 1 && d <= 90;
-        });
-      return list;
-    };
-  }, []);
-
-  useEffect(() => {
-    setTcPage(1);
-  }, [
-    tcQuickFilter,
-    tcComponentFilter,
-    tcStageFilter,
-    tcSearch,
-    tcTranslatorSearch,
-  ]);
-
-  const tcDisplayList = useMemo(
-    () => applyTcQuickFilter(filteredTc, tcQuickFilter),
-    [filteredTc, tcQuickFilter, applyTcQuickFilter],
-  );
-
-  // Filter and sort ALL data from DB (before pagination)
-  // Order: Filter -> Sort -> Paginate (in paginatedPc)
-  const filteredPc = useMemo(() => {
-    let list = pcScoped;
-
-    // Step 1: Filter by component
-    if (pcComponentFilter && pcComponentFilter !== "all") {
-      list = list.filter((c) => c.componentId === pcComponentFilter);
-    }
-
-    // Step 2: Filter by stage (via work)
-    if (pcStageFilter && pcStageFilter !== "all") {
-      const workIdsWithStage = new Set(
-        worksScoped.filter((w) => w.stage === pcStageFilter).map((w) => w.id),
-      );
-      list = list.filter((c) => c.workId && workIdsWithStage.has(c.workId));
-    }
-
-    // Step 3: Filter by search
-    if (pcSearch.trim()) {
-      const q = normalizeSearch(pcSearch.trim());
-      list = list.filter(
-        (c) =>
-          (c.contractNumber && normalizeSearch(c.contractNumber).includes(q)) ||
-          normalizeSearch(getProofreaderName(c.id)).includes(q) ||
-          normalizeSearch(getComponentName(c.componentId)).includes(q) ||
-          normalizeSearch(getWorkTitle(c.workId)).includes(q),
-      );
-    }
-
-    // Step 4: Apply sorting to ALL filtered data (not just current page)
-    return sortProofreadingContracts(list, pcSortColumns, getComponentName);
-  }, [
     pcScoped,
-    pcSearch,
-    pcComponentFilter,
-    pcStageFilter,
-    pcSortColumns,
-    worksScoped,
     componentsList,
-  ]);
+    PAGE_SIZE,
+  });
+  const {
+    tasksPage,
+    setTasksPage,
+    isExportingTasks,
+    setIsExportingTasks,
+    tasksScoped,
+    taskStages,
+    taskComponentOptions,
+    tasksSearch,
+    setTasksSearch,
+    taskFilters,
+    setTaskFilters,
+    taskSortBy,
+    taskSortDir,
+    handleTaskSort,
+    taskViewMode,
+    setTaskViewMode,
+    filteredTasks,
+    tasksForStats,
+    taskYearOptions,
+    activeStatsKey,
+    paginatedTasks,
+    totalTasksPages,
+  } = tasksHook;
 
-  const pcStats = useMemo(() => {
-    const today = new Date();
-    const total = filteredPc.length;
-    const completed = filteredPc.filter((c) => !!c.actualCompletionDate).length;
-    const valid = filteredPc.filter((c) => {
-      if (c.actualCompletionDate) return false;
-      const due = getPcDueDate(c);
-      if (!due) return true;
-      return due >= today;
-    }).length;
-    const expired = filteredPc.filter((c) => {
-      if (c.actualCompletionDate) return false;
-      const due = getPcDueDate(c);
-      if (!due) return false;
-      return due < today;
-    }).length;
-    const expiring = filteredPc.filter((c) => {
-      if (c.actualCompletionDate) return false;
-      const due = getPcDueDate(c);
-      if (!due) return false;
-      const d = daysUntil(today, due);
-      return d >= 1 && d <= 90;
-    }).length;
-    return { total, valid, completed, expired, expiring };
-  }, [filteredPc]);
-
-  const applyPcQuickFilter = useMemo(() => {
-    return (list: ProofreadingContract[], key: typeof pcQuickFilter) => {
-      const today = new Date();
-      if (key === "all") return list;
-      if (key === "completed")
-        return list.filter((c) => !!c.actualCompletionDate);
-      if (key === "valid")
-        return list.filter((c) => {
-          if (c.actualCompletionDate) return false;
-          const due = getPcDueDate(c);
-          if (!due) return true;
-          return due >= today;
-        });
-      if (key === "expired")
-        return list.filter((c) => {
-          if (c.actualCompletionDate) return false;
-          const due = getPcDueDate(c);
-          if (!due) return false;
-          return due < today;
-        });
-      if (key === "expiring")
-        return list.filter((c) => {
-          if (c.actualCompletionDate) return false;
-          const due = getPcDueDate(c);
-          if (!due) return false;
-          const d = daysUntil(today, due);
-          return d >= 1 && d <= 90;
-        });
-      return list;
-    };
-  }, []);
-
-  useEffect(() => {
-    setPcPage(1);
-  }, [pcQuickFilter, pcComponentFilter, pcStageFilter, pcSearch]);
-
-  const pcDisplayList = useMemo(
-    () => applyPcQuickFilter(filteredPc, pcQuickFilter),
-    [filteredPc, pcQuickFilter, applyPcQuickFilter],
-  );
-
-  const proofreadingCompletionByTcId = useMemo(() => {
-    const map = new Map<string, string>();
-    proofreadingContracts.forEach((c) => {
-      if (!c.actualCompletionDate) return;
-      const date =
-        typeof c.actualCompletionDate === "string"
-          ? c.actualCompletionDate.slice(0, 10)
-          : new Date(c.actualCompletionDate as any).toISOString().slice(0, 10);
-      if (c.translationContractId) {
-        const prev = map.get(c.translationContractId);
-        if (!prev || date > prev) map.set(c.translationContractId, date);
-      }
-    });
-    return map;
-  }, [proofreadingContracts]);
 
   type ProgressBadge = {
     label: string;
@@ -1851,289 +1377,6 @@ export default function ThuKyHopPhanPage() {
     return badges;
   };
 
-  const paginatedTasks = useMemo(() => {
-    const start = (tasksPage - 1) * PAGE_SIZE;
-    return filteredTasks.slice(start, start + PAGE_SIZE);
-  }, [filteredTasks, tasksPage]);
-  const totalTasksPages = Math.max(
-    1,
-    Math.ceil(filteredTasks.length / PAGE_SIZE),
-  );
-
-  // Paginate AFTER filtering and sorting (sort is applied to ALL data, not just current page)
-  const paginatedWorks = useMemo(() => {
-    const start = (worksPage - 1) * PAGE_SIZE;
-    // filteredWorks is already sorted, we just slice the correct page
-    return filteredWorks.slice(start, start + PAGE_SIZE);
-  }, [filteredWorks, worksPage]);
-  const totalWorksPages = Math.max(
-    1,
-    Math.ceil(filteredWorks.length / PAGE_SIZE),
-  );
-  const paginatedWorkIds = useMemo(
-    () => new Set(paginatedWorks.map((w) => w.id)),
-    [paginatedWorks],
-  );
-  const selectedWorkSet = useMemo(
-    () => new Set(selectedWorkIds),
-    [selectedWorkIds],
-  );
-  const allSelectedOnPage =
-    paginatedWorks.length > 0 &&
-    paginatedWorks.every((w) => selectedWorkSet.has(w.id));
-  const someSelectedOnPage =
-    paginatedWorks.some((w) => selectedWorkSet.has(w.id)) && !allSelectedOnPage;
-
-  const workTcIdsForOutstanding = useMemo(() => {
-    if (!tcColumnVis.outstanding) return [];
-    const ids = new Set<string>();
-    paginatedWorks.forEach((w) => {
-      const list = tcByWorkId.get(w.id) ?? [];
-      list.forEach((c) => {
-        if (c?.id) ids.add(c.id);
-      });
-    });
-    return Array.from(ids);
-  }, [paginatedWorks, tcByWorkId, tcColumnVis.outstanding]);
-
-  const worksFinanceQueries = useQueries({
-    queries: workTcIdsForOutstanding.map((id) => ({
-      queryKey: ["finance-summary", id],
-      queryFn: () => fetchFinanceSummary(id),
-      enabled: !!id && tcColumnVis.outstanding,
-      staleTime: 60_000,
-    })),
-  });
-  const outstandingByTcIdForWorks = useMemo(() => {
-    const map = new Map<string, number>();
-    worksFinanceQueries.forEach((q, idx) => {
-      const id = workTcIdsForOutstanding[idx];
-      if (id && q.data) map.set(id, Math.max(q.data.outstanding, 0));
-    });
-    return map;
-  }, [worksFinanceQueries, workTcIdsForOutstanding]);
-
-  const getWorkContractNumbers = useMemo(() => {
-    return (workId: string): string => {
-      const tcList = tcByWorkId.get(workId) ?? [];
-      const set = new Set<string>();
-      tcList.forEach((c) => {
-        const v = (c.contractNumber ?? "").trim();
-        if (v) set.add(v);
-      });
-      return set.size ? Array.from(set).join(", ") : "—";
-    };
-  }, [tcByWorkId]);
-
-  const getWorkTranslators = useMemo(() => {
-    return (workId: string): string => {
-      const tcList = tcByWorkId.get(workId) ?? [];
-      const set = new Set<string>();
-      tcList.forEach((c) => {
-        const raw = (getTranslatorName(c.id) ?? "").trim();
-        if (!raw || raw === "—") return;
-        raw
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .forEach((name) => set.add(name));
-      });
-      return set.size ? Array.from(set).join(", ") : "—";
-    };
-  }, [tcByWorkId, getTranslatorName]);
-
-  const sumTcMoneyForWork = useMemo(() => {
-    const toNum = (v: unknown): number | null => {
-      if (v === null || v === undefined || v === "") return null;
-      const n = typeof v === "string" ? parseFloat(v) : Number(v);
-      return Number.isNaN(n) ? null : n;
-    };
-    return (
-      workId: string,
-      key:
-        | "overviewValue"
-        | "translationValue"
-        | "contractValue"
-        | "settlementValue",
-    ): number | null => {
-      const tcList = tcByWorkId.get(workId) ?? [];
-      let sum = 0;
-      let has = false;
-      tcList.forEach((c) => {
-        const v = toNum((c as any)[key]);
-        if (v == null) return;
-        sum += v;
-        has = true;
-      });
-      return has ? sum : null;
-    };
-  }, [tcByWorkId]);
-
-  const getOutstandingForWork = useMemo(() => {
-    return (workId: string): number | null => {
-      if (!tcColumnVis.outstanding) return null;
-      const tcList = tcByWorkId.get(workId) ?? [];
-      let sum = 0;
-      let has = false;
-      tcList.forEach((c) => {
-        const v = outstandingByTcIdForWorks.get(c.id);
-        if (typeof v !== "number") return;
-        sum += v;
-        has = true;
-      });
-      return has ? sum : null;
-    };
-  }, [tcByWorkId, outstandingByTcIdForWorks, tcColumnVis.outstanding]);
-
-  const worksTableColSpan = useMemo(() => {
-    const extra =
-      (tcColumnVis.contractNumber ? 1 : 0) +
-      (tcColumnVis.translators ? 1 : 0) +
-      (tcColumnVis.overviewValue ? 1 : 0) +
-      (tcColumnVis.translationValue ? 1 : 0) +
-      (tcColumnVis.contractValue ? 1 : 0) +
-      (tcColumnVis.settlementValue ? 1 : 0) +
-      (tcColumnVis.outstanding ? 1 : 0);
-    return 14 + extra;
-  }, [tcColumnVis]);
-
-  const paginatedTc = useMemo(() => {
-    const start = (tcPage - 1) * PAGE_SIZE;
-    return tcDisplayList.slice(start, start + PAGE_SIZE);
-  }, [tcDisplayList, tcPage]);
-  const totalTcPages = Math.max(1, Math.ceil(tcDisplayList.length / PAGE_SIZE));
-
-  const financeQueries = useQueries({
-    queries: paginatedTc.map((c) => ({
-      queryKey: ["finance-summary", c.id],
-      queryFn: () => fetchFinanceSummary(c.id),
-      enabled: !!c.id,
-      staleTime: 60_000,
-    })),
-  });
-  const outstandingById = useMemo(() => {
-    const map = new Map<string, number>();
-    financeQueries.forEach((q, idx) => {
-      const id = paginatedTc[idx]?.id;
-      if (id && q.data) map.set(id, Math.max(q.data.outstanding, 0));
-    });
-    return map;
-  }, [financeQueries, paginatedTc]);
-
-  const paymentsQueries = useQueries({
-    queries: paginatedTc.map((c) => ({
-      queryKey: ["payments", c.id],
-      queryFn: () => fetchContractPayments(c.id),
-      enabled: !!c.id,
-      staleTime: 60_000,
-    })),
-  });
-  const paymentInfoById = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        advance1?: Payment;
-        advance2?: Payment;
-        settlement?: Payment;
-      }
-    >();
-    paymentsQueries.forEach((q, idx) => {
-      const id = paginatedTc[idx]?.id;
-      const list = (q.data ?? []).slice();
-      const advances = list
-        .filter((p) => String(p.paymentType || "").toLowerCase() === "advance")
-        .sort((a, b) => {
-          const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
-          const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
-          return ad - bd;
-        });
-      const settlements = list
-        .filter(
-          (p) => String(p.paymentType || "").toLowerCase() === "settlement",
-        )
-        .sort((a, b) => {
-          const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
-          const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
-          return bd - ad;
-        });
-      if (id) {
-        map.set(id, {
-          advance1: advances[0],
-          advance2: advances[1],
-          settlement: settlements[0],
-        });
-      }
-    });
-    return map;
-  }, [paymentsQueries, paginatedTc]);
-  const paginatedPc = useMemo(() => {
-    const start = (pcPage - 1) * PAGE_SIZE;
-    return pcDisplayList.slice(start, start + PAGE_SIZE);
-  }, [pcDisplayList, pcPage]);
-  const totalPcPages = Math.max(1, Math.ceil(pcDisplayList.length / PAGE_SIZE));
-
-  const pcFinanceQueries = useQueries({
-    queries: paginatedPc.map((c) => ({
-      queryKey: ["finance-summary", c.id],
-      queryFn: () => fetchFinanceSummaryPc(c.id),
-      enabled: !!c.id,
-      staleTime: 60_000,
-    })),
-  });
-  const pcOutstandingById = useMemo(() => {
-    const map = new Map<string, number>();
-    pcFinanceQueries.forEach((q, idx) => {
-      const id = paginatedPc[idx]?.id;
-      if (id && q.data) map.set(id, Math.max(q.data.outstanding, 0));
-    });
-    return map;
-  }, [pcFinanceQueries, paginatedPc]);
-  const pcPaymentsQueries = useQueries({
-    queries: paginatedPc.map((c) => ({
-      queryKey: ["payments", c.id],
-      queryFn: () => fetchPaymentsByPcId(c.id),
-      enabled: !!c.id,
-      staleTime: 60_000,
-    })),
-  });
-  const pcPaymentInfoById = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        advance1?: Payment;
-        advance2?: Payment;
-        settlement?: Payment;
-      }
-    >();
-    pcPaymentsQueries.forEach((q, idx) => {
-      const id = paginatedPc[idx]?.id;
-      const list = (q.data ?? []).slice();
-      const advances = list
-        .filter((p) => String(p.paymentType || "").toLowerCase() === "advance")
-        .sort((a, b) => {
-          const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
-          const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
-          return ad - bd;
-        });
-      const settlements = list
-        .filter(
-          (p) => String(p.paymentType || "").toLowerCase() === "settlement",
-        )
-        .sort((a, b) => {
-          const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
-          const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
-          return bd - ad;
-        });
-      if (id) {
-        map.set(id, {
-          advance1: advances[0],
-          advance2: advances[1],
-          settlement: settlements[0],
-        });
-      }
-    });
-    return map;
-  }, [pcPaymentsQueries, paginatedPc]);
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "High":
@@ -3863,6 +3106,22 @@ export default function ThuKyHopPhanPage() {
                   </Badge>
                 </div>
                 <div className="flex gap-2">
+                  <ToggleGroup
+                    type="single"
+                    value={worksViewMode}
+                    onValueChange={(v) =>
+                      v && (v === "table" || v === "card") && setWorksViewMode(v)
+                    }
+                    className="border rounded-md bg-background">
+                    <ToggleGroupItem value="table" aria-label="Bảng">
+                      <List className="h-4 w-4 mr-1.5" />
+                      Bảng
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="card" aria-label="Thẻ">
+                      <LayoutGrid className="h-4 w-4 mr-1.5" />
+                      Thẻ
+                    </ToggleGroupItem>
+                  </ToggleGroup>
                   {selectedWorkIds.length > 0 && (
                     <Button
                       size="sm"
@@ -3980,6 +3239,88 @@ export default function ThuKyHopPhanPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Bộ cột
+                  </Label>
+                  <ToggleGroup
+                    type="single"
+                    value={(() => {
+                      const allFalse =
+                        !tcColumnVis.contractNumber &&
+                        !tcColumnVis.translators &&
+                        !tcColumnVis.overviewValue &&
+                        !tcColumnVis.translationValue &&
+                        !tcColumnVis.contractValue &&
+                        !tcColumnVis.settlementValue &&
+                        !tcColumnVis.outstanding;
+                      const allTrue =
+                        tcColumnVis.contractNumber &&
+                        tcColumnVis.translators &&
+                        tcColumnVis.overviewValue &&
+                        tcColumnVis.translationValue &&
+                        tcColumnVis.contractValue &&
+                        tcColumnVis.settlementValue &&
+                        tcColumnVis.outstanding;
+                      if (allFalse) return "basic";
+                      if (allTrue) return "finance";
+                      return "estimate";
+                    })()}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      if (v === "basic") {
+                        setTcColumnVis({
+                          contractNumber: false,
+                          translators: false,
+                          overviewValue: false,
+                          translationValue: false,
+                          contractValue: false,
+                          settlementValue: false,
+                          outstanding: false,
+                        });
+                      } else if (v === "finance") {
+                        setTcColumnVis({
+                          contractNumber: true,
+                          translators: true,
+                          overviewValue: true,
+                          translationValue: true,
+                          contractValue: true,
+                          settlementValue: true,
+                          outstanding: true,
+                        });
+                      } else if (v === "estimate") {
+                        setTcColumnVis({
+                          contractNumber: false,
+                          translators: false,
+                          overviewValue: false,
+                          translationValue: false,
+                          contractValue: false,
+                          settlementValue: false,
+                          outstanding: false,
+                        });
+                      }
+                    }}
+                    className="border rounded-md bg-background h-9">
+                    <ToggleGroupItem
+                      value="basic"
+                      aria-label="Cơ bản"
+                      className="text-xs h-8 px-3">
+                      Cơ bản
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="finance"
+                      aria-label="Tài chính"
+                      className="text-xs h-8 px-3">
+                      Tài chính
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="estimate"
+                      aria-label="Ước tính"
+                      className="text-xs h-8 px-3">
+                      Ước tính
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
                 <div className="flex-1" />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -4049,7 +3390,7 @@ export default function ThuKyHopPhanPage() {
               <TaskTableSkeleton rows={10} columns={7} />
             ) : (
               <>
-                {tcViewMode === "table" ? (
+                {worksViewMode === "table" ? (
                   <Table
                     className="border-collapse"
                     containerClassName="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
@@ -4109,7 +3450,11 @@ export default function ThuKyHopPhanPage() {
                           column="stage"
                           sortColumns={worksSortColumns}
                           onSort={handleWorksSort}
+                          className="w-[100px] min-w-[90px]"
                         />
+                        <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[260px] min-w-[240px]">
+                          Pipeline
+                        </TableHead>
                         {tcColumnVis.contractNumber && (
                           <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[160px] min-w-[140px]">
                             Số HĐ
@@ -4235,6 +3580,18 @@ export default function ThuKyHopPhanPage() {
                               {w.titleHannom ?? "—"}
                             </TableCell>
                             <TableCell>{formatStageDisplay(w.stage)}</TableCell>
+                            <TableCell className="p-4 align-middle">
+                              <Suspense fallback={<div className="flex gap-0.5"><div className="h-5 w-5 rounded-full bg-slate-100 animate-pulse"/><div className="h-1 flex-1 my-2 bg-slate-100 animate-pulse w-5 rounded-full"/></div>}>
+                                <Pipeline8StepperLazy
+                                  orientation="compact"
+                                  size="sm"
+                                  {...getPipelineStepperPropsForWork(
+                                    w,
+                                    workPipelineCtx,
+                                  )}
+                                />
+                              </Suspense>
+                            </TableCell>
                             {tcColumnVis.contractNumber && (
                               <TableCell
                                 className="p-4 align-middle max-w-[220px] truncate"
@@ -4356,136 +3713,230 @@ export default function ThuKyHopPhanPage() {
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {paginatedTc.length === 0 ? (
+                  <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {paginatedWorks.length === 0 ? (
                       <div className="text-center text-muted-foreground py-8 col-span-full">
-                        Chưa có hợp đồng dịch thuật nào.
+                        Chưa có tác phẩm nào.
                       </div>
                     ) : (
-                      paginatedTc.map((c) => (
+                      paginatedWorks.map((w) => (
                         <div
-                          key={c.id}
-                          className="border rounded-lg p-4 bg-background shadow-sm">
+                          key={w.id}
+                          className="border rounded-lg p-4 bg-card shadow-sm hover:shadow-md transition-all duration-200 flex flex-col gap-3"
+                          onClick={() => setWorkDialog({ open: true, work: w })}
+                          role="button"
+                          tabIndex={0}>
                           <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-semibold truncate">
-                                {c.contractNumber ?? "—"}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge
+                                  variant="outline"
+                                  className="bg-status-info/20 border-status-info/40 text-slate-900">
+                                  {formatStageDisplay(w.stage)}
+                                </Badge>
+                                <span className="text-[11px] text-muted-foreground truncate">
+                                  {getComponentName(w.componentId)}
+                                </span>
                               </div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {getComponentName(c.componentId)}
+                              <div className="font-semibold text-base truncate">
+                                {w.titleVi ?? "—"}
                               </div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {getWorkTitle(c.workId)}
-                              </div>
+                              {w.titleHannom && (
+                                <div className="text-xs text-muted-foreground truncate mt-0.5">
+                                  {w.titleHannom}
+                                </div>
+                              )}
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-0.5 shrink-0">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() =>
-                                  setTcDialog({
-                                    open: true,
-                                    contract: c,
-                                    mode: "view",
-                                  })
-                                }>
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setWorkDialog({ open: true, work: w });
+                                }}>
                                 <Eye className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() =>
-                                  setTcDialog({
-                                    open: true,
-                                    contract: c,
-                                    mode: "edit",
-                                  })
-                                }>
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setWorkDialog({ open: true, work: w });
+                                }}>
                                 <Pencil className="w-4 h-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => {
-                                  setTcDeleteTarget(c);
-                                  setDeleteTcConfirmOpen(true);
-                                }}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
                             </div>
                           </div>
-                          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <div className="text-muted-foreground">
-                                Đơn giá
+                          <Suspense
+                            fallback={
+                              <div className="flex gap-0.5">
+                                <div className="h-5 w-5 rounded-full bg-slate-100 animate-pulse" />
+                                <div className="h-1 flex-1 my-2 bg-slate-100 animate-pulse rounded-full min-w-[140px]" />
                               </div>
-                              <div>{formatNumberAccounting(c.unitPrice)}</div>
-                            </div>
-                            <div>
-                              <div className="text-muted-foreground">
-                                Giá trị HĐ
-                              </div>
-                              <div>
-                                {formatNumberAccounting(c.contractValue)}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-muted-foreground">
-                                Bắt đầu
-                              </div>
-                              <div>
-                                {formatDateDDMMYYYY(c.startDate) || "—"}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-muted-foreground">
-                                Kết thúc
-                              </div>
-                              <div>{formatDateDDMMYYYY(c.endDate) || "—"}</div>
-                            </div>
-                            <div>
-                              <div className="text-muted-foreground">
-                                Hoàn thành Thực tế
-                              </div>
-                              <div>
-                                {formatDateDDMMYYYY(c.actualCompletionDate) ||
-                                  "—"}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-muted-foreground">
-                                Giá trị quyết toán
-                              </div>
-                              <div>
-                                {formatNumberAccounting(c.settlementValue)}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {buildTranslationContractPills(c, {
-                              proofreadingCompletedDate:
-                                proofreadingCompletionByTcId.get(c.id) ??
-                                (c.workId
-                                  ? proofreadingCompletionByWorkId.get(c.workId)
-                                  : undefined),
-                              editingCompletedDate: c.workId
-                                ? editingCompletionByWorkId.get(c.workId)
-                                : undefined,
-                            }).map((pill, idx) => (
+                            }>
+                            <Pipeline8StepperLazy
+                              size="sm"
+                              orientation="horizontal"
+                              showLabels={false}
+                              {...getPipelineStepperPropsForWork(
+                                w,
+                                workPipelineCtx,
+                              )}
+                            />
+                          </Suspense>
+                          <div className="flex flex-wrap gap-1.5">
+                            {buildWorkProgressBadges(w).map((b, idx) => (
                               <Badge
-                                key={`${c.id}-pill-card-${idx}`}
+                                key={`${w.id}-wcard-${idx}`}
                                 variant="outline"
-                                className={contractPillClass[pill.tone]}>
-                                {pill.label}
+                                className={progressBadgeClass[b.tone]}>
+                                {b.label}
                               </Badge>
                             ))}
                           </div>
-                          {c.note && (
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs pt-2 border-t border-border/60">
+                            {w.documentCode && (
+                              <div className="col-span-2 flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Mã tài liệu
+                                </span>
+                                <span className="font-medium tabular-nums">
+                                  {w.documentCode}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Số chữ gốc
+                              </span>
+                              <span className="font-medium tabular-nums">
+                                {formatNumberAccounting(w.baseWordCount)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Số trang gốc
+                              </span>
+                              <span className="font-medium tabular-nums">
+                                {formatNumberAccounting(w.basePageCount)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Hệ số
+                              </span>
+                              <span className="font-medium tabular-nums">
+                                {w.estimateFactor != null
+                                  ? formatNumberAccounting(
+                                      w.estimateFactor,
+                                      1,
+                                    )
+                                  : "—"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Trang ước tính
+                              </span>
+                              <span className="font-medium tabular-nums">
+                                {formatNumberAccounting(w.estimatePageCount)}
+                              </span>
+                            </div>
+                            {tcColumnVis.overviewValue && (
+                              <div className="flex justify-between col-span-2">
+                                <span className="text-muted-foreground">
+                                  Kinh phí tổng quan
+                                </span>
+                                <span className="font-medium tabular-nums">
+                                  {formatNumberAccounting(
+                                    sumTcMoneyForWork(w.id, "overviewValue"),
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {tcColumnVis.translationValue && (
+                              <div className="flex justify-between col-span-2">
+                                <span className="text-muted-foreground">
+                                  Kinh phí dịch thuật
+                                </span>
+                                <span className="font-medium tabular-nums">
+                                  {formatNumberAccounting(
+                                    sumTcMoneyForWork(
+                                      w.id,
+                                      "translationValue",
+                                    ),
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {tcColumnVis.contractValue && (
+                              <div className="flex justify-between col-span-2">
+                                <span className="text-muted-foreground">
+                                  Giá trị HĐ
+                                </span>
+                                <span className="font-medium tabular-nums">
+                                  {formatNumberAccounting(
+                                    sumTcMoneyForWork(w.id, "contractValue"),
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {tcColumnVis.settlementValue && (
+                              <div className="flex justify-between col-span-2">
+                                <span className="text-muted-foreground">
+                                  Giá trị quyết toán
+                                </span>
+                                <span className="font-medium tabular-nums">
+                                  {formatNumberAccounting(
+                                    sumTcMoneyForWork(
+                                      w.id,
+                                      "settlementValue",
+                                    ),
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {tcColumnVis.outstanding && (
+                              <div className="flex justify-between col-span-2">
+                                <span className="text-muted-foreground">
+                                  Công nợ
+                                </span>
+                                <span className="font-medium tabular-nums">
+                                  {formatNumberAccounting(
+                                    getOutstandingForWork(w.id),
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {tcColumnVis.contractNumber &&
+                              getWorkContractNumbers(w.id) && (
+                                <div className="col-span-2 text-xs pt-0.5">
+                                  <span className="text-muted-foreground">
+                                    Số HĐ:{" "}
+                                  </span>
+                                  <span className="font-medium truncate">
+                                    {getWorkContractNumbers(w.id)}
+                                  </span>
+                                </div>
+                              )}
+                            {tcColumnVis.translators &&
+                              getWorkTranslators(w.id) && (
+                                <div className="col-span-2 text-xs pt-0.5">
+                                  <span className="text-muted-foreground">
+                                    Dịch giả:{" "}
+                                  </span>
+                                  <span className="font-medium truncate">
+                                    {getWorkTranslators(w.id)}
+                                  </span>
+                                </div>
+                              )}
+                          </div>
+                          {w.note && (
                             <div
-                              className="mt-2 text-xs text-muted-foreground truncate"
-                              title={c.note}>
-                              {c.note}
+                              className="text-xs text-muted-foreground truncate pt-1 border-t border-border/60"
+                              title={w.note}>
+                              📝 {w.note}
                             </div>
                           )}
                         </div>
