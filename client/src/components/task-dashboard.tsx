@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { LazyChart } from "@/components/ui/lazy-chart";
 import {
   CheckCircle2,
   AlertCircle,
@@ -495,7 +496,7 @@ export function TaskDashboard({
           </CardHeader>
           <CardContent className="p-6">
             {statusChartData.length > 0 ? (
-              <div className="h-[220px] w-full min-w-0">
+              <LazyChart height={220} variant="pie">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -524,7 +525,7 @@ export function TaskDashboard({
                     />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
+              </LazyChart>
             ) : (
               <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50">
                 {t.dashboard.noTasksFound}
@@ -568,7 +569,7 @@ export function TaskDashboard({
           </CardHeader>
           <CardContent className="p-6">
             {groupChartData.length > 0 ? (
-              <div className="h-[220px] w-full min-w-0">
+              <LazyChart height={220} variant="pie">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -597,7 +598,7 @@ export function TaskDashboard({
                     />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
+              </LazyChart>
             ) : (
               <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm rounded-lg border border-dashed border-border/50">
                 {t.dashboard.noTasksFound}
@@ -638,7 +639,7 @@ export function TaskDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="h-[280px] w-full">
+            <LazyChart height={280} variant="bar">
               {groupStatusBarData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={groupStatusBarData} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
@@ -684,7 +685,7 @@ export function TaskDashboard({
                   {t.dashboard.noTasksFound}
                 </div>
               )}
-            </div>
+            </LazyChart>
           </CardContent>
         </Card>
 
@@ -698,7 +699,7 @@ export function TaskDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="h-[280px] w-full">
+            <LazyChart height={280} variant="bar">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={scheduleRatioBarData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" vertical={false} />
@@ -736,7 +737,7 @@ export function TaskDashboard({
                   <Bar dataKey="behindSchedule" name={t.dashboard.behindSchedule} stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} barSize={36} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </LazyChart>
           </CardContent>
         </Card>
       </div>
@@ -764,7 +765,7 @@ export function TaskDashboard({
           </div>
         </CardHeader>
         <CardContent className="p-6">
-          <div className="h-[280px] w-full">
+          <LazyChart height={280} variant="line">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
@@ -803,7 +804,7 @@ export function TaskDashboard({
                 />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </LazyChart>
         </CardContent>
       </Card>
         </>

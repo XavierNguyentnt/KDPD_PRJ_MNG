@@ -62,6 +62,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, Clock } from "lucide-react";
 import { FullPageSkeleton } from "@/components/ui/skeletons";
+import { GroupPageHero } from "@/components/group-page-hero";
 
 export default function Dashboard() {
   const [includeArchivedForList, setIncludeArchivedForList] = useState(false);
@@ -89,6 +90,22 @@ export default function Dashboard() {
   const [viewModeExtra, setViewModeExtra] = useState<"calendar" | null>(null);
   const [isExportingTasks, setIsExportingTasks] = useState(false);
   const taskListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onCmdSwitchTab(e: Event) {
+      const detail = (e as CustomEvent).detail as "overview" | "stats" | "tasks";
+      const map: Record<"overview" | "stats" | "tasks", "overview" | "analytics" | "tasks"> = {
+        overview: "overview",
+        stats: "analytics",
+        tasks: "tasks",
+      };
+      setActiveTab(map[detail] ?? "overview");
+    }
+    window.addEventListener("cmd:dashboard:switch-tab", onCmdSwitchTab as EventListener);
+    return () =>
+      window.removeEventListener("cmd:dashboard:switch-tab", onCmdSwitchTab as EventListener);
+  }, []);
+
   const dialogMode = useMemo<"view" | "edit">(() => {
     if (!selectedTask) return "view";
     const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
@@ -404,14 +421,14 @@ export default function Dashboard() {
 
   const handleCreateNew = useCallback(() => setIsCreateDialogOpen(true), []);
 
-  const handleExportTasks = useCallback(() => {
+  const handleExportTasks = useCallback(async () => {
     setIsExportingTasks(true);
     try {
       const noData = language === "vi" ? "Không có dữ liệu" : "No data";
       const noDesc = language === "vi"
         ? "Không có công việc để xuất Excel."
         : "No tasks to export.";
-      const result = exportTasksToExcel(filteredTasks as any, {
+      const result = await exportTasksToExcel(filteredTasks as any, {
         fileNameSuffix: "Dashboard_Tasks",
         localize: { noDataTitle: noData, noDataDesc: noDesc },
       });
@@ -436,6 +453,14 @@ export default function Dashboard() {
       setIsExportingTasks(false);
     }
   }, [filteredTasks, language, toast, t]);
+
+  useEffect(() => {
+    function onCmdExportExcel() {
+      handleExportTasks();
+    }
+    window.addEventListener("cmd:export:excel", onCmdExportExcel);
+    return () => window.removeEventListener("cmd:export:excel", onCmdExportExcel);
+  }, [handleExportTasks]);
 
   const getPriorityColor = (p: string) => getTaskPriorityColor(p).badge;
   const getStatusColor = (s: string) => getTaskStatusColor(s).badge;
@@ -472,40 +497,20 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 dashboard-page">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-            <span>{t.dashboard.title}</span>
-            <span aria-hidden>/</span>
-            <span className="text-foreground font-medium">
-              {t.dashboard.overview}
-            </span>
-          </nav>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">
-            {language === "vi"
-              ? `Xin chào, ${welcomeName}`
-              : `Welcome back, ${welcomeName}`}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {t.dashboard.overview}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>
-            {t.dashboard.lastSynced}: {format(new Date(), "HH:mm")}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="btn-icon shrink-0"
-            onClick={() => refresh()}
-            disabled={isRefreshing}>
-            <RefreshCw
-              className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-            />
-          </Button>
-        </div>
-      </div>
+      <GroupPageHero
+        groupCode="dashboard"
+        syncedAt={new Date()}
+        showRefresh
+        isRefreshing={isRefreshing}
+        onRefresh={() => refresh()}
+        countBadge={{
+          label:
+            language === "vi"
+              ? `${tasksForStats?.length ?? 0} công việc`
+              : `${tasksForStats?.length ?? 0} tasks`,
+          tone: "default",
+        }}
+      />
 
       <Tabs
         value={activeTab}
@@ -857,74 +862,80 @@ export default function Dashboard() {
 
         <TabsContent value="tasks" className="mt-0" ref={taskListRef}>
           <section className="section-card">
-            <div className="section-header">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <h3 className="font-semibold mr-2">{t.dashboard.tasks}</h3>
-                <Badge variant="secondary" className="font-normal">
-                  {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
-                </Badge>
-                <div className="flex items-center gap-2 ml-3">
-                  <span className="text-xs text-muted-foreground">
-                    {language === "vi" ? "Bao gồm lưu trữ" : "Include archived"}
-                  </span>
-                  <Switch
-                    checked={includeArchivedForList}
-                    onCheckedChange={(val) =>
-                      setIncludeArchivedForList(Boolean(val))
-                    }
-                  />
+            {/* ============================================================ */}
+            {/* [ROW 1] Section Header: Title + Badge + Switch (archived)    */}
+            {/*               vs Create New + Export Excel (right align)     */}
+            {/* ============================================================ */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between
+                            border-b border-border/60 bg-card/40 px-4 sm:px-5 py-3.5">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-base sm:text-lg">{t.dashboard.tasks}</h3>
+                  <Badge variant="secondary" className="font-normal shrink-0">
+                    {filteredTasks.length} {t.dashboard.tasks.toLowerCase()}
+                  </Badge>
                 </div>
+                <div className="flex items-center gap-2 pl-1 ml-0 sm:ml-2 border-l border-border/60 sm:border-l sm:pl-4">
+                  <Switch
+                    id="include-archived-toggle"
+                    checked={includeArchivedForList}
+                    onCheckedChange={(val) => setIncludeArchivedForList(Boolean(val))}
+                  />
+                  <label htmlFor="include-archived-toggle"
+                         className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none">
+                    {language === "vi" ? "Bao gồm lưu trữ" : "Include archived"}
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {(role === UserRole.ADMIN ||
                   role === UserRole.MANAGER ||
                   role === UserRole.EMPLOYEE) && (
                   <Button
                     size="sm"
                     onClick={() => setIsCreateDialogOpen(true)}
-                    disabled={isCreating}
-                    className="ml-2">
-                    <Plus className="w-4 h-4 mr-2" />
+                    disabled={isCreating}>
+                    <Plus className="w-4 h-4 mr-1.5" />
                     {t.dashboard.createNew}
                   </Button>
                 )}
-                {(role === UserRole.ADMIN ||
-                  role === UserRole.MANAGER) && (
+                {(role === UserRole.ADMIN || role === UserRole.MANAGER) && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleExportTasks}
-                    disabled={isExportingTasks || !filteredTasks.length}
-                    className="ml-1">
+                    disabled={isExportingTasks || !filteredTasks.length}>
                     <Download
-                      className={`w-4 h-4 mr-2 ${
-                        isExportingTasks ? "animate-pulse" : ""
-                      }`}
+                      className={`w-4 h-4 mr-1.5 ${isExportingTasks ? "animate-pulse" : ""}`}
                     />
                     {language === "vi" ? "Xuất Excel" : "Export Excel"}
                   </Button>
                 )}
               </div>
+            </div>
 
-              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:flex-wrap">
-                <div className="relative w-full sm:w-64">
+            {/* ============================================================ */}
+            {/* [ROW 2] Primary Quick Filters: Search / Group / Year /      */}
+            {/*          Clear + View-mode Toggle Group (Table|Kanban|Cal)  */}
+            {/* ============================================================ */}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between
+                            border-b border-border/60 bg-muted/15 px-4 sm:px-5 py-3">
+              <div className="flex flex-wrap items-center gap-2.5 grow min-w-0">
+                <div className="relative min-w-[200px] grow sm:grow-0 sm:w-72">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder={
-                      t.common.search +
-                      " " +
-                      t.dashboard.tasks.toLowerCase() +
-                      "..."
+                      t.common.search + " " + t.dashboard.tasks.toLowerCase() + "..."
                     }
-                    className="search-input pl-10"
+                    className="pl-9 search-input h-9"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
-
-                <Select
-                  value={groupFilter}
-                  onValueChange={setGroupFilter}>
-                  <SelectTrigger className="w-full sm:w-[160px] bg-background">
-                    <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                <Select value={groupFilter} onValueChange={setGroupFilter}>
+                  <SelectTrigger className="w-full sm:w-[160px] bg-background h-9">
+                    <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground shrink-0" />
                     <SelectValue placeholder={t.task.group} />
                   </SelectTrigger>
                   <SelectContent>
@@ -932,91 +943,78 @@ export default function Dashboard() {
                     {availableGroups
                       .filter((g): g is string => !!g)
                       .map((group) => (
-                        <SelectItem key={group} value={group}>
-                          {group}
-                        </SelectItem>
+                        <SelectItem key={group} value={group}>{group}</SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
-
-                <Select
-                  value={receivedYearFilter}
-                  onValueChange={setReceivedYearFilter}>
-                  <SelectTrigger className="w-full sm:w-[140px] bg-background">
-                    <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                <Select value={receivedYearFilter} onValueChange={setReceivedYearFilter}>
+                  <SelectTrigger className="w-full sm:w-[140px] bg-background h-9">
+                    <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground shrink-0" />
                     <SelectValue
                       placeholder={
                         (t.filter as any)?.year ??
-                        (language === "vi"
-                          ? "Năm nhận việc"
-                          : "Received year")
+                        (language === "vi" ? "Năm nhận việc" : "Received year")
                       }
                     />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">
                       {(t.filter as any)?.allYears ??
-                        (language === "vi"
-                          ? "Tất cả năm"
-                          : "All years")}
+                        (language === "vi" ? "Tất cả năm" : "All years")}
                     </SelectItem>
                     {availableYears.map((y) => (
-                      <SelectItem key={y} value={y}>
-                        {y}
-                      </SelectItem>
+                      <SelectItem key={y} value={y}>{y}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full sm:w-auto"
+                  size="sm"
+                  className="h-9"
                   onClick={clearAllFilters}>
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4 mr-1.5" />
                   {language === "vi" ? "Xoá lọc" : "Clear filters"}
                 </Button>
-
-                <ToggleGroup
-                  type="single"
-                  value={viewMode}
-                  onValueChange={(v) =>
-                    v &&
-                    (v === "table" ||
-                      v === "board" ||
-                      v === "calendar") &&
-                    setViewMode(v)
-                  }
-                  className="border rounded-md bg-background w-full sm:w-auto">
-                  <ToggleGroupItem
-                    value="table"
-                    aria-label={t.dashboard.viewTable}>
-                    <List className="h-4 w-4 sm:mr-1.5" />
-                    <span className="hidden sm:inline">
-                      {t.dashboard.viewTable}
-                    </span>
-                  </ToggleGroupItem>
-                  <ToggleGroupItem
-                    value="board"
-                    aria-label={t.dashboard.viewBoard}>
-                    <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
-                    <span className="hidden sm:inline">
-                      {t.dashboard.viewBoard}
-                    </span>
-                  </ToggleGroupItem>
-                  <ToggleGroupItem
-                    value="calendar"
-                    aria-label={t.dashboard.calendar}>
-                    <Calendar className="h-4 w-4 sm:mr-1.5" />
-                    <span className="hidden sm:inline">
-                      {t.dashboard.calendar}
-                    </span>
-                  </ToggleGroupItem>
-                </ToggleGroup>
               </div>
+
+              <ToggleGroup
+                type="single"
+                value={viewMode}
+                onValueChange={(v) =>
+                  v &&
+                  (v === "table" || v === "board" || v === "calendar") &&
+                  setViewMode(v)
+                }
+                className="border rounded-md bg-background h-9 p-0.5 shrink-0 self-start lg:self-auto w-full sm:w-auto">
+                <ToggleGroupItem
+                  value="table"
+                  aria-label={t.dashboard.viewTable}
+                  className="h-8 px-2 sm:px-3">
+                  <List className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">{t.dashboard.viewTable}</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="board"
+                  aria-label={t.dashboard.viewBoard}
+                  className="h-8 px-2 sm:px-3">
+                  <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">{t.dashboard.viewBoard}</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="calendar"
+                  aria-label={t.dashboard.calendar}
+                  className="h-8 px-2 sm:px-3">
+                  <Calendar className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">{t.dashboard.calendar}</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
 
-            <div className="px-4 sm:px-5 py-3 border-b border-border bg-muted/20">
+            {/* ============================================================ */}
+            {/* [ROW 3] Advanced TaskFilters component (2-tier)             */}
+            {/* ============================================================ */}
+            <div className="px-4 sm:px-5 py-3 border-b border-border/60 bg-muted/5">
               <TaskFilters
                 users={users ?? []}
                 components={componentOptions}
@@ -1030,37 +1028,39 @@ export default function Dashboard() {
               />
             </div>
 
-            <div className="px-4 sm:px-5 py-3 border-b border-border bg-muted/10 flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground shrink-0">
+            {/* ============================================================ */}
+            {/* [ROW 4] Assignee Quick Chips (horizontal scroll + wrap)     */}
+            {/* ============================================================ */}
+            <div className="px-4 sm:px-5 py-3 border-b border-border/60 bg-muted/10
+                            flex flex-wrap items-center gap-2 row-gap-2">
+              <span className="text-xs sm:text-sm font-medium text-muted-foreground shrink-0">
                 {t.dashboard.filterByStaff}:
               </span>
-              <Badge
-                variant={
-                  selectedAssignees.length === 0 ? "default" : "outline"
-                }
-                className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
-                onClick={() => setSelectedAssignees([])}>
-                {t.filter.allStaff}
-              </Badge>
-              {byAssignee.map(({ name, count, display }) => (
+              <div className="flex flex-wrap items-center gap-1.5 grow min-w-0">
                 <Badge
-                  key={name || "_unassigned"}
-                  variant={
-                    selectedAssignees.includes(name)
-                      ? "default"
-                      : "outline"
-                  }
-                  className="cursor-pointer hover:opacity-90 transition-opacity font-normal"
-                  onClick={() => {
-                    setSelectedAssignees((prev) => {
-                      const exists = prev.includes(name);
-                      if (exists) return prev.filter((n) => n !== name);
-                      return [...prev, name];
-                    });
-                  }}>
-                  {display} ({count})
+                  variant={selectedAssignees.length === 0 ? "default" : "outline"}
+                  className="cursor-pointer hover:opacity-90 transition-opacity font-normal text-xs h-7"
+                  onClick={() => setSelectedAssignees([])}>
+                  {t.filter.allStaff}
                 </Badge>
-              ))}
+                {byAssignee.map(({ name, count, display }) => (
+                  <Badge
+                    key={name || "_unassigned"}
+                    variant={
+                      selectedAssignees.includes(name) ? "default" : "outline"
+                    }
+                    className="cursor-pointer hover:opacity-90 transition-opacity font-normal text-xs h-7"
+                    onClick={() => {
+                      setSelectedAssignees((prev) => {
+                        const exists = prev.includes(name);
+                        if (exists) return prev.filter((n) => n !== name);
+                        return [...prev, name];
+                      });
+                    }}>
+                    {display} ({count})
+                  </Badge>
+                ))}
+              </div>
             </div>
 
             {viewMode === "table" ? (

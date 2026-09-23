@@ -6,11 +6,11 @@ import {
   useQueryClient,
   useQueries,
 } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
 import {
   useTasks,
   useCreateTask,
   useDeleteTask,
+  useRefreshTasks,
   UserRole,
 } from "@/hooks/use-tasks";
 import { useAuth } from "@/hooks/use-auth";
@@ -22,6 +22,7 @@ import {
   useTaskFilterStaffUsers,
 } from "@/hooks/use-works-and-components";
 import { TranslatorPicker } from "@/components/translator-picker";
+import { GroupPageHero } from "@/components/group-page-hero";
 import { TaskTable } from "@/components/task-table";
 import { TaskKanbanBoard } from "@/components/task-kanban-board";
 import {
@@ -141,6 +142,9 @@ import {
   numberToVietnameseWords,
   normalizeSearch,
   buildExportPrefix,
+  getTaskStatusColor,
+  getTaskPriorityColor,
+  loadXLSX,
 } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
@@ -884,6 +888,7 @@ export default function ThuKyHopPhanPage() {
     isLoading: tasksLoading,
     isError: tasksError,
   } = useTasks();
+  const { mutate: refresh, isPending: isRefreshing } = useRefreshTasks();
   const { data: users = [] } = useUsers();
   const { data: taskFilterUsers = [] } = useTaskFilterStaffUsers();
   const { data: works = [], isLoading: worksLoading } = useQuery({
@@ -2319,9 +2324,7 @@ export default function ThuKyHopPhanPage() {
 
     setIsExportingTasks(true);
     try {
-      const xlsxModule = await import("xlsx");
-      const XLSX = xlsxModule.default || xlsxModule;
-
+      const XLSX = await loadXLSX();
       const headers = [
         "ID",
         "Tiêu đề",
@@ -2502,6 +2505,14 @@ export default function ThuKyHopPhanPage() {
     }
   };
 
+  useEffect(() => {
+    function onCmdExportExcel() {
+      void handleExportTasks();
+    }
+    window.addEventListener("cmd:export:excel", onCmdExportExcel);
+    return () => window.removeEventListener("cmd:export:excel", onCmdExportExcel);
+  }, [handleExportTasks]);
+
   const handleExportWorks = async (
     filteredWorks: Work[],
     toast: (opts: any) => any,
@@ -2515,6 +2526,7 @@ export default function ThuKyHopPhanPage() {
     }
 
     try {
+      const XLSX = await loadXLSX();
       const includeOutstanding = !!tcColumnVis.outstanding;
       const tcIdsForOutstanding = includeOutstanding
         ? Array.from(
@@ -2685,6 +2697,7 @@ export default function ThuKyHopPhanPage() {
     }
 
     try {
+      const XLSX = await loadXLSX();
       const paymentsList = await Promise.all(
         filteredTc.map((c) => fetchPaymentsByTcId(c.id)),
       );
@@ -2817,6 +2830,7 @@ export default function ThuKyHopPhanPage() {
     }
 
     try {
+      const XLSX = await loadXLSX();
       const paymentsList = await Promise.all(
         filteredPc.map((c) => fetchPaymentsByPcId(c.id)),
       );
@@ -3618,6 +3632,21 @@ export default function ThuKyHopPhanPage() {
 
         {/* Tab: Tasks */}
         <TabsContent value="tasks" className="mt-6">
+          <GroupPageHero
+            groupCode="thuky"
+            syncedAt={new Date()}
+            showRefresh
+            isRefreshing={isRefreshing}
+            onRefresh={() => refresh()}
+            countBadge={{
+              label:
+                language === "vi"
+                  ? `${tasksForStats.length} công việc`
+                  : `${tasksForStats.length} tasks`,
+              tone: "default",
+            }}
+          />
+
           <div className="grid gap-6">
             <TaskStatsBadgesOnly
               tasks={tasksForStats}

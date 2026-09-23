@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useTasks,
   useRefreshTasks,
@@ -48,6 +48,7 @@ import {
   List,
 } from "lucide-react";
 import { TaskTableSkeleton } from "@/components/ui/skeletons";
+import { GroupPageHero } from "@/components/group-page-hero";
 import { Task } from "@shared/schema";
 import type { TaskWithAssignmentDetails as TTask } from "@shared/schema";
 import { format } from "date-fns";
@@ -57,7 +58,7 @@ import {
   getTaskPriorityColor,
 } from "@/lib/utils";
 
-function handleExportTasks(
+async function handleExportTasks(
   filteredTasks: TTask[],
   language: string,
   toast: (opts: any) => any,
@@ -66,7 +67,7 @@ function handleExportTasks(
   const noDesc = language === "vi"
     ? "Không có công việc để xuất Excel."
     : "No tasks to export.";
-  const result = exportTasksToExcel(filteredTasks, {
+  const result = await exportTasksToExcel(filteredTasks, {
     fileNameSuffix: "CV_Chung_Tasks",
     localize: { noDataTitle: noData, noDataDesc: noDesc },
   });
@@ -151,6 +152,14 @@ export default function CVChungPage() {
     setFilters({ status: "all", vote: "all" } as any);
   }, [setSearch, setFilters]);
 
+  useEffect(() => {
+    function onCmdExportExcel() {
+      handleExportTasks(filteredTasks, language, toast);
+    }
+    window.addEventListener("cmd:export:excel", onCmdExportExcel);
+    return () => window.removeEventListener("cmd:export:excel", onCmdExportExcel);
+  }, [filteredTasks, language, toast]);
+
   if (isLoading) {
     return <TaskTableSkeleton />;
   }
@@ -177,28 +186,24 @@ export default function CVChungPage() {
 
   return (
     <div className="space-y-8">
+      {/* Group Page Hero */}
+      <GroupPageHero
+        groupCode="cvchung"
+        syncedAt={new Date()}
+        showRefresh
+        isRefreshing={isRefreshing}
+        onRefresh={() => refresh()}
+        countBadge={{
+          label:
+            language === "vi"
+              ? `${tasksForStats.length} công việc`
+              : `${tasksForStats.length} tasks`,
+          tone: "default",
+        }}
+      />
+
       {/* Overview Stats */}
       <section>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              Quản lý các công việc chung của dự án
-            </p>
-          </div>
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            {t.dashboard.lastSynced}: {format(new Date(), "h:mm a")}
-            <Button
-              variant="outline"
-              size="sm"
-              className="btn-icon"
-              onClick={() => refresh()}
-              disabled={isRefreshing}>
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-            </Button>
-          </div>
-        </div>
         <TaskStatsBadgesOnly
           tasks={tasksForStats}
           activeKey={activeStatsKey}

@@ -74,6 +74,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TaskDialog } from "@/components/task-dialog";
+import { CommandPalette } from "@/components/ui/command-palette";
 import { formatDistanceToNow } from "date-fns";
 
 function getPasswordRequirementState(password: string) {
@@ -478,6 +479,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main
         ref={mainContentRef}
+        id="main-content"
+        role="main"
+        aria-label="Nội dung chính"
         className="flex flex-col min-h-[100dvh] min-w-0">
         {/* Header */}
         <header className="h-16 px-4 sm:px-8 flex items-center justify-between sticky-app-header">
@@ -1520,6 +1524,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         title={language === "vi" ? "Lên đầu trang" : "Back to top"}>
         <ChevronUp className="h-5 w-5" />
       </Button>
+
+      <CommandPalette
+        tasks={tasks}
+        permissions={{
+          canViewCVChung: true,
+          canViewEditorial: canViewBienTap,
+          canViewDesign: canViewThietKe,
+          canViewCNTT,
+          canViewThukyhopPhan: canViewThuKyHopPhan,
+          canViewTeam: true,
+          canViewAdmin: role === UserRole.ADMIN,
+          canExportExcel: true,
+          canCreateTask: true,
+        }}
+        onOpenTask={(t) => setSelectedTask(t as any)}
+      />
     </div>
   );
 }

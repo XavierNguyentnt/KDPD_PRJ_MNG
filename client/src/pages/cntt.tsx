@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useTasks,
   useRefreshTasks,
@@ -75,6 +75,7 @@ import {
 } from "@/lib/utils";
 import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { GroupPageHero } from "@/components/group-page-hero";
 
 const INCLUDED_GROUPS = ["CNTT", "Quét trùng lặp"];
 const DEFAULT_GROUP = "CNTT";
@@ -84,7 +85,7 @@ import type { TaskWithAssignmentDetails as TTask } from "@shared/schema";
 const getTaskStatusBadgeClass = (s: string) => getTaskStatusColor(s).badge;
 const getTaskPriorityBadgeClass = (p: string) => getTaskPriorityColor(p).badge;
 
-function handleExportTasks(
+async function handleExportTasks(
   filteredTasks: TTask[],
   language: string,
   toast: (opts: any) => any,
@@ -93,7 +94,7 @@ function handleExportTasks(
   const noDesc = language === "vi"
     ? "Không có công việc để xuất Excel."
     : "No tasks to export.";
-  const result = exportTasksToExcel(filteredTasks, {
+  const result = await exportTasksToExcel(filteredTasks, {
     fileNameSuffix: "CNTT_Tasks",
     localize: { noDataTitle: noData, noDataDesc: noDesc },
   });
@@ -166,6 +167,14 @@ export default function CNTTPage() {
     setFilters({ status: "all", vote: "all" } as any);
   }, [setSearch, setFilters]);
 
+  useEffect(() => {
+    function onCmdExportExcel() {
+      handleExportTasks(filteredTasks, language, toast);
+    }
+    window.addEventListener("cmd:export:excel", onCmdExportExcel);
+    return () => window.removeEventListener("cmd:export:excel", onCmdExportExcel);
+  }, [filteredTasks, language, toast]);
+
   const activeStatsKey = useMemo(
     () => getTaskStatsBadgeKeyFromFilters(filters),
     [filters.status, filters.vote],
@@ -225,28 +234,22 @@ export default function CNTTPage() {
 
   return (
     <div className="space-y-8">
+      <GroupPageHero
+        groupCode="cntt"
+        syncedAt={new Date()}
+        showRefresh
+        isRefreshing={isRefreshing}
+        onRefresh={() => refresh()}
+        countBadge={{
+          label:
+            language === "vi"
+              ? `${tasksForStats.length} công việc`
+              : `${tasksForStats.length} tasks`,
+          tone: "default",
+        }}
+      />
+
       <section>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              Quản lý công việc CNTT và quét trùng lặp với nhiều nhân sự thực
-              hiện
-            </p>
-          </div>
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            {t.dashboard.lastSynced}: {format(new Date(), "h:mm a")}
-            <Button
-              variant="outline"
-              size="sm"
-              className="btn-icon"
-              onClick={() => refresh()}
-              disabled={isRefreshing}>
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-            </Button>
-          </div>
-        </div>
         <TaskStatsBadgesOnly
           tasks={tasksForStats}
           activeKey={activeStatsKey}

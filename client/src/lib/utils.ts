@@ -1,7 +1,16 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import * as XLSX from "xlsx";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
+
+let XLSX_LAZY: any = null;
+let XLSX_LOADING: Promise<any> | null = null;
+export async function loadXLSX(): Promise<any> {
+  if (XLSX_LAZY) return XLSX_LAZY;
+  if (!XLSX_LOADING) {
+    XLSX_LOADING = import("xlsx").then((m) => { XLSX_LAZY = m; return m; });
+  }
+  return XLSX_LOADING;
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -238,74 +247,93 @@ export interface TaskColorClasses {
 /**
  * Trả về className Badge màu theo Trạng thái công việc.
  * Sử dụng HSL CSS variables --status-* đã định nghĩa trong index.css.
- * Ví dụ usage: <Badge className={getTaskStatusColor(task.status).badge}>...</Badge>
+ * Đảm bảo WCAG AA contrast 4.5+: dùng text-slate-900/white (universal dark)
+ * trên bg tinted 32-40% + border 80-85% family để distinct rõ.
+ * Variant="ghost" ở Badge sẽ bỏ variant default (nó inject text-primary-foreground
+ * gây FAIL contrast trên tinted bg).
+ * Lưu: text class và class màu được MERGE vào .badge LUÔN (không chỉ .text)
+ * để các helper cũ `getStatusBadgeClass = (s) => .badge` vẫn nhận đúng chữ.
  */
 export function getTaskStatusColor(status: TaskStatus | null | undefined): TaskColorClasses {
   const s = String(status ?? "").trim();
+  const universalDarkText = "!text-slate-900 dark:!text-white font-semibold";
   switch (s) {
     case "Not Started":
       return {
-        badge: "bg-status-muted/15 border-status-muted/30 border",
-        text:  "text-status-muted-foreground",
+        badge:
+          `bg-status-muted/35 border-status-muted/80 border ${universalDarkText}`,
+        text:  universalDarkText,
       };
     case "Pending":
       return {
-        badge: "bg-status-warning/15 border-status-warning/30 border",
-        text:  "text-[hsl(var(--status-warning))]",
+        badge:
+          `bg-status-warning/38 border-status-warning/85 border ${universalDarkText}`,
+        text:  universalDarkText,
       };
     case "In Progress":
       return {
-        badge: "bg-status-info/15 border-status-info/30 border",
-        text:  "text-[hsl(var(--status-info))]",
+        badge:
+          `bg-status-info/36 border-status-info/85 border ${universalDarkText}`,
+        text:  universalDarkText,
       };
     case "Completed":
       return {
-        badge: "bg-status-success/15 border-status-success/30 border",
-        text:  "text-[hsl(var(--status-success))]",
+        badge:
+          `bg-status-success/40 border-status-success/85 border ${universalDarkText}`,
+        text:  universalDarkText,
       };
     case "Cancelled":
       return {
-        badge: "bg-status-danger/10 border-status-danger/25 border",
-        text:  "text-[hsl(var(--status-danger))]",
+        badge:
+          `bg-status-danger/34 border-status-danger/85 border ${universalDarkText}`,
+        text:  universalDarkText,
       };
     default:
       return {
-        badge: "bg-muted border-border border",
-        text:  "text-foreground/80",
+        badge:
+          `bg-muted/40 border-border/80 border ${universalDarkText}`,
+        text:  universalDarkText,
       };
   }
 }
 
 /**
  * Trả về className Badge màu theo Mức độ Ưu tiên.
+ * Cùng nguyên tắc WCAG: universal dark text + tinted bg + dark border.
  */
 export function getTaskPriorityColor(priority: TaskPriority | null | undefined): TaskColorClasses {
   const p = String(priority ?? "").trim();
+  const boldText = "!text-slate-900 dark:!text-white font-semibold";
   switch (p) {
     case "Critical":
       return {
-        badge: "bg-destructive/15 border-destructive/30 border",
-        text:  "text-destructive font-semibold",
+        badge:
+          `bg-destructive/35 border-destructive/85 border ${boldText}`,
+        text:  boldText,
       };
     case "High":
       return {
-        badge: "bg-group-admin/15 border-group-admin/30 border",
-        text:  "text-[hsl(var(--group-admin))] font-medium",
+        badge:
+          `bg-group-admin/36 border-group-admin/80 border ${boldText}`,
+        text:  boldText,
       };
     case "Medium":
       return {
-        badge: "bg-group-thuky/25 border-group-thuky/40 border",
-        text:  "text-[hsl(var(--group-thuky))]",
+        badge:
+          `bg-group-thuky/40 border-group-thuky/80 border ${boldText}`,
+        text:  boldText,
       };
     case "Low":
       return {
-        badge: "bg-status-muted/20 border-status-muted/35 border",
-        text:  "text-muted-foreground",
+        badge:
+          `bg-status-muted/35 border-status-muted/80 border !text-slate-900 dark:!text-white font-medium`,
+        text:  "!text-slate-900 dark:!text-white font-medium",
       };
     default:
       return {
-        badge: "bg-muted border-border border",
-        text:  "text-foreground/70",
+        badge:
+          `bg-muted/40 border-border/80 border !text-slate-900 dark:!text-white font-medium`,
+        text:  "!text-slate-900 dark:!text-white font-medium",
       };
   }
 }
@@ -408,10 +436,10 @@ export function defaultAssignmentLabel(stageType: string): string {
   return stageType;
 }
 
-export function exportTasksToExcel<T extends TaskWithAssignmentDetails>(
+export async function exportTasksToExcel<T extends TaskWithAssignmentDetails>(
   filteredTasks: T[],
   opts: ExportTasksOptions<T>,
-): { ok: boolean; rows: number; fileName: string } {
+): Promise<{ ok: boolean; rows: number; fileName: string }> {
   const {
     fileNameSuffix,
     localize,
@@ -424,6 +452,8 @@ export function exportTasksToExcel<T extends TaskWithAssignmentDetails>(
   if (!filteredTasks || filteredTasks.length === 0) {
     return { ok: false, rows: 0, fileName: "" };
   }
+
+  const XLSX = await loadXLSX();
 
   const statusMap  = { ...DEFAULT_STATUS_VI, ...(localize.statusMap ?? {}) };
   const priorityMap = { ...DEFAULT_PRIORITY_VI, ...(localize.priorityMap ?? {}) };

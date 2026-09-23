@@ -15,6 +15,19 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    modulePreload: false,
+    rollupOptions: {
+      output: {
+        hoistTransitiveImports: false,
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (/node_modules\/xlsx\b/.test(id)) return "vendor-xlsx";
+            if (/node_modules\/@tanstack\/react-query\b/.test(id)) return "vendor-tanstack";
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     fs: {

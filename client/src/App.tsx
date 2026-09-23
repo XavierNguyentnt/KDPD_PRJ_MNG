@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -7,16 +8,17 @@ import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { UserRole } from "@/hooks/use-tasks";
 import { I18nProvider } from "@/hooks/use-i18n";
 import Layout from "@/components/layout";
-import Dashboard from "@/pages/dashboard";
-import CVChungPage from "@/pages/cv-chung";
-import BienTapPage from "@/pages/bien-tap";
-import ThietKePage from "@/pages/thiet-ke";
-import CNTTPage from "@/pages/cntt";
-import Team from "@/pages/team";
-import AdminDashboardPage from "@/pages/admin-dashboard";
-import ThuKyHopPhanPage from "@/pages/thu-ky-hop-phan";
 import LoginPage from "@/pages/login";
-import NotFound from "@/pages/not-found";
+
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const CVChungPage = lazy(() => import("@/pages/cv-chung"));
+const BienTapPage = lazy(() => import("@/pages/bien-tap"));
+const ThietKePage = lazy(() => import("@/pages/thiet-ke"));
+const CNTTPage = lazy(() => import("@/pages/cntt"));
+const Team = lazy(() => import("@/pages/team"));
+const AdminDashboardPage = lazy(() => import("@/pages/admin-dashboard"));
+const ThuKyHopPhanPage = lazy(() => import("@/pages/thu-ky-hop-phan"));
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 function normalize(text: string) {
   return text.toLowerCase().replace(/\s+/g, "");
@@ -162,25 +164,33 @@ function RedirectLegacyAdminUsersPage() {
 function Router() {
   return (
     <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/cv-chung" component={CVChungPage} />
-        <Route
-          path="/bien-tap"
-          component={() => (
-            <GuardedGroupPage group="Biên tập" Component={BienTapPage} />
-          )}
-        />
-        <Route path="/thiet-ke" component={GuardedThietKePage} />
-        <Route path="/cntt" component={GuardedCNTTPage} />
-        <Route path="/tasks" component={Dashboard} /> {/* Legacy route */}
-        <Route path="/thu-ky-hop-phan" component={ThuKyHopPhanPage} />
-        <Route path="/thu-ky-hop-phan/:sub" component={ThuKyHopPhanPage} />
-        <Route path="/team" component={Team} />
-        <Route path="/admin" component={GuardedAdminDashboardPage} />
-        <Route path="/admin/users" component={RedirectLegacyAdminUsersPage} />
-        <Route component={NotFound} />
-      </Switch>
+      <Suspense
+        fallback={
+          <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-muted-foreground">
+            <div className="h-10 w-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+            <p className="text-sm">Đang tải trang...</p>
+          </div>
+        }>
+        <Switch>
+          <Route path="/" component={Dashboard} />
+          <Route path="/cv-chung" component={CVChungPage} />
+          <Route
+            path="/bien-tap"
+            component={() => (
+              <GuardedGroupPage group="Biên tập" Component={BienTapPage} />
+            )}
+          />
+          <Route path="/thiet-ke" component={GuardedThietKePage} />
+          <Route path="/cntt" component={GuardedCNTTPage} />
+          <Route path="/tasks" component={Dashboard} /> {/* Legacy route */}
+          <Route path="/thu-ky-hop-phan" component={ThuKyHopPhanPage} />
+          <Route path="/thu-ky-hop-phan/:sub" component={ThuKyHopPhanPage} />
+          <Route path="/team" component={Team} />
+          <Route path="/admin" component={GuardedAdminDashboardPage} />
+          <Route path="/admin/users" component={RedirectLegacyAdminUsersPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </Suspense>
     </Layout>
   );
 }

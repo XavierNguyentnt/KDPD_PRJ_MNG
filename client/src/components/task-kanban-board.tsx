@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { memo, useCallback, useMemo, useRef } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -6,6 +6,8 @@ import {
   useSensors,
   useDroppable,
   useDraggable,
+  pointerWithin,
+  rectIntersection,
   type DragEndEvent,
   type DragCancelEvent,
   type DragStartEvent,
@@ -27,8 +29,8 @@ const TASK_PREFIX = "task-";
 
 const DEFAULT_WIP_LIMITS: Readonly<Record<string, number>> = {
   "Not Started": Infinity,
-  "In Progress": 8,
-  Pending: 5,
+  "In Progress": 15,
+  Pending: 10,
   Completed: Infinity,
   Cancelled: Infinity,
 };
@@ -130,8 +132,18 @@ export function TaskKanbanBoard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
+      activationConstraint: { distance: 6 },
     }),
+  );
+
+  const collisionDetectionStrategy = useMemo(
+    () =>
+      function customCollisionDetection(args: any) {
+        const pointer = pointerWithin(args);
+        if (pointer) return pointer;
+        return rectIntersection(args);
+      },
+    [],
   );
 
   const handleDragStart = useCallback((_event: DragStartEvent) => {
@@ -165,18 +177,20 @@ export function TaskKanbanBoard({
           targetTasks.filter((x) => x.id !== taskId).length + 1;
         const limit = getWipLimit(targetStatus);
         if (Number.isFinite(limit) && willCount > limit) {
+          const capacityPercent = Math.round(
+            (willCount / (limit as number)) * 100,
+          );
           toast({
-            variant: "destructive",
             title:
-              t.common.error ??
-              (language === "vi" ? "Cảnh báo" : "Warning"),
+              language === "vi"
+                ? "Gợi ý phân bổ công việc"
+                : "Capacity gentle reminder",
             description:
               language === "vi"
-                ? `Cột "${getStatusLabel(targetStatus)}" đã đạt WIP limit ${limit}. Không thể thêm công việc mới.`
-                : `Column "${targetStatus}" would exceed WIP limit of ${limit}. Move rejected.`,
-            duration: 6000,
+                ? `Cột "${getStatusLabel(targetStatus)}" đang ở mức ${willCount}/${limit} (~${capacityPercent}% WIP). Đã cho phép di chuyển bình thường — hãy cân nhắc chuyển/hoàn thành bớt việc sau để đảm bảo hiệu suất nhé.`
+                : `Column "${targetStatus}" now at ${willCount}/${limit} (~${capacityPercent}% WIP). Move completed normally — consider rebalancing later to stay focused.`,
+            duration: 6500,
           });
-          return;
         }
         updateTask(
           { id: taskId, status: targetStatus },
@@ -228,6 +242,7 @@ export function TaskKanbanBoard({
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={collisionDetectionStrategy}
       onDragStart={handleDragStart}
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}>
@@ -264,7 +279,7 @@ export function TaskKanbanBoard({
   );
 }
 
-function KanbanColumn({
+function KanbanColumnBase({
   id,
   title,
   tasks,
@@ -293,65 +308,112 @@ function KanbanColumn({
   const hasWip = Number.isFinite(wipLimit);
   const wipText = hasWip ? `${count} / ${wipLimit}` : String(count);
 
+  /**
+   * 3-TIER WIP VISUAL (bannerless, space-efficient, friendly):
+   *  Tier 1 — Under (< 80% capacity)        = neutral
+   *  Tier 2 — Approaching (80% ~ 100%) = amber/awareness
+   *  Tier 3 — Over  (> 100%)           = rose/gentle reminder
+   *  Tier 0 — No limit (Infinity)          = neutral (no progress)
+   */
+  const wipRatio = hasWip ? count / (wipLimit as number) : 0;
+  const wipTier: 0 | 1 | 2 | 3 = !hasWip
+    ? 0
+    : wipRatio > 1
+      ? 3
+      : wipRatio >= 0.8
+        ? 2
+        : 1;
+  const wipPercent = !hasWip
+    ? 0
+    : Math.min(100, Math.round(wipRatio * 100));
+
+  /** Shared color keys for Progress / Badge / Borders:
+   *  Tier 2 uses status-warning (amber) family, Tier 3 status-danger (rose/red)
+   */
+  const tierProgressIndicatorClass =
+    wipTier === 3
+      ? "bg-status-danger"
+      : wipTier === 2
+        ? "bg-status-warning"
+        : "bg-muted-foreground/35";
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex-shrink-0 w-[300px] rounded-lg border-2 transition-colors",
-        isOver && !overWip && "border-primary bg-primary/5",
-        isOver && overWip && "border-destructive bg-destructive/5",
-        !isOver && overWip && "border-destructive/60 bg-destructive/[0.04]",
-        !isOver && atWip && "border-accent/60 bg-accent/5",
-        !isOver && !overWip && !atWip && "border-border bg-muted/30",
+        "flex-shrink-0 w-[300px] rounded-lg border-2 transition-colors overflow-hidden",
+        // ── Border / outer tint (drag over states + static tiers)
+        isOver && wipTier === 3 && "border-destructive bg-destructive/5",
+        isOver && wipTier === 2 && "border-status-warning/80 bg-status-warning/5",
+        isOver && (wipTier === 1 || wipTier === 0) && "border-primary bg-primary/5",
+        !isOver && wipTier === 3 && "border-status-danger/55 bg-status-danger/[0.05]",
+        !isOver && wipTier === 2 && "border-status-warning/55 bg-status-warning/[0.045]",
+        !isOver && (wipTier === 1 || wipTier === 0) && "border-border bg-muted/25",
       )}>
+      {/* COLUMN HEADER (title + icon + count badge) */}
       <div
         className={cn(
-          "p-3 border-b flex items-center justify-between gap-2",
-          overWip
-            ? "border-destructive/30 bg-destructive/[0.05]"
-            : atWip
-            ? "border-accent/30 bg-accent/[0.05]"
-            : "border-border",
+          "p-3 border-b flex flex-col gap-2.5",
+          // Subtle header gradient tint by tier
+          wipTier === 3 && "border-status-danger/25 bg-gradient-to-b from-status-danger/15 to-status-danger/[0.07]",
+          wipTier === 2 && "border-status-warning/25 bg-gradient-to-b from-status-warning/14 to-status-warning/[0.06]",
+          (wipTier === 1 || wipTier === 0) && "border-border bg-muted/30",
         )}>
-        <div className="flex items-center gap-2 min-w-0">
-          {overWip ? (
-            <AlertTriangle
-              className="w-4 h-4 text-destructive shrink-0"
-              strokeWidth={2.2}
-            />
-          ) : atWip ? (
-            <AlertTriangle
-              className="w-4 h-4 text-accent shrink-0 opacity-85"
-              strokeWidth={2.0}
-            />
-          ) : null}
-          <span className="font-semibold text-sm truncate">{title}</span>
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Tier 2/3 only: gentle visual icon (NO TEXT BANNER!) */}
+            {wipTier === 3 ? (
+              <AlertTriangle
+                className="w-4 h-4 text-status-danger shrink-0"
+                strokeWidth={2.2}
+              />
+            ) : wipTier === 2 ? (
+              <AlertTriangle
+                className="w-4 h-4 text-status-warning shrink-0 opacity-90"
+                strokeWidth={2.0}
+              />
+            ) : null}
+            <span className="font-semibold text-sm truncate">{title}</span>
+          </div>
+          {/* Badge count: 3-tier chromatic tiered */}
+          <Badge
+            className={cn(
+              "text-xs shrink-0 tabular-nums border font-semibold",
+              wipTier === 3 &&
+                "bg-status-danger/90 text-white border-status-danger/40 shadow-sm",
+              wipTier === 2 &&
+                "bg-status-warning/22 text-foreground border-status-warning/55",
+              (wipTier === 1 || wipTier === 0) &&
+                "bg-secondary/70 text-secondary-foreground border-transparent",
+            )}>
+            {wipText}
+          </Badge>
         </div>
-        <Badge
-          className={cn(
-            "text-xs shrink-0 tabular-nums border",
-            overWip
-              ? "bg-destructive text-destructive-foreground border-destructive/40 shadow-sm"
-              : atWip
-              ? "bg-accent/15 text-accent-foreground border-accent/40"
-              : "bg-secondary text-secondary-foreground border-transparent",
-          )}>
-          {wipText}
-        </Badge>
+
+        {/* ── Capacity progress bar (tiered color, NO LABEL) */}
+        {hasWip && (
+          <div
+          aria-hidden="true" className="w-full">
+            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted/70 border border-border/70">
+              <div
+                className={cn(
+                  "absolute left-0 top-0 h-full rounded-full transition-all duration-300",
+                  tierProgressIndicatorClass,
+                )}
+                style={{ width: `${wipPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
-      <div className="p-2 min-h-[320px] flex flex-col gap-2">
-        {hasWip && overWip && (
-          <div className="flex items-center gap-1.5 rounded-md bg-destructive/10 border border-destructive/20 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
-            <span>Vượt WIP limit. Không thể thêm công việc.</span>
-          </div>
-        )}
-        {hasWip && !overWip && atWip && (
-          <div className="flex items-center gap-1.5 rounded-md bg-accent/10 border border-accent/20 px-2.5 py-1.5 text-[11px] font-medium text-accent-foreground">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
-            <span>Đạt WIP limit. Cân nhắc hoàn thành trước.</span>
-          </div>
-        )}
+
+      {/* BODY: tasks stack (NO TEXT BANNERS — removed old warning copy! Icon was at L340-L351, save 40px/cột vertical space reclaimed) */}
+      <div
+        className={cn(
+          "p-2 min-h-[320px] flex flex-col gap-2",
+          wipTier === 3 && "bg-status-danger/[0.035]",
+          wipTier === 2 && "bg-status-warning/[0.025]",
+        )}>
         {isUpdating && (
           <div className="flex items-center justify-center py-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -371,8 +433,29 @@ function KanbanColumn({
     </div>
   );
 }
+const KanbanColumn = memo(KanbanColumnBase, (prev, next) =>
+  prev.id === next.id &&
+  prev.title === next.title &&
+  prev.count === next.count &&
+  prev.wipLimit === next.wipLimit &&
+  prev.overWip === next.overWip &&
+  prev.atWip === next.atWip &&
+  prev.isUpdating === next.isUpdating &&
+  prev.tasks === next.tasks &&
+  prev.onTaskClick === next.onTaskClick &&
+  prev.getPriorityColor === next.getPriorityColor &&
+  prev.getStatusColor === next.getStatusColor,
+);
 
-function KanbanCard({
+const STATUS_LABEL_KEYS: Record<string, keyof any> = {
+  "Not Started": "notStarted",
+  "In Progress": "inProgress",
+  Completed: "completed",
+  Pending: "pending",
+  Cancelled: "cancelled",
+};
+
+function KanbanCardBase({
   task,
   onTaskClick,
   getPriorityColor,
@@ -390,23 +473,34 @@ function KanbanCard({
       data: { task },
     });
 
-  const style =
-    transform
-      ? {
-          transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        }
-      : undefined;
+  const cardStyle = useMemo(
+    () =>
+      transform
+        ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+        : undefined,
+    [transform?.x, transform?.y],
+  );
+
+  const handleClick = useMemo(
+    () => (onTaskClick ? () => onTaskClick(task) : undefined),
+    [onTaskClick, task],
+  );
+
+  const statusLabelKey = STATUS_LABEL_KEYS[task.status];
+  const statusText = statusLabelKey
+    ? (t.status as any)[statusLabelKey] ?? task.status
+    : task.status;
 
   return (
     <Card
       ref={setNodeRef}
-      style={style}
+      style={cardStyle}
       className={`touch-none select-none cursor-grab active:cursor-grabbing rounded-lg border bg-card text-card-foreground shadow-sm transition-shadow ${
         isDragging ? "relative z-50 shadow-lg ring-2 ring-primary/20" : ""
       }`}
       {...listeners}
       {...attributes}
-      onClick={onTaskClick ? () => onTaskClick(task) : undefined}>
+      onClick={handleClick}>
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
           <div className="p-0.5 rounded text-muted-foreground">
@@ -417,21 +511,13 @@ function KanbanCard({
               {task.title ?? ""}
             </p>
             <div className="flex flex-wrap gap-1 mt-2">
-              <Badge className={`text-xs ${getStatusColor(task.status)}`}>
-                {task.status === "Not Started"
-                  ? t.status.notStarted
-                  : task.status === "In Progress"
-                    ? t.status.inProgress
-                    : task.status === "Completed"
-                      ? t.status.completed
-                      : task.status === "Pending"
-                        ? t.status.pending
-                        : task.status === "Cancelled"
-                          ? t.status.cancelled
-                          : task.status}
+              <Badge
+                variant="ghost"
+                className={`text-xs ${getStatusColor(task.status)}`}>
+                {statusText}
               </Badge>
               <Badge
-                variant="outline"
+                variant="ghost"
                 className={`text-xs ${getPriorityColor(task.priority ?? "")}`}>
                 {task.priority ?? "—"}
               </Badge>
@@ -456,3 +542,9 @@ function KanbanCard({
     </Card>
   );
 }
+const KanbanCard = memo(KanbanCardBase, (prev, next) =>
+  prev.task === next.task &&
+  prev.onTaskClick === next.onTaskClick &&
+  prev.getPriorityColor === next.getPriorityColor &&
+  prev.getStatusColor === next.getStatusColor,
+);

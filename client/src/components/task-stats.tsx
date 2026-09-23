@@ -1,10 +1,85 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState, Suspense, lazy } from "react";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, AlertCircle, Clock, BarChart3, PauseCircle, AlertTriangle } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { useI18n } from "@/hooks/use-i18n";
 import type { TaskFilterState } from "@/components/task-filters";
+
+const TaskStatsCharts = lazy(async () => {
+  const { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } = await import("recharts");
+  return {
+    default: (props: {
+      statusData: Array<{ name: string; value: number }>;
+      priorityData: Array<{ name: string; value: number }>;
+      colors: string[];
+      tStatusDist: string;
+      tTasksByPrio: string;
+    }) => {
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="shadow-sm border-border/50">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">{props.tStatusDist}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={props.statusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {props.statusData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={props.colors[index % props.colors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+                {props.statusData.map((entry, index) => (
+                  <div key={entry.name} className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: props.colors[index % props.colors.length] }} />
+                    {entry.name}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-border/50">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">{props.tTasksByPrio}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={props.priorityData}>
+                    <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                    <Tooltip
+                      cursor={{ fill: 'transparent' }}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    />
+                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    },
+  };
+});
 
 interface TaskStatsProps {
   tasks: TaskWithAssignmentDetails[];
@@ -228,66 +303,18 @@ export function TaskStats({ tasks }: TaskStatsProps) {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-sm border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">{t.stats.statusDistribution}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {statusData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex justify-center gap-4 text-xs text-muted-foreground">
-              {statusData.map((entry, index) => (
-                <div key={entry.name} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                  {entry.name}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">{t.stats.tasksByPriority}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={priorityData}>
-                  <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
-                  <Tooltip 
-                    cursor={{ fill: 'transparent' }}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Suspense fallback={<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-sm border-border/50 h-[360px] animate-pulse bg-muted/20" />
+        <Card className="shadow-sm border-border/50 h-[360px] animate-pulse bg-muted/20" />
+      </div>}>
+        <TaskStatsCharts
+          statusData={statusData}
+          priorityData={priorityData}
+          colors={COLORS}
+          tStatusDist={t.stats.statusDistribution}
+          tTasksByPrio={t.stats.tasksByPriority}
+        />
+      </Suspense>
     </div>
   );
 }

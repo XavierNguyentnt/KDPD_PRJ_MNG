@@ -79,7 +79,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] w-full bg-background flex flex-col md:flex-row overflow-hidden">
+    <main role="main" aria-label="Đăng nhập" className="min-h-[100dvh] w-full bg-background flex flex-col md:flex-row overflow-hidden">
       <div className="hidden md:flex md:w-1/2 lg:w-[55%] relative overflow-hidden bg-gradient-to-br from-primary via-primary/92 to-accent text-white">
         <div className="absolute inset-0 opacity-[0.08] pointer-events-none"
           style={{
@@ -119,8 +119,7 @@ export default function LoginPage() {
                 </span>
               </h1>
               <p className="text-lg text-white/85 leading-relaxed font-light">
-                Bảo tồn, dịch thuật và phổ biến những tinh hoa kinh điển Phật giáo &
-                văn hóa Hán Nôm Việt Nam qua các thế hệ.
+                Dịch thuật và phát huy một cách toàn diện, có hệ thống giá trị tinh hoa các tác phẩm kinh điển phương Đông.
               </p>
             </div>
 
@@ -317,6 +316,6 @@ export default function LoginPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

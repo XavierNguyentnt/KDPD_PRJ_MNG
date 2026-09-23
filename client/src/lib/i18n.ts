@@ -168,6 +168,23 @@ export interface Translations {
     tasksByPriority: string;
   };
 
+  commandPalette: {
+    openShortcut: string;
+    placeholder: string;
+    noResults: string;
+    navigateGroup: string;
+    tasksGroup: string;
+    actionsGroup: string;
+    dashboardTabsGroup: string;
+    openTask: string;
+    createTask: string;
+    exportExcel: string;
+    switchView: string;
+    viewOverview: string;
+    viewDetails: string;
+    viewList: string;
+  };
+
   // Errors
   errors: {
     failedToLoad: string;
@@ -335,6 +352,22 @@ const translations: Record<Language, Translations> = {
       statusDistribution: "Phân bố trạng thái",
       tasksByPriority: "Công việc theo độ ưu tiên",
     },
+    commandPalette: {
+      openShortcut: "Mở thanh lệnh nhanh",
+      placeholder: "Tìm công việc, chuyển trang, tạo mới…",
+      noResults: "Không tìm thấy kết quả phù hợp",
+      navigateGroup: "Điều hướng",
+      tasksGroup: "Công việc",
+      actionsGroup: "Hành động nhanh",
+      dashboardTabsGroup: "Tab Bảng điều khiển",
+      openTask: "Mở chi tiết công việc",
+      createTask: "Tạo công việc mới",
+      exportExcel: "Xuất danh sách Excel",
+      switchView: "Chuyển chế độ xem",
+      viewOverview: "Tổng quan",
+      viewDetails: "Thống kê chi tiết",
+      viewList: "Danh sách công việc",
+    },
     errors: {
       failedToLoad: "Không thể tải dữ liệu",
       failedToCreate: "Không thể tạo công việc",
@@ -498,6 +531,22 @@ const translations: Record<Language, Translations> = {
       notCompleted: "Not Completed",
       statusDistribution: "Status Distribution",
       tasksByPriority: "Tasks by Priority",
+    },
+    commandPalette: {
+      openShortcut: "Open command palette",
+      placeholder: "Find a task, jump to page, create new…",
+      noResults: "No results match your query",
+      navigateGroup: "Navigate",
+      tasksGroup: "Tasks",
+      actionsGroup: "Quick actions",
+      dashboardTabsGroup: "Dashboard tabs",
+      openTask: "Open task details",
+      createTask: "Create new task",
+      exportExcel: "Export list to Excel",
+      switchView: "Switch view mode",
+      viewOverview: "Overview",
+      viewDetails: "Detailed statistics",
+      viewList: "Task list",
     },
     errors: {
       failedToLoad: "Failed to load tasks",

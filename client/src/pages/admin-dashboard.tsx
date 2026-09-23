@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminUsersPage from "@/pages/admin-users";
+import { GroupPageHero } from "@/components/group-page-hero";
 import type { TaskWithAssignmentDetails } from "@shared/schema";
 import { format } from "date-fns";
 import {
@@ -166,29 +167,22 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
+      <GroupPageHero
+        groupCode="admin"
+        syncedAt={new Date()}
+        showRefresh
+        isRefreshing={isRefreshing}
+        onRefresh={() => refresh()}
+        countBadge={{
+          label:
+            language === "vi"
+              ? `${allUsers.length ?? 0} người dùng`
+              : `${allUsers.length ?? 0} users`,
+          tone: "default",
+        }}
+      />
+
       <section>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex flex-col gap-1">
-            <p className="text-sm text-muted-foreground">
-              {language === "vi"
-                ? "Quản trị: Công việc & Người dùng"
-                : "Admin: Tasks & Users"}
-            </p>
-          </div>
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            {t.dashboard.lastSynced}: {format(new Date(), "h:mm a")}
-            <Button
-              variant="outline"
-              size="sm"
-              className="btn-icon"
-              onClick={() => refresh()}
-              disabled={isRefreshing}>
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-            </Button>
-          </div>
-        </div>
         <TaskStatsBadgesOnly
           tasks={tasksForStats}
           activeKey={activeStatsKey}
