@@ -1890,6 +1890,12 @@ export function TaskDialog({
         priority: data.priority || "Medium",
         group: selectedGroup,
         progress: progressVal,
+        dueDate: data.dueDate != null && String(data.dueDate).trim() !== ""
+          ? data.dueDate
+          : null,
+        actualCompletedAt: hasActualCompletedAtCreate && data.actualCompletedAt
+          ? new Date(data.actualCompletedAt).toISOString()
+          : null,
         notes:
           data.notes != null && String(data.notes).trim() !== ""
             ? String(data.notes).trim()
@@ -1984,8 +1990,11 @@ export function TaskDialog({
           thietKeKtvChinh.completeDate,
           ...thietKeTroLyList.map((s) => s.completeDate),
         );
-        payload.dueDate = maxDueTc ?? null;
-        payload.actualCompletedAt = maxActualTc ?? null;
+        (payload as Record<string, unknown>).dueDate = maxDueTc ?? null;
+        (payload as Record<string, unknown>).actualCompletedAt =
+          hasActualCompletedAtCreate && data.actualCompletedAt
+            ? new Date(data.actualCompletedAt).toISOString()
+            : maxActualTc ?? null;
         const nTc = designWorkAssignments.length;
         const mTc = designWorkAssignments.filter((a) => !!a.completedAt).length;
         payload.progress = nTc === 0 ? 0 : Math.round((100 / nTc) * mTc);
@@ -2030,7 +2039,9 @@ export function TaskDialog({
         payload.dueDate =
           maxDateString(...staffMulti.map((s) => s.dueDate)) ?? null;
         payload.actualCompletedAt =
-          maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
+          hasActualCompletedAtCreate && data.actualCompletedAt
+            ? new Date(data.actualCompletedAt).toISOString()
+            : maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
         const nMulti = staffMulti.length;
         const mMulti = staffMulti.filter(
           (s) => !!s.completedAt || s.status === "completed",
@@ -2138,6 +2149,17 @@ export function TaskDialog({
         payload.status = lastStageActual
           ? "Completed"
           : (payload.status ?? "Not Started");
+        const maxBienTapActualCreate = maxDateString(
+          data.btv2CompleteDate,
+          data.btv1CompleteDate,
+          data.docDuyetCompleteDate,
+        );
+        payload.actualCompletedAt =
+          hasActualCompletedAtCreate && data.actualCompletedAt
+            ? new Date(data.actualCompletedAt).toISOString()
+            : maxBienTapActualCreate
+              ? new Date(maxBienTapActualCreate).toISOString()
+              : null;
         // Ghi vào task_assignments: mỗi stage có userId thì thêm 1 assignment; round_number lấy từ Loại bông (Bông 1 → 1, Bông 3 → 3)
         const stageStatusToApi = (s: string) =>
           s === StageStatus.COMPLETED
@@ -2225,6 +2247,13 @@ export function TaskDialog({
           priority: data.priority,
           group: data.group,
           progress: progressVal,
+          dueDate:
+            data.dueDate != null && String(data.dueDate).trim() !== ""
+              ? data.dueDate
+              : null,
+          actualCompletedAt: hasActualCompletedAt && data.actualCompletedAt
+            ? new Date(data.actualCompletedAt).toISOString()
+            : null,
           notes:
             data.notes != null && String(data.notes).trim() !== ""
               ? String(data.notes).trim()
@@ -2237,6 +2266,9 @@ export function TaskDialog({
         }
       : {
           progress: data.progress,
+          actualCompletedAt: hasActualCompletedAt && data.actualCompletedAt
+            ? new Date(data.actualCompletedAt).toISOString()
+            : null,
           notes:
             data.notes != null && String(data.notes).trim() !== ""
               ? String(data.notes).trim()
@@ -2338,7 +2370,9 @@ export function TaskDialog({
       );
       (payload as Record<string, unknown>).dueDate = maxDueTc ?? null;
       (payload as Record<string, unknown>).actualCompletedAt =
-        maxActualTc ?? null;
+        hasActualCompletedAt && data.actualCompletedAt
+          ? new Date(data.actualCompletedAt).toISOString()
+          : maxActualTc ?? null;
       const nTc = designWorkAssignments.length;
       const mTc = designWorkAssignments.filter((a) => !!a.completedAt).length;
       (payload as Record<string, unknown>).progress =
@@ -2385,7 +2419,9 @@ export function TaskDialog({
       (payload as Record<string, unknown>).dueDate =
         maxDateString(...staffMulti.map((s) => s.dueDate)) ?? null;
       (payload as Record<string, unknown>).actualCompletedAt =
-        maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
+        hasActualCompletedAt && data.actualCompletedAt
+          ? new Date(data.actualCompletedAt).toISOString()
+          : maxDateString(...staffMulti.map((s) => s.completedAt)) ?? null;
       const nMulti = staffMulti.length;
       const mMulti = staffMulti.filter(
         (s) => !!s.completedAt || s.status === "completed",
@@ -2484,6 +2520,17 @@ export function TaskDialog({
       payload.status = lastStageActual
         ? "Completed"
         : (payload.status as string);
+      const maxBienTapActualEdit = maxDateString(
+        data.btv2CompleteDate,
+        data.btv1CompleteDate,
+        data.docDuyetCompleteDate,
+      );
+      (payload as Record<string, unknown>).actualCompletedAt =
+        hasActualCompletedAt && data.actualCompletedAt
+          ? new Date(data.actualCompletedAt).toISOString()
+          : maxBienTapActualEdit
+            ? new Date(maxBienTapActualEdit).toISOString()
+            : null;
       if (data.btv2Id || data.btv1Id || data.docDuyetId) {
         const stageStatusToApi = (s: string) =>
           s === StageStatus.COMPLETED
