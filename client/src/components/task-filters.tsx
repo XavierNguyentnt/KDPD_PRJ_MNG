@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useI18n } from "@/hooks/use-i18n";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,9 +21,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { Filter, X, ChevronDown } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Filter, X, ChevronDown, Check, Search } from "lucide-react";
 import type { User } from "@shared/schema";
-import { compareNamesByLastNameAZ } from "@/lib/utils";
+import { compareNamesByLastNameAZ, normalizeSearch } from "@/lib/utils";
 
 export interface TaskFilterState {
   staffId: string;
@@ -298,28 +300,108 @@ export function TaskFilters({
     </div>
   );
 
-  const StaffControl = (
-    <div className="flex flex-col gap-1 w-full sm:w-auto">
-      <Label className="text-xs text-muted-foreground">
-        {t.filter.staff}
-      </Label>
-      <Select
-        value={filters.staffId}
-        onValueChange={(v) => onFiltersChange({ staffId: v })}>
-        <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background">
-          <SelectValue placeholder={t.filter.allStaff} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">{t.filter.allStaff}</SelectItem>
-          {staffOptions.map((u) => (
-            <SelectItem key={u.id} value={u.id}>
-              {u.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
+  const StaffControl = (() => {
+    const [staffOpen, setStaffOpen] = useState(false);
+    const [staffSearch, setStaffSearch] = useState("");
+    const filteredStaff = useMemo(() => {
+      if (!staffSearch.trim()) return staffOptions;
+      const q = normalizeSearch(staffSearch.trim());
+      return staffOptions.filter((o) => normalizeSearch(o.label).includes(q));
+    }, [staffOptions, staffSearch]);
+    const currentStaff = staffOptions.find((u) => u.id === filters.staffId);
+    return (
+      <div className="flex flex-col gap-1 w-full sm:w-auto">
+        <Label className="text-xs text-muted-foreground">
+          {t.filter.staff}
+        </Label>
+        <Popover open={staffOpen} onOpenChange={(o) => {
+          setStaffOpen(o);
+          if (!o) setStaffSearch("");
+        }}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-[200px] h-9 justify-start font-normal px-3 gap-2 bg-background">
+              <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className={`truncate ${!currentStaff ? "text-muted-foreground" : ""}`}>
+                {currentStaff ? currentStaff.label : t.filter.allStaff}
+              </span>
+              {filters.staffId && filters.staffId !== "all" && (
+                <X
+                  className="w-3.5 h-3.5 ml-auto text-muted-foreground hover:text-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFiltersChange({ staffId: "all" });
+                  }}
+                />
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            side="bottom"
+            sideOffset={6}
+            className="w-[260px] p-0 shadow-lg">
+            <div className="p-2 pb-1 border-b">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  value={staffSearch}
+                  onChange={(e) => setStaffSearch(e.target.value)}
+                  placeholder={language === "vi" ? "Nhập tên nhân sự..." : "Type staff name..."}
+                  className="pl-8 h-9 text-sm"
+                />
+              </div>
+            </div>
+            <ScrollArea className="max-h-[280px]">
+              <div className="p-1">
+                <button
+                  type="button"
+                  className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center gap-2 transition-colors hover:bg-muted ${filters.staffId === "all" ? "bg-muted text-primary font-medium" : ""}`}
+                  onClick={() => {
+                    onFiltersChange({ staffId: "all" });
+                    setStaffOpen(false);
+                  }}>
+                  <span className="w-4 h-4 shrink-0 flex items-center justify-center">
+                    {filters.staffId === "all" && <Check className="w-3.5 h-3.5" />}
+                  </span>
+                  <span className="truncate">{t.filter.allStaff}</span>
+                  <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1.5 font-normal">
+                    {staffOptions.length}
+                  </Badge>
+                </button>
+                <Separator className="my-1" />
+                {filteredStaff.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    {language === "vi" ? "Không tìm thấy nhân sự phù hợp" : "No matching staff found"}
+                  </div>
+                ) : (
+                  filteredStaff.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className={`w-full text-left px-3 py-1.5 text-sm rounded-md flex items-center gap-2 transition-colors hover:bg-muted ${filters.staffId === u.id ? "bg-muted text-primary font-medium" : ""}`}
+                      onClick={() => {
+                        onFiltersChange({ staffId: u.id });
+                        setStaffOpen(false);
+                      }}>
+                      <span className="w-4 h-4 shrink-0 flex items-center justify-center">
+                        {filters.staffId === u.id && <Check className="w-3.5 h-3.5" />}
+                      </span>
+                      <span className="truncate">{u.label}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
+      </div>
+    );
+  })();
 
   return (
     <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-3">

@@ -773,6 +773,13 @@ export function TaskTable({
         </Popover>
       </div>
 
+      {/* HEADER STYLE ĐỒNG BỘ VỚI DANH MỤC TÁC PHẨM & HỢP ĐỒNG DỊCH THUẬT
+          Pattern từ thu-ky-hop-phan.tsx L3406-L3448 (works) & L4253-L4280 (contracts):
+            · <TableHeader> sticky top-0 z-20
+            · <TableRow> bg-muted/95 + backdrop-blur-sm (màu nền header dày đặc blur nhẹ giống 2 bảng trên)
+            · Sticky header columns (ID / Tiêu đề công việc) = bg-muted/95 z-30 (lớp 2) trên cùng khi scroll ngang
+            · Sticky body rows columns (ID / Tiêu đề) = bg-card z-10 (khác màu so với header → không bị trôi title theo body)
+          → Đảm bảo màu sắc đồng bộ 100% giữa 3 bảng nghiệp vụ */}
       <div className="sticky-table-thead relative w-full overflow-auto max-h-[calc(100dvh-300px)]">
         <table className="w-full caption-bottom text-sm border-collapse">
           <thead className="[&_tr]:border-b sticky top-0 z-20">
@@ -795,7 +802,7 @@ export function TaskTable({
                   sortDir={sortDir}
                   onSort={onSort}
                   className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[25%] min-w-[200px] sticky z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                  style={{ left: `${visibleTitleColumnLeft}px` }}
+                  style={{ left: visibleTitleColumnLeft }}
                 />
               )}
               {defaultColumns.group !== false && isColumnVisible("group") && (
@@ -825,7 +832,7 @@ export function TaskTable({
                   sortBy={sortBy}
                   sortDir={sortDir}
                   onSort={onSort}
-                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                 />
               )}
               {defaultColumns.status !== false && isColumnVisible("status") && (
@@ -835,7 +842,7 @@ export function TaskTable({
                   sortBy={sortBy}
                   sortDir={sortDir}
                   onSort={onSort}
-                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                 />
               )}
               {defaultColumns.dueDate !== false && isColumnVisible("dueDate") && (
@@ -845,7 +852,7 @@ export function TaskTable({
                   sortBy={sortBy}
                   sortDir={sortDir}
                   onSort={onSort}
-                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                 />
               )}
               {defaultColumns.progress !== false && isColumnVisible("progress") && (
@@ -855,7 +862,7 @@ export function TaskTable({
                   sortBy={sortBy}
                   sortDir={sortDir}
                   onSort={onSort}
-                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[15%]"
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                 />
               )}
               {defaultColumns.receivedDate !== false && isColumnVisible("receivedDate") && (
@@ -886,7 +893,7 @@ export function TaskTable({
                   sortBy={sortBy}
                   sortDir={sortDir}
                   onSort={onSort}
-                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                 />
               )}
               {defaultColumns.customColumns?.map((col) => {
@@ -912,14 +919,14 @@ export function TaskTable({
                 return (
                   <th
                     key={col.key}
-                    className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                    className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                   >
                     {col.label}
                   </th>
                 );
               })}
               {hasActions && (
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px]"></th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[120px] whitespace-nowrap"></th>
               )}
             </tr>
           </thead>

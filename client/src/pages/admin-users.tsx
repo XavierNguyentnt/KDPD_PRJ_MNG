@@ -60,9 +60,11 @@ import {
   UserPlus,
   Search,
   Briefcase,
+  DatabaseBackup,
 } from "lucide-react";
 import { cn, formatDateDDMMYYYY } from "@/lib/utils";
 import { api } from "@shared/routes";
+import { AdminBackupPanel } from "@/components/admin-backup-panel";
 
 /** (roleId, componentId) từ user_roles — dùng cho Thư ký hợp phần + Tên Hợp phần */
 interface RoleAssignmentItem {
@@ -838,25 +840,38 @@ export default function AdminUsersPage({
               className="pl-8 h-9 bg-background"
             />
           </div>
-          <Button
-            className="gap-2"
-            onClick={() => {
-              setCreateDialogOpen(true);
-              setCreateForm({
-                email: "",
-                displayName: "",
-                firstName: "",
-                lastName: "",
-                department: "",
-                isActive: true,
-                roleIds: [],
-                groupIds: [],
-                componentIds: [],
-              });
-            }}>
-            <UserPlus className="h-4 w-4" />
-            Thêm người dùng
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              className="gap-2"
+              onClick={() => {
+                setCreateDialogOpen(true);
+                setCreateForm({
+                  email: "",
+                  displayName: "",
+                  firstName: "",
+                  lastName: "",
+                  department: "",
+                  isActive: true,
+                  roleIds: [],
+                  groupIds: [],
+                  componentIds: [],
+                });
+              }}>
+              <UserPlus className="h-4 w-4" />
+              Thêm người dùng
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() =>
+                document
+                  .getElementById("admin-backup-anchor")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }>
+              <DatabaseBackup className="h-4 w-4" />
+              Sao lưu CSDL
+            </Button>
+          </div>
         </div>
       </div>
       <Card>
@@ -1775,6 +1790,12 @@ export default function AdminUsersPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <div
+        id="admin-backup-anchor"
+        className="mt-10 scroll-mt-24">
+        <AdminBackupPanel />
+      </div>
     </div>
   );
 }

@@ -191,62 +191,46 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const onScroll = () => {
       setShowBackToTop(window.scrollY > 300);
-
-      if (!sidebarOpen) return;
-      const nav = sidebarNavRef.current;
-      if (!nav) return;
-
-      if (userIsInteractingSidebarRef.current) return;
-
-      const now = Date.now();
-      if (now - lastSidebarSyncAtRef.current < 80) return;
-      lastSidebarSyncAtRef.current = now;
-
-      const mainEl = document.scrollingElement || document.documentElement;
-      const mainScrollTop = mainEl.scrollTop || 0;
-      const mainScrollHeight =
-        (mainEl.scrollHeight || window.innerHeight) - window.innerHeight;
-      const mainProgress = mainScrollHeight > 0
-        ? Math.max(0, Math.min(1, mainScrollTop / mainScrollHeight))
-        : 0;
-
-      const navMaxScroll = Math.max(
-        0,
-        (nav.scrollHeight || 0) - (nav.clientHeight || 0),
-      );
-      if (navMaxScroll <= 0) return;
-
-      const target = navMaxScroll * mainProgress;
-      const current = nav.scrollTop;
-      const diff = target - current;
-      if (Math.abs(diff) > 1.5) {
-        nav.scrollTop = current + diff * 0.35;
-      }
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
     };
-  }, [sidebarOpen]);
+  }, []);
 
   useEffect(() => {
     if (!sidebarOpen) return;
     const nav = sidebarNavRef.current;
     const active = activeNavItemRef.current;
-    if (!nav || !active) return;
+    if (!nav) return;
 
-    const navRect = nav.getBoundingClientRect();
-    const itemRect = active.getBoundingClientRect();
-    const above = itemRect.top < navRect.top + 18;
-    const below = itemRect.bottom > navRect.bottom - 18;
-    if (above || below) {
-      active.scrollIntoView({
-        block: "center",
-        behavior: "smooth",
-      });
-    }
-  }, [location, sidebarOpen]);
+    let rafId = 0;
+    const run = () => {
+      if (active) {
+        const navRect = nav.getBoundingClientRect();
+        const itemRect = active.getBoundingClientRect();
+        const above = itemRect.top < navRect.top + 18;
+        const below = itemRect.bottom > navRect.bottom - 18;
+        if (above || below) {
+          active.scrollIntoView({
+            block: "center",
+            behavior: "smooth",
+          });
+          return;
+        }
+      }
+      if (Math.abs(nav.scrollTop) > 0.5) {
+        nav.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    };
+    rafId = window.requestAnimationFrame(() => {
+      rafId = window.requestAnimationFrame(run);
+    });
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [sidebarOpen, location]);
 
   useEffect(() => {
     if (settingsOpen) {
@@ -448,101 +432,148 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="min-h-[100dvh] bg-gray-50/50 md:grid overflow-x-hidden relative"
-      style={{
-        gridTemplateColumns: sidebarOpen ? "16rem 1fr" : "0px 1fr",
-        transition: "grid-template-columns 300ms ease-in-out",
-      }}>
-      {/* Floating sidebar toggle — always reachable anywhere on page (md+).
-          - Sidebar closed: left-edge thin gold bar → click = OPEN
-          - Sidebar open: right-edge of sidebar → click = CLOSE */}
-      <button
-        type="button"
-        aria-label={
-          sidebarOpen
-            ? language === "vi"
-              ? "Đóng thanh điều hướng"
-              : "Close navigation sidebar"
-            : language === "vi"
-            ? "Mở thanh điều hướng"
-            : "Open navigation sidebar"
-        }
-        aria-expanded={sidebarOpen}
-        aria-controls="sidebar-nav"
-        onClick={() => setSidebarOpen((v) => !v)}
-        className={cn(
-          "group fixed z-[60] top-1/2 -translate-y-1/2",
-          "hidden md:flex items-center justify-center cursor-pointer",
-          "h-28 w-3 rounded-r-md md:w-[10px]",
-          "outline-none transition-all duration-300 ease-in-out",
-          "backdrop-blur-[2px]",
-          sidebarOpen
-            ? "translate-x-[calc(16rem-1px)] rounded-l-md rounded-r-none"
-            : "left-0 rounded-r-md rounded-l-none",
-        )}
-        style={{
-          background: sidebarOpen
-            ? "linear-gradient(270deg, hsl(var(--sidebar-glow) / 0.82) 0%, hsl(var(--sidebar-glow) / 0.22) 100%)"
-            : "linear-gradient(90deg, hsl(var(--sidebar-glow) / 0.72) 0%, hsl(var(--sidebar-glow) / 0.18) 100%)",
-          boxShadow: sidebarOpen
-            ? "-1px 0 0 hsl(var(--sidebar-glow) / 0.9) inset, 0 -10px 22px -10px hsl(var(--sidebar-glow) / 0.65), 0 0 0 1px hsl(var(--sidebar-border) / 0.7)"
-            : "1px 0 0 hsl(var(--sidebar-glow) / 0.9) inset, 0 10px 22px -10px hsl(var(--sidebar-glow) / 0.65), 0 0 0 1px hsl(var(--sidebar-border) / 0.7)",
-          color: "hsl(var(--sidebar-active-fg))",
-        }}>
-        <span className="sr-only">
-          {sidebarOpen
-            ? language === "vi"
-              ? "Đóng thanh điều hướng"
-              : "Close sidebar"
-            : language === "vi"
-            ? "Mở thanh điều hướng"
-            : "Open sidebar"}
-        </span>
-        {sidebarOpen ? (
-          <ChevronLeft
-            className="h-5 w-5 transition-transform duration-200 group-hover:-translate-x-[2px]"
-            strokeWidth={2.4}
-          />
-        ) : (
-          <ChevronRight
-            className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-[2px]"
-            strokeWidth={2.4}
-          />
-        )}
-      </button>
-
-      {/* Sidebar */}
+      className="min-h-[100dvh] bg-gray-50/50 overflow-x-hidden relative w-full"
+      >
+      {/* Sidebar V.3 Fixed Viewport Layer — cố định toàn bộ chiều dọc màn hình (inset-y-0 left-0)
+          Không di chuyển theo scroll của trang (lên/xuống/trái/phải).
+          Chiếm chiều rộng động theo expanded/collapsed state, main content bên phải tự padding-left tương ứng. */}
       <aside
         id="sidebar-nav"
         ref={sidebarRef}
-        className={`
-          sidebar-shell hidden md:block h-screen overflow-hidden
-          transition-[opacity,transform] duration-300 ease-in-out
-          ${sidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"}
-        `}
-        style={{ willChange: "transform,opacity" }}>
-        <div className="h-full flex flex-col">
-          <div className="p-6 border-b border-[hsl(var(--sidebar-border))]/70 bg-gradient-to-b from-[hsl(var(--sidebar-bg-elevated))] to-transparent flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-display font-bold text-2xl">
+        className={cn(
+          "hidden md:block",
+          "fixed inset-y-0 left-0 z-30",
+          sidebarOpen ? "md:p-3" : "md:p-2",
+        )}
+        style={{
+          width: sidebarOpen
+            ? "var(--sidebar-width-expanded)"
+            : "var(--sidebar-width-collapsed)",
+          transition:
+            "width 320ms cubic-bezier(0.22,1,0.36,1), padding 320ms ease",
+        }}>
+        <div
+          className={cn(
+            "sidebar-shell h-full flex flex-col overflow-hidden",
+            "rounded-2xl border",
+          )}
+          style={{
+            borderColor: "hsl(var(--sidebar-border) / 0.9)",
+          }}>
+          {/* NAVBAR TOP: logo area (hình tròn như tham chiếu DexignLab) + toggle Chevron đơn giản
+              Khi COLLAPSED: ẩn toggle bên trong (dùng Floating Gold Bar 10px làm trigger),
+              logo 44px căn giữa tuyệt đối (đồng bộ với nav items 44px bên dưới) để thẳng hàng pixel-perfect.
+              Padding logo area = padding nav items (px-1 py-4) → edge left/right của 2 vùng trùng nhau = thẳng hàng tuyệt đối. */}
+          <div
+            className={cn(
+              "relative flex-shrink-0 flex items-center transition-[padding] duration-300 ease-out",
+              sidebarOpen
+                ? "p-3 justify-between gap-2"
+                : "px-1 py-4 justify-center items-center",
+            )}
+            style={{
+              borderBottom: "1px solid hsl(var(--sidebar-border) / 0.7)",
+              background:
+                "linear-gradient(180deg, hsl(var(--sidebar-bg-elevated)), hsl(var(--sidebar-bg)))",
+            }}>
+            <div
+              className={cn(
+                "flex items-center gap-3 min-w-0",
+                sidebarOpen ? "justify-start" : "justify-center w-full",
+              )}>
+              {/* Logo container: COLLAPSED mode = 44×44 (đồng bộ 100% kích thước nav buttons dưới)
+                  Collapsed: dùng rounded-2xl thay vì rounded-full? Giữ hình tròn (brand), nhưng
+                  center-align vật lý bằng w/h chính xác + flex-center. */}
+              <div
+                className="flex-shrink-0 relative flex items-center justify-center"
+                style={{
+                  width: sidebarOpen ? 48 : 44,
+                  height: sidebarOpen ? 48 : 44,
+                  borderRadius: sidebarOpen ? "9999px" : "16px",
+                  border: sidebarOpen
+                    ? "1px solid hsl(var(--sidebar-border) / 0.7)"
+                    : "1px solid transparent",
+                  background: sidebarOpen
+                    ? "radial-gradient(ellipse at 30% 20%, hsl(var(--sidebar-glow) / 0.22), transparent 60%), hsl(var(--sidebar-bg-elevated))"
+                    : "hsl(var(--sidebar-bg-elevated))",
+                  boxShadow: sidebarOpen
+                    ? "0 1px 0 hsl(var(--sidebar-border) / 0.5) inset, 0 8px 16px -12px hsl(var(--sidebar-glow) / 0.5)"
+                    : "none",
+                }}>
                 <img
                   src="/logo-duan.png"
-                  alt="Logo"
-                  className="h-16 w-auto rounded"
+                  alt="Logo Văn phòng Dự án Kinh điển phương Đông"
+                  draggable={false}
+                  className="object-contain select-none m-auto block"
                   style={{
-                    filter:
-                      "drop-shadow(0 1px 0 hsl(var(--sidebar-border) / 0.6)) drop-shadow(0 6px 12px -8px hsl(var(--sidebar-glow) / 0.45))",
+                    width: sidebarOpen ? "68%" : "70%",
+                    height: sidebarOpen ? "68%" : "70%",
+                    maxWidth: "100%",
+                    maxHeight: "100%",
                   }}
                 />
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`h-8 w-8 transition-opacity duration-200 hover:bg-[hsl(var(--sidebar-active-bg))]/60 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-                onClick={() => setSidebarOpen(false)}>
-                <X className="h-4 w-4" />
-              </Button>
+              <div
+                className={cn(
+                  "flex flex-col min-w-0",
+                  sidebarOpen
+                    ? "opacity-100 w-auto"
+                    : "opacity-0 w-0 overflow-hidden pointer-events-none",
+                )}
+                style={{ transition: "opacity 200ms ease 60ms" }}>
+                <span
+                  className="font-display font-bold tracking-tight text-[15px] leading-none truncate"
+                  style={{
+                    color: "hsl(var(--sidebar-fg))",
+                  }}>
+                  {language === "vi" ? "Văn phòng KDPD" : "KDPD Office"}
+                </span>
+                <span
+                  className="mt-1 text-[11px] leading-none truncate"
+                  style={{ color: "hsl(var(--sidebar-muted-fg))" }}>
+                  {language === "vi"
+                    ? "Quản lý dự án Kinh điển"
+                    : "Project Management"}
+                </span>
+              </div>
             </div>
+
+            {/* Toggle button Chevron — CHỈ HIỂN THỊ KHI EXPANDED (collapsed dùng Floating Gold Bar thay thế
+                để tránh chồng lấn logo + không gian quá chật). */}
+            <button
+              type="button"
+              aria-label={
+                sidebarOpen
+                  ? language === "vi"
+                    ? "Thu gọn thanh điều hướng"
+                    : "Collapse navigation"
+                  : language === "vi"
+                  ? "Mở rộng thanh điều hướng"
+                  : "Expand navigation"
+              }
+              aria-expanded={sidebarOpen}
+              aria-controls="sidebar-nav"
+              onClick={() => setSidebarOpen((v) => !v)}
+              className={cn(
+                "relative flex-shrink-0 flex items-center justify-center rounded-full border cursor-pointer select-none outline-none transition-all duration-300 ease-out hover:opacity-90 active:scale-95",
+                sidebarOpen
+                  ? "h-9 w-9 opacity-100 scale-100 translate-x-0"
+                  : "h-0 w-0 min-h-0 min-w-0 opacity-0 -translate-x-1 scale-50 pointer-events-none overflow-hidden border-0",
+              )}
+              style={{
+                borderColor: "hsl(var(--sidebar-border) / 0.7)",
+                background: "hsl(var(--sidebar-bg-elevated))",
+                color: "hsl(var(--sidebar-muted-fg))",
+                boxShadow: sidebarOpen
+                  ? "0 1px 0 hsl(var(--sidebar-border) / 0.5) inset"
+                  : "none",
+              }}>
+              {sidebarOpen ? (
+                <ChevronLeft className="w-4.5 h-4.5 shrink-0" />
+              ) : (
+                <ChevronRight className="w-4.5 h-4.5 shrink-0" />
+              )}
+            </button>
           </div>
 
           <nav
@@ -552,7 +583,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onWheel={() => {
               userIsInteractingSidebarRef.current = true;
               window.clearTimeout(
-                (userIsInteractingSidebarRef as any)._t as number | undefined,
+                (userIsInteractingSidebarRef as any)._t as
+                  | number
+                  | undefined,
               );
               (userIsInteractingSidebarRef as any)._t = window.setTimeout(() => {
                 userIsInteractingSidebarRef.current = false;
@@ -563,39 +596,192 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             }}
             onPointerUp={() => {
               window.clearTimeout(
-                (userIsInteractingSidebarRef as any)._t as number | undefined,
+                (userIsInteractingSidebarRef as any)._t as
+                  | number
+                  | undefined,
               );
               (userIsInteractingSidebarRef as any)._t = window.setTimeout(() => {
                 userIsInteractingSidebarRef.current = false;
               }, 900);
             }}
-            className={`flex-1 px-4 py-4 space-y-1 overflow-y-auto overscroll-contain transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+            className={cn(
+              "flex-1 space-y-1 overflow-y-auto overscroll-contain transition-[padding] duration-300 ease-out",
+              sidebarOpen
+                ? "px-3 py-3"
+                : "px-1 py-4 md:space-y-3",
+            )}>
             {navItems.map((item) => {
               const isActive = location === item.href;
               return (
-                <Link key={item.href} href={item.href}>
+                <Link key={item.href} href={item.href} className="block">
                   <div
                     ref={(el) => {
                       if (isActive) activeNavItemRef.current = el;
                     }}
+                    role="link"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        window.location.href = item.href;
+                      }
+                    }}
+                    title={sidebarOpen ? undefined : item.label}
                     className={cn(
-                      "sidebar-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-colors duration-200",
+                      "sidebar-nav-item relative flex items-center text-xs font-medium cursor-pointer select-none",
+                      sidebarOpen
+                        ? "gap-3 px-3.5 py-2.5 justify-start h-11 w-full rounded-xl"
+                        : "gap-0 justify-center items-center h-11 w-11 aspect-square rounded-2xl mx-auto",
                       isActive && "sidebar-nav-item-active",
                     )}>
                     <item.icon
-                      className="w-4 h-4"
-                      style={
-                        isActive
-                          ? { color: "hsl(var(--sidebar-active-fg))" }
-                          : undefined
-                      }
+                      className={cn(
+                        "flex-shrink-0 w-[18px] h-[18px]",
+                      )}
                     />
-                    {item.label}
+                    <span
+                      className={cn(
+                        "min-w-0 truncate transition-[opacity,transform,width] duration-200 ease-out font-medium",
+                        sidebarOpen
+                          ? "w-auto opacity-100 translate-x-0"
+                          : "w-0 opacity-0 -translate-x-2 pointer-events-none overflow-hidden",
+                      )}>
+                      {item.label}
+                    </span>
                   </div>
                 </Link>
               );
             })}
           </nav>
+
+          {/* Footer Action Icons Group — tham chiếu DexignLab (2 icon gradient đặc biệt ở cuối sidebar rail)
+              Khi collapsed: 2 icon tròn gradient nổi bật (44px, căn giữa tuyệt đối) | Khi expanded: 2 row như nav item thường */}
+          <div
+            className={cn(
+              "flex-shrink-0 border-t transition-[padding] duration-300 ease-out",
+              sidebarOpen
+                ? "px-3 pt-2 pb-1 space-y-1.5"
+                : "px-1 pt-3 pb-2 space-y-3",
+            )}
+            style={{ borderColor: "hsl(var(--sidebar-border) / 0.6)" }}>
+            {/* Settings */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setSettingsOpen(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSettingsOpen(true);
+                }
+              }}
+              title={
+                language === "vi" ? "Cài đặt tài khoản" : "Account settings"
+              }
+              className={cn(
+                "sidebar-nav-item relative flex items-center text-xs font-medium cursor-pointer select-none transition-all duration-200",
+                sidebarOpen
+                  ? "gap-3 px-3.5 py-2.5 justify-start h-11 w-full rounded-xl"
+                  : "gap-0 justify-center items-center h-11 w-11 aspect-square mx-auto rounded-full text-white",
+              )}
+              style={
+                !sidebarOpen
+                  ? {
+                      background:
+                        "linear-gradient(135deg, hsl(var(--sidebar-glow)) 0%, hsl(12 78% 58%) 100%)",
+                      boxShadow:
+                        "0 6px 16px -8px hsl(var(--sidebar-glow) / 0.8), 0 0 0 1px hsl(var(--sidebar-glow) / 0.5) inset",
+                      color: "hsl(var(--accent-foreground))",
+                      border: "1px solid transparent",
+                    }
+                  : undefined
+              }>
+              <Settings className="w-[18px] h-[18px] flex-shrink-0" />
+              <span
+                className={cn(
+                  "min-w-0 truncate transition-[opacity,transform,width] duration-200 ease-out font-medium",
+                  sidebarOpen
+                    ? "w-auto opacity-100 translate-x-0"
+                    : "w-0 opacity-0 -translate-x-2 pointer-events-none overflow-hidden",
+                )}>
+                {language === "vi" ? "Cài đặt" : "Settings"}
+              </span>
+            </div>
+            {/* PWA Install */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                if (!installPromptOpen) setInstallPromptOpen(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (!installPromptOpen) setInstallPromptOpen(true);
+                }
+              }}
+              title={
+                language === "vi"
+                  ? "Cài đặt ứng dụng"
+                  : "Install application"
+              }
+              className={cn(
+                "sidebar-nav-item relative flex items-center text-xs font-medium cursor-pointer select-none transition-all duration-200",
+                sidebarOpen
+                  ? "gap-3 px-3.5 py-2.5 justify-start h-11 w-full rounded-xl"
+                  : "gap-0 justify-center items-center h-11 w-11 aspect-square mx-auto rounded-full text-white",
+              )}
+              style={
+                !sidebarOpen
+                  ? {
+                      background:
+                        "linear-gradient(135deg, hsl(192 78% 36%) 0%, hsl(274 62% 58%) 100%)",
+                      boxShadow:
+                        "0 6px 16px -8px hsl(192 78% 36% / 0.8), 0 0 0 1px hsl(192 78% 36% / 0.5) inset",
+                      color: "hsl(var(--primary-foreground))",
+                      border: "1px solid transparent",
+                    }
+                  : undefined
+              }>
+              <Smartphone className="w-[18px] h-[18px] flex-shrink-0" />
+              <span
+                className={cn(
+                  "min-w-0 truncate transition-[opacity,transform,width] duration-200 ease-out font-medium",
+                  sidebarOpen
+                    ? "w-auto opacity-100 translate-x-0"
+                    : "w-0 opacity-0 -translate-x-2 pointer-events-none overflow-hidden",
+                )}>
+                {language === "vi" ? "Ứng dụng" : "Install app"}
+              </span>
+            </div>
+          </div>
+
+          {/* Footer Tips card — đơn giản hóa theo tông V.3 sạch, tối giản (visible expanded only) */}
+          <div
+            className={cn(
+              "relative mx-2 mb-2 flex-shrink-0 rounded-2xl border overflow-hidden transition-all duration-300 ease-out",
+              sidebarOpen
+                ? "opacity-100 p-4 mt-2 translate-y-0"
+                : "opacity-0 p-2 h-0 mt-0 pointer-events-none translate-y-1",
+            )}
+            style={{
+              borderColor: "hsl(var(--sidebar-border) / 0.7)",
+              background:
+                "linear-gradient(180deg, hsl(var(--sidebar-bg-elevated)), hsl(var(--sidebar-bg)))",
+            }}>
+            <p
+              className="font-display font-bold leading-tight text-[14px]"
+              style={{ color: "hsl(var(--sidebar-fg))" }}>
+              {language === "vi" ? "Mẹo nhanh" : "Quick tips"}
+            </p>
+            <p
+              className="mt-1.5 text-[11.5px] leading-snug"
+              style={{ color: "hsl(var(--sidebar-muted-fg))" }}>
+              {language === "vi"
+                ? "Nhấn Ctrl/⌘ + K để tìm kiếm tức thì. Dùng badges lọc nhanh công việc."
+                : "Press Ctrl/⌘+K for quick search. Use badges for fast task filtering."}
+            </p>
+          </div>
         </div>
       </aside>
 
@@ -607,19 +793,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </SheetHeader>
           <div className="flex flex-col h-full">
             <div className="p-6 border-b border-[hsl(var(--sidebar-border))]/70">
-              <div className="flex items-center gap-2 font-display font-bold text-2xl">
-                <img
-                  src="/logo-duan.png"
-                  alt="Logo"
-                  className="h-10 w-auto rounded"
-                  style={{
-                    filter:
-                      "drop-shadow(0 6px 12px -8px hsl(var(--sidebar-glow) / 0.5))",
-                  }}
-                />
+              <div className="flex items-center gap-3 font-display font-bold text-2xl">
+                <div className="flex items-center justify-center rounded-full border w-11 h-11" style={{
+                  borderColor: "hsl(var(--sidebar-border) / 0.8)",
+                  background: "hsl(var(--sidebar-bg-elevated))",
+                }}>
+                  <img
+                    src="/logo-duan.png"
+                    alt="Logo"
+                    draggable={false}
+                    className="h-[65%] w-[65%] object-contain select-none"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-base font-bold leading-tight" style={{ color: "hsl(var(--sidebar-fg))" }}>
+                    {language === "vi" ? "Văn phòng KDPD" : "KDPD Office"}
+                  </span>
+                </div>
               </div>
             </div>
-            <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
               {navItems.map((item) => {
                 const isActive = location === item.href;
                 return (
@@ -629,22 +822,62 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     onClick={() => setMobileSidebarOpen(false)}>
                     <div
                       className={cn(
-                        "sidebar-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200",
+                        "sidebar-nav-item flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium cursor-pointer transition-all duration-200 h-11 w-full",
                         isActive && "sidebar-nav-item-active",
                       )}>
-                      <item.icon
-                        className="w-4 h-4"
-                        style={
-                          isActive
-                            ? { color: "hsl(var(--sidebar-active-fg))" }
-                            : undefined
-                        }
-                      />
-                      {item.label}
+                      <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
+                      <span className="font-medium">{item.label}</span>
                     </div>
                   </Link>
                 );
               })}
+              {/* Mobile Settings + PWA actions (consistency với desktop) */}
+              <div className="mt-3 pt-3 border-t space-y-1" style={{ borderColor: "hsl(var(--sidebar-border) / 0.6)" }}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setMobileSidebarOpen(false);
+                    setSettingsOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setMobileSidebarOpen(false);
+                      setSettingsOpen(true);
+                    }
+                  }}
+                  className={cn(
+                    "sidebar-nav-item flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium cursor-pointer transition-all duration-200 h-11 w-full",
+                  )}>
+                  <Settings className="w-[18px] h-[18px] flex-shrink-0" />
+                  <span className="font-medium">
+                    {language === "vi" ? "Cài đặt" : "Settings"}
+                  </span>
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setMobileSidebarOpen(false);
+                    if (!installPromptOpen) setInstallPromptOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setMobileSidebarOpen(false);
+                      if (!installPromptOpen) setInstallPromptOpen(true);
+                    }
+                  }}
+                  className={cn(
+                    "sidebar-nav-item flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium cursor-pointer transition-all duration-200 h-11 w-full",
+                  )}>
+                  <Smartphone className="w-[18px] h-[18px] flex-shrink-0" />
+                  <span className="font-medium">
+                    {language === "vi" ? "Cài ứng dụng" : "Install app"}
+                  </span>
+                </div>
+              </div>
             </nav>
           </div>
         </SheetContent>
@@ -656,9 +889,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         id="main-content"
         role="main"
         aria-label="Nội dung chính"
-        className="flex flex-col min-h-[100dvh] min-w-0 bg-[hsl(var(--background))]">
-        {/* Header */}
-        <header className="h-16 px-4 sm:px-8 flex items-center justify-between sticky-app-header">
+        className="flex flex-col min-h-[100dvh] min-w-0 bg-[hsl(var(--background))] w-full"
+        style={{
+          paddingLeft: sidebarOpen
+            ? "var(--sidebar-width-expanded)"
+            : "var(--sidebar-width-collapsed)",
+          // padding-top 64px = chiều cao fixed header h-16, đảm bảo nội dung đầu (hero/tabs/...)
+          // không bị che bởi header fixed (thay vì chỉ dùng sticky main-flow)
+          paddingTop: "var(--app-header-height, 4rem)",
+          transition:
+            "padding-left 320ms cubic-bezier(0.22,1,0.36,1), padding-top 200ms ease",
+        }}>
+        {/* Header — LUÔN HIỂN THỊ TRÊN ĐẦU TRANG (fixed top-0 z-40)
+            ĐẶC BIỆT QUAN TRỌNG: Không dùng inset-x-0 (chiếm toàn viewport) → sẽ CHE sidebar fixed left-0.
+            Giải pháp: Đặt `left: sidebarWidth` (động theo expanded/collapsed) + `right: 0`
+              → Header chỉ chiếm nửa PHẢI màn hình, BẮT ĐẦU NGAY TẠI MẸP PHẢI sidebar
+              → Sidebar (left-0 → sidebarWidth) luôn hiển thị đầy đủ, SÁT cạnh trái header (yêu cầu user).
+            Kích thước (width) header TỰ ĐỘNG THAY ĐỔI theo sidebar width:
+              · Collapsed (80px): header width = 100vw - 80px
+              · Expanded  (256px): header width = 100vw - 256px
+              · Mobile   (no sidebar): header width = 100vw (left=0, md:hidden cho desktop logic) */}
+        <header
+          className="h-16 px-4 sm:px-8 flex items-center justify-between sticky-app-header"
+          style={{
+            left: sidebarOpen
+              ? "var(--sidebar-width-expanded)"
+              : "var(--sidebar-width-collapsed)",
+            right: 0,
+            width: "auto",
+            transition:
+              "left 320ms cubic-bezier(0.22,1,0.36,1), width 320ms cubic-bezier(0.22,1,0.36,1)",
+          }}>
           <div className="flex items-center gap-4">
             {/* Mobile menu button */}
             <Button
@@ -977,8 +1238,57 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
 
-        <footer className="border-t border-border/50 bg-card/50 px-4 sm:px-8 py-4">
-          <div className="text-center text-xs text-muted-foreground">
+        {/* Footer với hoa văn nền: /HVDV - LYTRAN - PhiThien_Light.png
+            - Light mode: hoa văn gốc (mực đậm/vàng thư pháp), opacity trung bình ~10-14%
+            - Dark mode: sử dụng pseudo-class Tailwind `dark:` + filter invert(1) → HOÀN TOÀN ĐỔI SANG MÀU TRẮNG
+              (đặc biệt, không đảo màu chữ copyright — đảo màu chỉ áp dụng cho pattern layer riêng biệt
+              bằng cách đặt ảnh nền trong pseudo element ::before riêng, đảo màu chỉ trên pseudo đó
+              → chữ Copyright không bị tẩy trắng/đảo) */}
+        <footer
+          className={cn(
+            "relative overflow-hidden border-t w-full px-4 sm:px-8 py-6",
+          )}
+          style={{
+            borderColor: "hsl(var(--border) / 0.5)",
+            background:
+              theme === "dark"
+                ? "hsl(var(--card))"
+                : "hsl(var(--card))",
+          }}>
+          {/* Inner 2nd scrim (light/dark): nhẹ opacity ~15-20% để tăng contrast cho text
+              KHÔNG che khuất pattern artwork (pattern đặt SAO layer này với z-index cao hơn). */}
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                theme === "dark"
+                  ? "linear-gradient(180deg, hsl(var(--card) / 0.18) 0%, hsl(var(--card) / 0.22) 100%)"
+                  : "linear-gradient(180deg, hsl(var(--card) / 0.12) 0%, hsl(var(--card) / 0.18) 100%)",
+            }}
+          />
+          {/* Pattern Artwork Layer: đặt SAU scrim (DOM order later = render trên cùng) + z-5
+              Text content z-10 cao hơn pattern → text không bị ảnh hưởng */}
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none select-none"
+            style={{
+              backgroundImage:
+                'url("/PhiThien_Light.png")',
+              backgroundRepeat: "no-repeat",
+              backgroundSize: "cover",
+              backgroundPosition: "center 58%",
+              opacity: theme === "dark" ? 0.14 : 0.12,
+              zIndex: 5,
+              filter:
+                theme === "dark"
+                  ? "invert(1) brightness(1.1) saturate(0.12)"
+                  : "saturate(1.08) brightness(1.04)",
+              mixBlendMode: theme === "dark" ? "normal" : "multiply",
+            }}
+          />
+          {/* Text content z-10 trên tất cả layer (pattern + scrim + base card) → không bị ảnh hưởng filter */}
+          <div className="relative z-10 text-center text-xs text-muted-foreground">
             Copyright of Văn phòng Dự án Kinh điển phương Đông
           </div>
         </footer>
@@ -1698,6 +2008,67 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         title={language === "vi" ? "Lên đầu trang" : "Back to top"}>
         <ChevronUp className="h-5 w-5" />
       </Button>
+
+      {/* Floating Gold Bar Toggle — NÚT MỞ RỘNG SIDEBAR ĐỂ BÊN MẸP PHẢI CỦA SIDEBAR (theo yêu cầu).
+          Khi sidebar collapsed: nút đặt ngay cạnh phải rail 80px → nhìn thấy ở biên giữa sidebar & main content.
+          Tăng kích thước (16×96px) thay vì 10×96px cho dễ bấm (đạt touch target dễ dàng).
+          Animation hover: rộng ra 24px, scale nhẹ, có icon Chevron hướng phải để chỉ dẫn hành động expand. */}
+      {/* <button
+        type="button"
+        aria-label={
+          sidebarOpen
+            ? language === "vi"
+              ? "Thu gọn thanh điều hướng"
+              : "Collapse navigation"
+            : language === "vi"
+            ? "Mở rộng thanh điều hướng"
+            : "Expand navigation"
+        }
+        aria-expanded={sidebarOpen}
+        aria-controls="sidebar-nav"
+        onClick={() => setSidebarOpen((v) => !v)}
+        className={cn(
+          "hidden md:flex fixed top-1/2 -translate-y-1/2 z-40",
+          // Right-edge placement: left = EXACT WIDTH của sidebar (5rem = 80px khi collapsed, 16rem = 256px khi expanded)
+          // Dùng JS style để động theo state, className chỉ định dạng chung
+          "items-center justify-center",
+          "cursor-pointer select-none outline-none",
+          "transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "active:scale-y-95 active:scale-x-95",
+          sidebarOpen
+            ? "opacity-0 -translate-x-full pointer-events-none"
+            : "opacity-100 translate-x-0",
+        )}
+        style={{
+          // LEFT-OFFSET ĐỘNG THEO WIDTH SIDEBAR → ĐẶT NGAY MẸP PHẢI CỦA SIDEBAR COLLAPSED/EXPANDED
+          left: sidebarOpen
+            ? "var(--sidebar-width-expanded)"
+            : "var(--sidebar-width-collapsed)",
+          // TĂNG KÍCH THƯỚC: 16px ngang × 96px dọc (dễ bấm hơn 10×96px cũ)
+          width: 16,
+          height: 96,
+          borderRadius: "0 12px 12px 0",    // bo phải (left-edge của trigger gắn vào sidebar)
+          background:
+            "linear-gradient(180deg, hsl(var(--sidebar-glow)) 0%, hsl(39 82% 48%) 50%, hsl(var(--sidebar-glow)) 100%)",
+          boxShadow:
+            // Shadow đổ SANG PHẢI (vì trigger ở right-edge, hướng vào main content)
+            "4px 0 16px -6px hsl(var(--sidebar-glow) / 0.75), 0 0 0 1px hsl(var(--sidebar-glow) / 0.55) inset",
+        }}
+        title={
+          sidebarOpen
+            ? language === "vi"
+              ? "Thu gọn"
+              : "Collapse"
+            : language === "vi"
+            ? "Mở rộng menu"
+            : "Expand menu"
+        }>
+        <ChevronRight
+          aria-hidden
+          className="w-[14px] h-[14px] -translate-x-[1px] shrink-0 text-white/95 drop-shadow-[0_1px_1px_hsl(var(--sidebar-active-fg)/0.35)]"
+          style={{ transition: "transform 260ms ease" }}
+        />
+      </button> */}
 
       <CommandPalette
         tasks={tasks}

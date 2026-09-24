@@ -47,7 +47,40 @@ export function useTaskFilterStaffUsers() {
       });
       if (res.status === 503) return [];
       if (!res.ok) throw new Error("Failed to fetch task-filter staff users");
-      return api.users.listTaskFilterStaff.responses[200].parse(await res.json());
+      const list = api.users.listTaskFilterStaff.responses[200].parse(
+        await res.json(),
+      );
+      return list.filter((u) => {
+        const isActive = Boolean((u as any).isActive);
+        const roles = Array.isArray((u as any).roles) ? (u as any).roles : [];
+        const isPartner = roles.some(
+          (r: any) =>
+            (r && typeof r.code === "string" && r.code.toLowerCase() === "partner") ||
+            (r &&
+              typeof r.name === "string" &&
+              r.name
+                .normalize("NFKD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .replace(/\s+/g, "")
+                .includes("doitac")),
+        );
+        const norm = (s: string) =>
+          s
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/\s+/g, "")
+            .trim();
+        const hasThuKyHopPhanRole = roles.some(
+          (r: any) =>
+            (r &&
+              typeof r.code === "string" &&
+              String(r.code).toLowerCase() === "prj_secretary") ||
+            (r && typeof r.name === "string" && norm(r.name) === norm("Thư ký hợp phần")),
+        );
+        return isActive && !isPartner && hasThuKyHopPhanRole;
+      });
     },
   });
 }

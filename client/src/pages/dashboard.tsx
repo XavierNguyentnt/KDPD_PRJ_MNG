@@ -57,7 +57,7 @@ import {
   ListChecks,
   Trophy,
 } from "lucide-react";
-import type { TaskWithAssignmentDetails } from "@shared/schema";
+import type { TaskWithAssignmentDetails, User } from "@shared/schema";
 import { format, formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, Clock } from "lucide-react";
@@ -156,6 +156,39 @@ export default function Dashboard() {
       (components ?? []).map((c) => ({ id: c.id, name: c.name })),
     [components],
   );
+  const normStr = useCallback((s: string) =>
+    s
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, "")
+      .trim(), []);
+  const isPartnerUser = useCallback((u: any) => {
+    const roles = Array.isArray(u?.roles) ? u.roles : [];
+    return roles.some(
+      (r: any) =>
+        (r && typeof r.code === "string" && String(r.code).toLowerCase() === "partner") ||
+        (r && typeof r.name === "string" && normStr(r.name).includes("doitac")),
+    );
+  }, [normStr]);
+  const staffFilteredUsers = useMemo<User[]>(() => {
+    const list = Array.isArray(users) ? users : [];
+    return list.filter((u) => {
+      if ((u as any).isActive === false) return false;
+      if (isPartnerUser(u)) return false;
+      return true;
+    });
+  }, [users, isPartnerUser]);
+  const partnerNameSet = useMemo<Set<string>>(() => {
+    const set = new Set<string>();
+    const list = Array.isArray(users) ? users : [];
+    list.forEach((u) => {
+      if (isPartnerUser(u) && u?.displayName) {
+        set.add(String(u.displayName).trim());
+      }
+    });
+    return set;
+  }, [users, isPartnerUser]);
 
   const availableGroups = useMemo(() => {
     if (!datasetForList) return [];
@@ -335,6 +368,7 @@ export default function Dashboard() {
     const counts: Record<string, number> = {};
     baseFilteredTasks.forEach((task) => {
       const name = task.assignee?.trim() ?? "";
+      if (name && partnerNameSet.has(name)) return;
       counts[name] = (counts[name] || 0) + 1;
     });
     return Object.entries(counts)
@@ -1016,7 +1050,7 @@ export default function Dashboard() {
             {/* ============================================================ */}
             <div className="px-4 sm:px-5 py-3 border-b border-border/60 bg-muted/5">
               <TaskFilters
-                users={users ?? []}
+                users={staffFilteredUsers ?? []}
                 components={componentOptions}
                 filters={filters}
                 onFiltersChange={(f) =>

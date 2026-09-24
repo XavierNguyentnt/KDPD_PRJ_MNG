@@ -53,6 +53,7 @@ async function main() {
   const { registerRoutes } = await import("./routes");
   const { startNotificationsJob } = await import("./notifications-job");
   const { ensureDbExtensions } = await import("./db");
+  const { startBackupScheduler } = await import("./backup");
 
   app.use(
     express.json({
@@ -139,6 +140,7 @@ async function main() {
 
   await registerRoutes(httpServer, app);
   startNotificationsJob();
+  startBackupScheduler();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

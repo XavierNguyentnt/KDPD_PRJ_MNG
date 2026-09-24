@@ -36,6 +36,22 @@ import {
   syncGoogleCalendarForUser,
   updateGoogleCalendarSyncSettings,
 } from "./google-calendar-sync";
+import {
+  deleteBackupFile,
+  getBackupDownloadPath,
+  getLastRestoreStats,
+  getRunLog,
+  isBackupRunning,
+  isRestoreRunning,
+  listBackupFiles,
+  loadBackupConfig,
+  previewRestoreFromDump,
+  requireAdmin,
+  restoreFromDumpFull,
+  restoreFromDumpUpsert,
+  runBackup,
+  saveBackupConfig,
+} from "./backup";
 
 /** Feature flag: Work/Contract taxonomy (theo Docs refactor – tắt được khi rollback). */
 const FEATURE_WORK_ENABLED = process.env.FEATURE_WORK_ENABLED === "true";
@@ -2814,13 +2830,40 @@ export async function registerRoutes(
             .replace(/\s+/g, "")
             .trim();
         const deptKey = norm("Ban thư ký");
+        const thuKyHpCodeKey = "prj_secretary";
+        const thuKyHpNameKey = norm("Thư ký hợp phần");
         const list = await dbStorage.getUsersWithRolesAndGroups();
         const filtered = list.filter((u) => {
           const hasPassword =
             typeof (u as any).passwordHash === "string" &&
             String((u as any).passwordHash).trim() !== "";
           const dept = typeof u.department === "string" ? u.department : "";
-          return hasPassword && norm(dept) === deptKey;
+          const isActive = Boolean((u as any).isActive);
+          const roles = Array.isArray((u as any).roles) ? (u as any).roles : [];
+          const isPartner = roles.some(
+            (r: any) =>
+              (r && typeof r.code === "string" && r.code.toLowerCase() === "partner") ||
+              (r && typeof r.name === "string" &&
+                r.name
+                  .normalize("NFKD")
+                  .replace(/[\u0300-\u036f]/g, "")
+                  .toLowerCase()
+                  .replace(/\s+/g, "")
+                  .trim()
+                  .includes("doitac")),
+          );
+          const hasThuKyHopPhanRole = roles.some(
+            (r: any) =>
+              (r && typeof r.code === "string" && String(r.code).toLowerCase() === thuKyHpCodeKey) ||
+              (r && typeof r.name === "string" && norm(r.name) === thuKyHpNameKey),
+          );
+          return (
+            hasPassword &&
+            norm(dept) === deptKey &&
+            isActive &&
+            !isPartner &&
+            hasThuKyHopPhanRole
+          );
         });
         res.json(filtered.map(sanitizeUser));
       } catch (err) {
@@ -4669,6 +4712,216 @@ export async function registerRoutes(
       res
         .status(500)
         .json({ message: err instanceof Error ? err.message : "Failed" });
+    }
+  });
+
+  // ===========================================================================
+  // /api/backup/* — Quản lý sao lưu DB (chỉ Admin)
+  // ===========================================================================
+
+  app.get("/api/backup/config", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới xem cấu hình backup." });
+      }
+      res.json(loadBackupConfig());
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Lỗi đọc cấu hình backup.",
+      });
+    }
+  });
+
+  app.patch("/api/backup/config", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới cập nhật cấu hình backup." });
+      }
+      requireDb();
+      const cfg = saveBackupConfig(req.body || {});
+      res.json(cfg);
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Lỗi lưu cấu hình backup.",
+      });
+    }
+  });
+
+  app.get("/api/backup/files", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới xem danh sách backup." });
+      }
+      res.json(await listBackupFiles());
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Lỗi liệt kê file backup.",
+      });
+    }
+  });
+
+  app.get("/api/backup/running", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới xem trạng thái backup." });
+      }
+      res.json({ running: isBackupRunning() });
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed",
+      });
+    }
+  });
+
+  app.get("/api/backup/log", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới xem lịch sử backup." });
+      }
+      res.json(getRunLog().slice(0, 20));
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed",
+      });
+    }
+  });
+
+  app.post("/api/backup/trigger", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới được chạy sao lưu DB." });
+      }
+      requireDb();
+      if (isBackupRunning()) {
+        return res.status(409).json({ message: "Một lượt sao lưu đang chạy, vui lòng đợi xong." });
+      }
+      const file = await runBackup("manual");
+      res.json(file);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      // Log đồng bộ 2 nơi:
+      //   1. Terminal backend (chính thức)
+      //   2. Response JSON trả về client (toast UI)
+      console.error(
+        "[routes:backup-trigger] 500 trigger backup LỖI:",
+        errMsg,
+        "\n  user=", (req.user as any)?.email || (req.user as any)?.id,
+      );
+      res.status(500).json({
+        message: errMsg || "Sao lưu thất bại.",
+        error: errMsg || "Sao lưu thất bại.",
+      });
+    }
+  });
+
+  app.delete("/api/backup/files/:filename", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới xoá file backup." });
+      }
+      const filename = Array.isArray(req.params.filename)
+        ? String(req.params.filename[0])
+        : String(req.params.filename);
+      deleteBackupFile(filename);
+      res.json({ message: "Đã xoá file backup.", filename });
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed",
+      });
+    }
+  });
+
+  app.get("/api/backup/files/:filename/download", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới tải file backup." });
+      }
+      const filename = Array.isArray(req.params.filename)
+        ? String(req.params.filename[0])
+        : String(req.params.filename);
+      const p = getBackupDownloadPath(filename);
+      if (!fs.existsSync(p)) {
+        return res.status(404).json({ message: `Không tìm thấy file backup ${filename}.` });
+      }
+      res.download(p, filename, (err) => {
+        if (err) console.error("[backup] download lỗi:", err);
+      });
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed",
+      });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RESTORE endpoints (yêu cầu CREATEDB privilege cho user trong DATABASE_URL)
+  // ─────────────────────────────────────────────────────────────────────────────
+  app.get("/api/restore/running", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới xem trạng thái khôi phục." });
+      }
+      res.json({
+        running: isRestoreRunning(),
+        lastStats: getLastRestoreStats(),
+      });
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed",
+      });
+    }
+  });
+
+  app.post("/api/backup/files/:filename/restore-preview", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới xem trước khôi phục." });
+      }
+      if (isRestoreRunning()) {
+        return res.status(409).json({ message: "Một lượt khôi phục đang chạy, vui lòng đợi hoàn tất." });
+      }
+      const filename = Array.isArray(req.params.filename)
+        ? String(req.params.filename[0])
+        : String(req.params.filename);
+      const stats = await previewRestoreFromDump(filename);
+      res.json(stats);
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed",
+      });
+    }
+  });
+
+  app.post("/api/backup/files/:filename/restore", requireAuth, async (req, res) => {
+    try {
+      if (!requireAdmin(req as any)) {
+        return res.status(403).json({ message: "Chỉ Admin mới kích hoạt khôi phục." });
+      }
+      if (isRestoreRunning()) {
+        return res.status(409).json({ message: "Một lượt khôi phục đang chạy, vui lòng đợi hoàn tất." });
+      }
+      const filename = Array.isArray(req.params.filename)
+        ? String(req.params.filename[0])
+        : String(req.params.filename);
+      const mode = (req.query.mode as string) === "full" ? "full" : "upsert";
+      const statsPromise =
+        mode === "full"
+          ? restoreFromDumpFull(filename)
+          : restoreFromDumpUpsert(filename);
+      // Fire-and-forget (không await lệnh chạy vì restore có thể lâu), trả về running state
+      statsPromise.catch(() => {
+        /* lỗi đã được log + cached trong _lastRestoreStats */
+      });
+      res.json({
+        queued: true,
+        mode,
+        filename,
+        running: isRestoreRunning(),
+      });
+    } catch (err) {
+      res.status(500).json({
+        message: err instanceof Error ? err.message : "Failed",
+      });
     }
   });
 

@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 :root {
+  --app-header-height: 4rem;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Text", system-ui, -apple-system, "Inter", ui-sans-serif, Roboto, Helvetica, Arial, sans-serif;
   --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Outfit", ui-sans-serif, "SF Pro Display", Roboto, Helvetica, Arial, sans-serif;
   --font-serif: "Libre Baskerville", "Iowan Old Style", Georgia, "Times New Roman", serif;
@@ -54,15 +55,18 @@
   --group-thuky: 38 88% 50%;
   --group-admin: 12 72% 48%;
 
-  /* Sidebar Palette (trong suốt lớp giấy + viền vàng thêu) */
-  --sidebar-bg: 38 42% 94%;
-  --sidebar-bg-elevated: 42 52% 97%;
-  --sidebar-border: 32 36% 78%;
+  /* Sidebar Palette (Nâng cấp V.3 — Clean Icon Rail — tham chiếu DexignLab Workload
+     Nền "giấy sạch" thay vì giấy mộc vàng đậm, active state = filled nền đặc với độ tương phản WCAG AA */
+  --sidebar-bg: 44 40% 97%;
+  --sidebar-bg-elevated: 48 50% 99%;
+  --sidebar-border: 40 28% 88%;
   --sidebar-fg: 22 28% 16%;
-  --sidebar-muted-fg: 24 18% 42%;
-  --sidebar-active-bg: 39 90% 86%;
-  --sidebar-active-fg: 192 78% 22%;
-  --sidebar-glow: 46 85% 70%;
+  --sidebar-muted-fg: 24 14% 42%;
+  --sidebar-active-bg: 39 82% 60%;
+  --sidebar-active-fg: 22 55% 14%;
+  --sidebar-glow: 44 85% 62%;
+  --sidebar-width-expanded: 16rem;
+  --sidebar-width-collapsed: 5rem;
 
   /* Semantic Status Colors (đậm + sáng rõ hơn so với v.1) */
   --status-success: 142 72% 36%;
@@ -109,14 +113,18 @@
   --group-thuky: 40 78% 60%;
   --group-admin: 12 78% 58%;
 
-  --sidebar-bg: 24 22% 9%;
-  --sidebar-bg-elevated: 26 24% 12%;
-  --sidebar-border: 24 14% 22%;
+  /* Sidebar Dark (Nâng cấp V.3 — Clean Icon Rail)
+     Nền giấy đen đơn giản, active filled = lục lam đậm với chữ sáng đạt WCAG AA */
+  --sidebar-bg: 24 18% 9%;
+  --sidebar-bg-elevated: 26 18% 12%;
+  --sidebar-border: 24 12% 20%;
   --sidebar-fg: 42 30% 94%;
-  --sidebar-muted-fg: 40 12% 66%;
-  --sidebar-active-bg: 210 40% 18%;
-  --sidebar-active-fg: 194 88% 82%;
+  --sidebar-muted-fg: 40 10% 66%;
+  --sidebar-active-bg: 192 55% 24%;
+  --sidebar-active-fg: 194 88% 90%;
   --sidebar-glow: 40 72% 58%;
+  --sidebar-width-expanded: 16rem;
+  --sidebar-width-collapsed: 5rem;
 
   --status-success: 142 68% 44%;
   --status-info: 196 88% 52%;
@@ -252,51 +260,52 @@ select[class*="dropdown"]:focus {
     @apply h-8 w-8 p-0;
   }
   .sticky-app-header {
-    @apply sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b;
-    background: linear-gradient(180deg, hsl(var(--background) / 0.86), hsl(var(--background) / 0.66));
-    border-color: hsl(var(--border) / 0.8);
-    box-shadow: 0 1px 0 hsl(var(--border) / 0.6), 0 12px 24px -20px hsl(var(--muted-foreground) / 0.4);
+    @apply fixed top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b;
+    background: linear-gradient(180deg, hsl(var(--background) / 0.95), hsl(var(--background) / 0.88));
+    border-color: hsl(var(--border) / 0.85);
+    box-shadow:
+      0 1px 0 hsl(var(--border) / 0.7) inset,
+      0 14px 30px -22px hsl(var(--muted-foreground) / 0.55),
+      0 2px 2px -1px hsl(var(--muted-foreground) / 0.15);
   }
   .sticky-page-section {
     @apply sticky z-30 backdrop-blur sm:!static;
     background: linear-gradient(180deg, hsl(var(--background) / 0.82), hsl(var(--background) / 0.55));
     top: calc(env(safe-area-inset-top) + 56px);
   }
-  .sticky-table-thead thead th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: linear-gradient(180deg, hsl(var(--card)), hsl(var(--card) / 0.96));
+  /* 🔁 Pattern chuẩn cho Bảng nghiệp vụ DANH MỤC TÁC PHẨM & HỢP ĐỒNG DỊCH THUẬT & CÔNG VIỆC
+        (thu-ky-hop-phan.tsx L3408-L3450 works, L4255-L4274 contracts, task-table.tsx thead)
+        thead row đã có bg-muted/95 + backdrop-blur-sm.
+        Tránh CSS global override làm lệch màu (nâu nhạt card) hoặc giảm z-index sticky cột khóa. */
+  .sticky-table-thead {
+    container-type: inline-size;
   }
 
-  /* Sidebar — Banner Design Art Direction: Giấy mộc thổ + viền vàng khắc + highlight active nhẹ */
+  /* Sidebar — Nâng cấp V.3 Clean Icon Rail (tham chiếu DexignLab Workload)
+     Nền giấy sạch đơn giản, nav items bo góc lớn Bát Quý, active = filled nền đặc thay vì indicator bar */
   .sidebar-shell {
-    background:
-      radial-gradient(ellipse at 0% 0%, hsl(var(--sidebar-glow) / 0.18) 0%, transparent 45%),
-      linear-gradient(180deg, hsl(var(--sidebar-bg-elevated)) 0%, hsl(var(--sidebar-bg)) 100%);
+    background: linear-gradient(180deg, hsl(var(--sidebar-bg-elevated)) 0%, hsl(var(--sidebar-bg)) 100%);
     border-right: 1px solid hsl(var(--sidebar-border));
-    box-shadow:
-      1px 0 0 hsl(var(--sidebar-border) / 0.5) inset,
-      -12px 0 30px -22px hsl(var(--sidebar-glow) / 0.35),
-      12px 0 30px -28px hsl(var(--muted-foreground) / 0.45);
+    box-shadow: 8px 0 24px -20px hsl(var(--muted-foreground) / 0.25);
     color: hsl(var(--sidebar-fg));
   }
   .sidebar-nav-item {
     color: hsl(var(--sidebar-muted-fg));
     border: 1px solid transparent;
+    border-radius: 1rem;
+    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
   }
   .sidebar-nav-item:hover {
     color: hsl(var(--sidebar-fg));
-    background: hsl(var(--sidebar-active-bg) / 0.38);
+    background: hsl(var(--sidebar-active-bg) / 0.28);
     border-color: hsl(var(--sidebar-border));
   }
   .sidebar-nav-item-active {
-    color: hsl(var(--sidebar-active-fg));
-    background:
-      linear-gradient(90deg, hsl(var(--sidebar-active-bg) / 0.92), hsl(var(--sidebar-active-bg) / 0.62));
-    border-color: hsl(var(--sidebar-glow) / 0.45);
+    color: hsl(var(--sidebar-active-fg)) !important;
+    background: hsl(var(--sidebar-active-bg)) !important;
+    border-color: hsl(var(--sidebar-active-bg)) !important;
     box-shadow:
-      0 0 0 1px hsl(var(--sidebar-glow) / 0.22) inset,
-      0 6px 16px -10px hsl(var(--sidebar-glow) / 0.55);
+      0 0 0 1px hsl(var(--sidebar-active-bg) / 0.6) inset,
+      0 8px 20px -14px hsl(var(--sidebar-active-bg) / 0.7);
   }
 }

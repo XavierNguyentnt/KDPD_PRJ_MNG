@@ -1075,6 +1075,8 @@ export default function ThuKyHopPhanPage() {
     setTcSortColumns,
     pcSearch,
     setPcSearch,
+    pcProofreaderSearch,
+    setPcProofreaderSearch,
     pcComponentFilter,
     setPcComponentFilter,
     pcStageFilter,
@@ -5093,6 +5095,19 @@ export default function ThuKyHopPhanPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Người hiệu đính
+                  </Label>
+                  <TranslatorPicker
+                    value={pcProofreaderSearch}
+                    userId={null}
+                    onChange={(name) => setPcProofreaderSearch(name)}
+                    placeholder="Tìm tên người hiệu đính..."
+                    className="w-[220px]"
+                    allowCreate={false}
+                  />
                 </div>
               </div>
               {/* moved stats outside container */}

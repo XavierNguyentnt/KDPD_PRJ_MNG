@@ -99,6 +99,7 @@ export function useThuKyContractsTab(params: UseThuKyContractsTabParams) {
     Array<{ column: TranslationContractSortColumn; dir: "asc" | "desc" }>
   >([]);
   const [pcSearch, setPcSearch] = useState("");
+  const [pcProofreaderSearch, setPcProofreaderSearch] = useState("");
   const [pcComponentFilter, setPcComponentFilter] = useState<string>("all");
   const [pcStageFilter, setPcStageFilter] = useState<string>("all");
   const [pcSortColumns, setPcSortColumns] = useState<
@@ -334,7 +335,7 @@ export function useThuKyContractsTab(params: UseThuKyContractsTabParams) {
 
   useEffect(() => {
     setPcPage(1);
-  }, [pcQuickFilter, pcComponentFilter, pcStageFilter, pcSearch]);
+  }, [pcQuickFilter, pcComponentFilter, pcStageFilter, pcSearch, pcProofreaderSearch]);
 
   const handleTcSort = (
     column: TranslationContractSortColumn,
@@ -491,12 +492,17 @@ export function useThuKyContractsTab(params: UseThuKyContractsTabParams) {
       );
       list = list.filter((c) => c.workId && workIdsWithStage.has(c.workId));
     }
+    if (pcProofreaderSearch.trim()) {
+      const q = normalizeSearch(pcProofreaderSearch.trim());
+      list = list.filter((c) =>
+        normalizeSearch(getProofreaderName(c.id)).includes(q),
+      );
+    }
     if (pcSearch.trim()) {
       const q = normalizeSearch(pcSearch.trim());
       list = list.filter(
         (c) =>
           (c.contractNumber && normalizeSearch(c.contractNumber).includes(q)) ||
-          normalizeSearch(getProofreaderName(c.id)).includes(q) ||
           normalizeSearch(getComponentName(c.componentId)).includes(q) ||
           normalizeSearch(getWorkTitle(c.workId)).includes(q),
       );
@@ -505,6 +511,7 @@ export function useThuKyContractsTab(params: UseThuKyContractsTabParams) {
   }, [
     pcScoped,
     pcSearch,
+    pcProofreaderSearch,
     pcComponentFilter,
     pcStageFilter,
     pcSortColumns,
@@ -772,6 +779,8 @@ export function useThuKyContractsTab(params: UseThuKyContractsTabParams) {
     setTcSortColumns,
     pcSearch,
     setPcSearch,
+    pcProofreaderSearch,
+    setPcProofreaderSearch,
     pcComponentFilter,
     setPcComponentFilter,
     pcStageFilter,
