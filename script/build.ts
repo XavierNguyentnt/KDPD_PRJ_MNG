@@ -10,11 +10,15 @@ const allowlist = [
   "connect-pg-simple",
   "cors",
   "date-fns",
+  "dotenv",
   "drizzle-orm",
   "drizzle-zod",
   "express",
   "express-rate-limit",
   "express-session",
+  "googleapis",
+  "googleapis-common",
+  "google-auth-library",
   "jsonwebtoken",
   "memorystore",
   "multer",
@@ -58,6 +62,14 @@ async function buildAll() {
     minify: true,
     external: externals,
     logLevel: "info",
+    alias: {
+      "@shared": "./shared",
+      "@shared/routes": "./shared/routes.ts",
+      "@shared/schema": "./shared/schema.ts",
+      "@shared/workflow": "./shared/workflow.ts",
+    },
+    resolveExtensions: [".ts", ".tsx", ".js", ".jsx", ".cjs", ".mjs", ".json"],
+    logOverride: { "ignored-bare-import": "silent" },
   });
 }
 

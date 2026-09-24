@@ -33,8 +33,25 @@ Nếu đã có repo và muốn cập nhật code:
 cd ~/Task-Project/KDPD_PRJ_MNG
 git fetch --all --prune
 git pull --rebase
+
+# ⚠️ BƯỚC BẮT BUỘC (bỏ qua sẽ lỗi 502 Bad Gateway):
+#  - Cập nhật dependencies (phòng trường hợp có package mới như googleapis)
+#  - Rebuild lại dist/index.cjs + static assets cho code mới
+npm ci
+npm run build
+
+# Sau đó mới restart service
 sudo systemctl restart kdpd
+
+# Kiểm tra 10s xem có crash lặp lại không:
+sleep 8 ; sudo systemctl status kdpd --no-pager
 ```
+
+**Nếu BỎ QUA bước `npm run build`:** file `dist/index.cjs` vẫn là bản cũ không chứa các
+hàm mới (như `startBackupScheduler`, `restoreFromDumpUpsert`, …) → Node.js throw
+`SyntaxError: Unexpected token 'import'` hoặc `Module not found` → Service liên tục
+crash → Port 5000 không có app lắng nghe → Nginx trả **502 (Bad Gateway)**.
+
 
 ## 3) Thiết lập PostgreSQL local
 
