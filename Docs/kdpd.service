@@ -1,0 +1,56 @@
+[Unit]
+Description=KDPD Project Management (Node.js Backend + Vite SSR)
+Documentation=file:/home/kdpd-project/Task-Project/KDPD_PRJ_MNG/Docs/DEPLOY.md
+# Start chỉ sau khi network + PostgreSQL đã sẵn sàng
+After=network.target postgresql.service
+Wants=network.target postgresql.service
+
+[Service]
+# ── Identity ──────────────────────────────────────────────
+# Thay bằng đúng USER thực tế trên máy chủ của bạn (thường giống thư mục /home/<tên>)
+User=kdpd-project
+Group=kdpd-project
+
+# ── Working directory + Environment File ──────────────────
+WorkingDirectory=/home/kdpd-project/Task-Project/KDPD_PRJ_MNG
+EnvironmentFile=/home/kdpd-project/Task-Project/KDPD_PRJ_MNG/.env
+Environment=NODE_ENV=production
+
+# ── App start command ─────────────────────────────────────
+# Khuyến nghị: dùng Node.js từ nvm nếu bạn dùng nvm
+#   → chạy 'which node' trên server terminal xong thay đường dẫn tuyệt đối ở dưới
+# Ví dụ nếu dùng nvm 20: ExecStart=/home/kdpd-project/.nvm/versions/node/v20.11.1/bin/node dist/index.cjs
+ExecStart=/usr/bin/env node dist/index.cjs
+# Hoặc dùng npm start trực tiếp (thay thế dòng trên nếu which node không rõ):
+# ExecStart=/usr/bin/env npm start
+
+# ── Runtime behavior (QUAN TRỌNG: auto restart crash) ────
+Type=simple
+Restart=always
+RestartSec=3
+# Giới hạn restart lặp liên tục (tránh loop nghẽn tài nguyên)
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# ── Hardening production ──────────────────────────────────
+# File dump backup & upload google cloud vẫn hoạt động, nhưng chặn quyền không cần thiết
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+# Danh sách các thư mục được phép GHI (chạy app):
+#   1. Thư mục dự án (chạy, log, node_modules temp)
+#   2. Thư mục backups local mặc định (nếu BACKUP_LOCAL_DIR ở trong dự án hoặc ~)
+#   3. /tmp cho pg_dump temp files
+ReadWritePaths=/home/kdpd-project/Task-Project/KDPD_PRJ_MNG /tmp /home/kdpd-project/Task-Project
+# Nếu BACKUP_LOCAL_DIR ở nơi khác (ví dụ /mnt/backups) thì thêm dòng tương tự vào ReadWritePaths=
+
+# ── Logging ───────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kdpd
+
+# ── File descriptors cho Postgres pool + connections ─────
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

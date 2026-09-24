@@ -13,6 +13,11 @@ vite.config.ts.*
 .env
 .env.local
 .env.*.local
+# Các bản backup env do script kdpd-generate-clean-env.sh tạo (chứa secrets thật)
+.env.backup-before-clean-*
+.env.backup-*
+kdpd-*-report.log
+kdpd-*-fix*.log
 
 # Database backups (may contain secrets/PII — session tokens, Google OAuth tokens, password hashes)
 attached_assets/DB Backup/
