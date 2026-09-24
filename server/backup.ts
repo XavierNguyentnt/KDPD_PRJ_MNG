@@ -84,7 +84,23 @@ export interface BackupRunLogEntry {
 // ---------------------------------------------------------------------------
 // Paths & defaults
 // ---------------------------------------------------------------------------
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Lấy __dirname đa dạng runtime format (ESM / CJS bundled / direct node run):
+//   - ESM:  import.meta.url là file:// URL
+//   - CJS (dist/index.cjs):  import.meta.url = undefined (esbuild warning)
+//     nhưng global __dirname được Node.js inject cho CJS
+//   - Fallback cuối cùng:  process.argv[1] (entry point file) hoặc process.cwd()
+let __dirname: string;
+{
+  const imu = (typeof import.meta !== "undefined" && import.meta && (import.meta as { url?: string }).url) || undefined;
+  if (imu && typeof imu === "string") {
+    __dirname = path.dirname(fileURLToPath(imu));
+  } else if (typeof (globalThis as { __dirname?: string }).__dirname === "string") {
+    __dirname = (globalThis as { __dirname: string }).__dirname;
+  } else {
+    const entry = process.argv[1] ? path.resolve(process.argv[1]) : undefined;
+    __dirname = entry ? path.dirname(entry) : process.cwd();
+  }
+}
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const DATA_DIR = path.join(PROJECT_ROOT, "data");
 const CONFIG_FILE = path.join(DATA_DIR, "backup-config.json");
