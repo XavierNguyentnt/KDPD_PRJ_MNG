@@ -144,6 +144,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const {
     installPromptOpen,
     setInstallPromptOpen,
+    canInstall,
+    blocker,
     handleInstall,
     handleDismiss,
   } = usePwaInstallPrompt();
@@ -2121,11 +2123,45 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </AlertDialogDescription>
             </AlertDialogHeader>
           </div>
+          {blocker?.code === "NOT_SECURE_CONTEXT" && (
+            <div className="mt-1 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mt-0.5 h-4 w-4 flex-none">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <div className="leading-relaxed">
+                <div className="font-semibold">
+                  {language === "vi"
+                    ? "Không thể cài đặt trên kết nối HTTP"
+                    : "Cannot install over HTTP"}
+                </div>
+                <div className="opacity-90">
+                  {language === "vi"
+                    ? "Trình duyệt yêu cầu kết nối HTTPS (hoặc localhost) để cài PWA. Vui lòng truy cập bằng https://task.kdpd.local hoặc xem hướng dẫn bật SSL trong DEPLOY.md."
+                    : "Your browser requires a secure (HTTPS) connection (or localhost) to install PWAs. Please use https://task.kdpd.local or enable SSL via the DEPLOY.md guide."}
+                </div>
+              </div>
+            </div>
+          )}
           <AlertDialogFooter className="sm:space-x-2">
             <AlertDialogCancel onClick={handleDismiss}>
               {language === "vi" ? "Để sau" : "Later"}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleInstall}>
+            <AlertDialogAction
+              onClick={handleInstall}
+              disabled={!canInstall}
+              title={
+                !canInstall && blocker
+                  ? blocker.message
+                  : undefined
+              }>
               <Download className="-ml-1 mr-2 h-4 w-4" />
               {language === "vi" ? "Cài đặt ngay" : "Install now"}
             </AlertDialogAction>

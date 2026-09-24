@@ -345,6 +345,180 @@ sudo ufw status
 
 Sau cùng, đảm bảo service app vẫn chạy ở port 5000 (`systemctl status kdpd` hoặc `npm start`), rồi truy cập: `http://task.kdpd.local/`.
 
+### 7.4 Bật HTTPS Self-Signed cho LAN (bắt buộc để cài PWA)
+
+> **Tại sao cần:** Trình duyệt Chrome/Edge chỉ cho phép cài đặt PWA (Progressive Web App) trên **Secure Context** = `https://` hoặc `localhost` / `127.0.0.1`. Domain LAN `http://task.kdpd.local` (HTTP) sẽ bị đánh dấu ⚠️ "Không bảo mật" → trình duyệt **không bắn event `beforeinstallprompt`** → nút "Cài đặt ngay" không thể gọi hộp thoại cài gốc. Dấu hiệu nhận biết: thanh địa chỉ Chrome không hiện biểu tượng 📥 "Mở trong ứng dụng" (install icon).
+
+3 bước trên **máy chủ Ubuntu** production:
+
+#### Bước 1: Cài `mkcert` (tạo CA tin cậy nội bộ)
+
+```bash
+# Ubuntu 22.04+: mkcert có sẵn trong apt universe
+sudo apt update
+sudo apt install -y mkcert libnss3-tools
+
+# (Nếu apt không tìm thấy) dùng bản prebuilt Go:
+#   curl -sL https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64 -o /usr/local/bin/mkcert
+#   chmod +x /usr/local/bin/mkcert
+
+# Install Local CA (Certificate Authority) vào hệ thống + NSS (Chrome/Firefox)
+sudo mkcert -install
+# → Thư mục CA key nằm ở: $(mkcert -CAROOT) = /root/.local/share/mkcert/
+```
+
+#### Bước 2: Generate cert cho domain `task.kdpd.local` + alias LAN IP
+
+```bash
+# Tạo thư mục lưu cert Nginx
+sudo mkdir -p /etc/nginx/ssl
+cd /etc/nginx/ssl
+
+# Generate cert (thêm cả IP LAN của server nếu muốn truy cập trực tiếp IP)
+# Lấy IP LAN hiện tại: hostname -I | awk '{print $1}'
+SERVER_IP=$(hostname -I | awk '{print $1}')
+sudo mkcert -key-file task.kdpd.local.key \
+            -cert-file task.kdpd.local.pem \
+            task.kdpd.local \
+            "*.task.kdpd.local" \
+            localhost \
+            127.0.0.1 \
+            "::1" \
+            "$SERVER_IP"
+
+# Phân quyền (chỉ root đọc key)
+sudo chmod 600 /etc/nginx/ssl/task.kdpd.local.key
+sudo chmod 644 /etc/nginx/ssl/task.kdpd.local.pem
+```
+
+#### Bước 3: Nginx `listen 443 ssl` + redirect 80 → 443
+
+Ghi đè file cấu hình cũ (port 80-only):
+
+```bash
+sudo nano /etc/nginx/sites-available/task.kdpd.local
+```
+
+Nội dung mới:
+
+```nginx
+# --- Redirect HTTP (80) → HTTPS (443) ---
+server {
+  listen 80;
+  listen [::]:80;
+  server_name task.kdpd.local;
+  return 301 https://$host$request_uri;
+}
+
+# --- HTTPS Main ---
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name task.kdpd.local;
+
+  # ---- SSL certs (tạo bằng mkcert Bước 2) ----
+  ssl_certificate     /etc/nginx/ssl/task.kdpd.local.pem;
+  ssl_certificate_key /etc/nginx/ssl/task.kdpd.local.key;
+
+  # ---- Hardened SSL (A+ trên testssl) ----
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers HIGH:!aNULL:!MD5;
+  ssl_prefer_server_ciphers on;
+  ssl_session_cache shared:SSL:10m;
+  ssl_session_timeout 10m;
+
+  # ---- Nâng buffer cho upload lớn ----
+  client_max_body_size 20m;
+
+  location / {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_http_version 1.1;
+
+    # QUAN TRỌNG: báo cho Express biết client dùng HTTPS (X-Forwarded-Proto)
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;   # Pass "https" về app
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port $server_port;
+
+    # WebSocket upgrade (cho Socket.io / live notification nếu có sau này)
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+}
+```
+
+Check syntax + reload Nginx + mở port UFW:
+
+```bash
+sudo nginx -t
+# → nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+# → nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+sudo systemctl reload nginx
+sudo ufw allow 443/tcp
+sudo ufw status
+```
+
+#### Bước 4: Cập nhật `.env` app production (bật cookie secure)
+
+```bash
+cd ~/Task-Project/KDPD_PRJ_MNG
+nano .env
+```
+
+Đổi / thêm 2 dòng:
+
+```dotenv
+# --- Quan trọng với HTTPS reverse proxy ---
+CSRF_ORIGIN=https://task.kdpd.local
+# Khi X-Forwarded-Proto=https, Express trust proxy sẽ set req.secure=true
+# → session cookie sẽ được gắn flag Secure (chỉ gửi qua HTTPS)
+SESSION_SECURE=true
+TRUST_PROXY=1
+```
+
+Restart app để nhận env mới:
+
+```bash
+sudo systemctl restart kdpd
+sleep 5 && sudo systemctl status kdpd --no-pager
+```
+
+#### Bước 5: Tin cậy CA cert trên các máy Windows Client (chrome dùng cert hệ thống)
+
+> **Lưu ý:** Mỗi máy client Windows truy cập `https://task.kdpd.local` cần install **Root CA public key** của mkcert (không phải cert website) vào Trusted Root store. Nếu không làm bước này, Chrome vẫn báo 🚫 "Kết nối của bạn không riêng tư" (NET::ERR_CERT_AUTHORITY_INVALID) dù Nginx đã có cert.
+
+Trên **máy chủ Ubuntu**, copy file CA public key về Windows client (dùng WinSCP / `cat` copy paste):
+
+```bash
+# Trên Ubuntu server: in đường dẫn + nội dung CA public cert
+echo "CA ROOT:"
+sudo mkcert -CAROOT
+# → thường là /root/.local/share/mkcert
+sudo cat "$(mkcert -CAROOT)/rootCA.pem"
+# ↑ Copy toàn bộ block BEGIN CERTIFICATE → END CERTIFICATE
+```
+
+Trên **máy Windows client**:
+1. Dán block trên vào file: `C:\Temp\kdpd-mkcert-rootCA.crt`
+2. Run (Admin) PowerShell:
+   ```powershell
+   Import-Certificate -FilePath "C:\Temp\kdpd-mkcert-rootCA.crt" `
+     -CertStoreLocation Cert:\LocalMachine\Root
+   ```
+3. Hoặc: Double click `.crt` → "Install Certificate…" → Local Machine → Place cert "Trusted Root Certification Authorities" → Finish.
+4. **Mở lại Chrome hoàn toàn** (không chỉ tab mới) → truy cập `https://task.kdpd.local`. Thanh địa chỉ hiện 🔒 "Bảo mật" (no ⚠️).
+
+**Kiểm tra PWA Installability (Chrome DevTools):**
+- F12 → tab **Application** → mục **Manifest** (nằm dưới PWA) → check 3 cột:
+  - ✓ `Icons` có 192×192, 512×512 + maskable
+  - ✓ `start_url` = `/`, `display: standalone`, `scope: /`
+- Vẫn trong Application → mục **Service Workers** → check: `Status activated and is running`, `Fetch handler: YES`
+- Cột **Installability** (dưới Manifest) → **NO ERRORS LISTED** (trước HTTPS thường ghi: "Page is not served over HTTPS")
+- Nếu trên đều OK → thanh địa chỉ Chrome sẽ hiện icon 📥 "Mở trong ứng dụng" (góc phải, cạnh sao Bookmarks). Click 📥 hoặc mở alert "Cài KDPD" → hộp thoại Chrome "Cài đặt ứng dụng?" hiện ra → ✅ OK.
+
 ## 8) Backup dữ liệu (Ubuntu, PostgreSQL 17)
 
 Mục tiêu: tạo file backup định kỳ để có thể restore lại DB khi cần.
@@ -1229,6 +1403,73 @@ grep -qE '^GOOGLE_CLIENT_SECRET=(GOCSPX-[A-Za-z0-9_-]{24})$' .env || echo "Clien
 ```
 
 Cách tốt nhất: luôn dùng script `kdpd-generate-clean-env.sh` để nhập từng trường 1 theo prompt.
+
+### 11.22 PWA Install Failures — 4 nguyên nhân hàng đầu (HTTP, Manifest, SW, Cache)
+
+**Triệu chứng nhóm A:** Modal "Cài KDPD vào màn hình chính" hiện lên bình thường, user click "Cài đặt ngay" → Chrome KHÔNG hiện hộp thoại cài gốc → đóng im lặng / cảm giác "đã xác nhận cài rồi nhưng chưa cài". Kèm: thanh địa chỉ không có biểu tượng 📥 "Mở trong ứng dụng".
+
+**Nguyên nhân 11.22.1 (P0 90%) — HTTP LAN (không phải Secure Context)**
+```
+Trang: http://task.kdpd.local
+Chrome DevTools → Application → Installability:
+  x No usable SSL certificate found. Page is not served over HTTPS.
+  x Page is not in a secure origin.
+```
+→ Chrome never fires `beforeinstallprompt` event → `deferredPrompt` = null → nút Cài đặt ngay click không gọi `evt.prompt()`.
+
+**Fix:** Xem **Section 7.4 Bật HTTPS Self-Signed cho LAN** (5 bước: mkcert → cert → Nginx 443 → env SESSION_SECURE → Client trust RootCA). Sau khi HTTPS OK: thanh địa chỉ đổi từ ⚠️ "Không bảo mật" → 🔒 "Bảo mật", Installability Errors rỗng.
+
+**Nguyên nhân 11.22.2 — Manifest 404 / MIME type sai**
+```
+Chrome DevTools → Network → Filter: manifest.webmanifest
+  Status 404 (Nginx chưa serve static)
+  Hoặc 200 nhưng Response Headers: Content-Type: text/html (application/octet-stream)
+→ Installability lỗi: "No manifest was found" / "Manifest could not be fetched"
+```
+**Fix:**
+- Verify Express static serve đúng thư mục `dist/public` (server index phải có `app.use(express.static(join(rootDir, "dist", "client")))` trước routes API).
+- Nginx block `location /manifest.webmanifest` phải được Express serve qua upstream (không override root).
+- Test nhanh: `curl -I https://task.kdpd.local/manifest.webmanifest | grep -i content-type` → phải trả về `application/manifest+json`.
+
+**Nguyên nhân 11.22.3 — Service Worker không register / không có fetch handler**
+```
+Chrome DevTools → Application → Service Workers:
+  (empty) — chưa register → Installability: "No matching service worker detected"
+  Hoặc có register nhưng Source path trả về 404 / script error khi parsing
+```
+**Fix (injectManifest strategy Vite PWA):**
+- Build lại production: `npm run build` → thư mục `dist/client/` phải chứa `sw.js` (kích thước > 2KB, không phải placeholder 0B).
+- Hard reload bypass cache Chrome: `Ctrl+Shift+R` (hoặc DevTools → Network → Disable cache rồi reload).
+- Unregister SW cũ (nếu có): DevTools → Application → Service Workers → Unregister → Site data → Clear.
+
+**Nguyên nhân 11.22.4 — Đã cài rồi / cache site data cũ chưa xóa**
+```
+Installability ghi: "App is already installed" (standalone mode)
+Hoặc Chrome tạm thời block install prompt do đã dismiss quá 3 lần (engagement heuristic)
+```
+**Fix:**
+1. Gỡ app cũ: Mở `chrome://apps` → tìm KDPD → chuột phải → "Remove from Chrome" (hoặc Win: `Start → KDPD → Uninstall`).
+2. Clear site data: DevTools → Application → Storage → ❌ Clear site data.
+3. Đóng toàn bộ Chrome, mở lại `https://task.kdpd.local`.
+
+**Runbook 1 trang Debug PWA Install:**
+```bash
+# 1) Check HTTPS + cert on server
+curl -sS -o /dev/null -w "HTTP %{http_code}  TLS %{ssl_verify_result}\n" \
+  --resolve task.kdpd.local:443:127.0.0.1 https://task.kdpd.local/
+# → mong muốn: HTTP 200  TLS 0
+
+# 2) Check manifest served OK (MIME + 200)
+curl -sS -I https://task.kdpd.local/manifest.webmanifest | head -n 5
+# → Content-Type: application/manifest+json
+
+# 3) Check sw.js tồn tại + fetch handler comment
+curl -sS https://task.kdpd.local/sw.js | grep -E "addEventListener\(['\"]fetch|self.__WB" | head -2
+# → phải thấy ít nhất 1 match
+
+# 4) Nginx reload + syntax check
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ---
 
