@@ -152,6 +152,7 @@ import {
   numberToVietnameseWords,
   normalizeSearch,
   buildExportPrefix,
+  buildExportPeriodSuffix,
   getTaskStatusColor,
   getTaskPriorityColor,
   loadXLSX,
@@ -1202,6 +1203,7 @@ export default function ThuKyHopPhanPage() {
     filteredTasks,
     tasksForStats,
     taskYearOptions,
+    taskPeriodOptions,
     activeStatsKey,
     paginatedTasks,
     totalTasksPages,
@@ -1723,7 +1725,8 @@ export default function ThuKyHopPhanPage() {
       XLSX.utils.book_append_sheet(workbook, worksheet, "Cong_viec");
 
       const prefix = buildExportPrefix();
-      const fileName = `${prefix}_thu-ky-hop-phan-cong-viec.xlsx`;
+      const periodSuffix = buildExportPeriodSuffix(taskFilters.periodType, taskFilters.periodValue);
+      const fileName = `${prefix}_thu-ky-hop-phan-cong-viec${periodSuffix}.xlsx`;
       XLSX.writeFile(workbook, fileName, { bookType: "xlsx" });
 
       toast({
@@ -2986,6 +2989,7 @@ export default function ThuKyHopPhanPage() {
                 stages={taskStages}
                 yearOptions={taskYearOptions}
                 showVoteFilter={true}
+                periodOptions={taskPeriodOptions}
               />
             </div>
             {tasksLoading ? (

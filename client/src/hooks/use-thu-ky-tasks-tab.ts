@@ -106,6 +106,7 @@ export function useThuKyTasksTab(params: UseThuKyTasksTabParams) {
     filteredTasks,
     tasksForStats,
     availableYears: taskYearOptions,
+    periodOptions: taskPeriodOptions,
   } = useTaskListControls({
     tasks: tasksScoped,
     role,
@@ -163,6 +164,7 @@ export function useThuKyTasksTab(params: UseThuKyTasksTabParams) {
     filteredTasks,
     tasksForStats,
     taskYearOptions,
+    taskPeriodOptions,
     activeStatsKey,
     paginatedTasks,
     totalTasksPages,

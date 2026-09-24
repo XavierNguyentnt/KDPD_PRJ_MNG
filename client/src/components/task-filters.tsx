@@ -24,7 +24,21 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Filter, X, ChevronDown, Check, Search } from "lucide-react";
 import type { User } from "@shared/schema";
-import { compareNamesByLastNameAZ, normalizeSearch } from "@/lib/utils";
+import {
+  compareNamesByLastNameAZ,
+  getReportPeriodBounds,
+  isTaskInReportPeriod,
+  normalizeSearch,
+  parseToLocalDate,
+  type PeriodOption,
+  type PeriodOptionsBundle,
+  type ReportPeriodType,
+  type ReportPeriodValue,
+  type ReportPeriodMode,
+} from "@/lib/utils";
+
+export type ArchivedFilterMode = "active" | "archived" | "all";
+export type { ReportPeriodMode } from "@/lib/utils";
 
 export interface TaskFilterState {
   staffId: string;
@@ -36,6 +50,10 @@ export interface TaskFilterState {
   dateFrom: string;
   dateTo: string;
   roundType: string;
+  periodType: ReportPeriodType;
+  periodValue: ReportPeriodValue;
+  archivedMode: ArchivedFilterMode;
+  reportPeriodMode: ReportPeriodMode;
 }
 
 const DEFAULT_FILTERS: TaskFilterState = {
@@ -48,10 +66,21 @@ const DEFAULT_FILTERS: TaskFilterState = {
   dateFrom: "",
   dateTo: "",
   roundType: "all",
+  periodType: "month",
+  periodValue: "all",
+  archivedMode: "active",
+  reportPeriodMode: "overlap",
 };
 
-export function getDefaultTaskFilters(): TaskFilterState {
-  return { ...DEFAULT_FILTERS };
+export function getDefaultTaskFilters(referenceDate: Date = new Date()): TaskFilterState {
+  const d = referenceDate;
+  const y = d.getFullYear();
+  const m0 = d.getMonth();
+  const currentMonthValue: string = `${y}-${m0}`;
+  return {
+    ...DEFAULT_FILTERS,
+    periodValue: currentMonthValue as ReportPeriodValue,
+  };
 }
 
 /** Apply filters to task list. Pass works to resolve relatedWorkId -> componentId/stage. */
@@ -185,6 +214,62 @@ export function applyTaskFilters<
     });
   }
 
+  if (
+    filters.periodType &&
+    filters.periodType !== "all" &&
+    filters.periodValue &&
+    filters.periodValue !== "all"
+  ) {
+    const bounds = getReportPeriodBounds(filters.periodType, filters.periodValue);
+    const mode: ReportPeriodMode = filters.reportPeriodMode ?? "overlap";
+    list = list.filter((t) => isTaskInReportPeriod(t as any, bounds.start, bounds.end, mode));
+
+    const psTuple: [number, number, number] = [
+      bounds.start.getFullYear(),
+      bounds.start.getMonth(),
+      bounds.start.getDate(),
+    ];
+
+    const cmpBefore = (ct: [number, number, number]): boolean => {
+      if (ct[0] !== psTuple[0]) return ct[0] < psTuple[0];
+      if (ct[1] !== psTuple[1]) return ct[1] < psTuple[1];
+      return ct[2] < psTuple[2];
+    };
+
+    // Helper: lấy actualCompletedAt tuple (task-level MAX or assignments-level MAX)
+    const computeCompletedTuple = (t: any): [number, number, number] | null => {
+      const top = parseToLocalDate(t.actualCompletedAt ?? null);
+      let latest: [number, number, number] | null = top;
+      if (t.assignments && Array.isArray(t.assignments)) {
+        for (const a of t.assignments) {
+          const ct = parseToLocalDate(a.completedAt ?? null);
+          if (!ct) continue;
+          if (!latest) { latest = ct; continue; }
+          const before =
+            ct[0] < latest[0] ||
+            (ct[0] === latest[0] && ct[1] < latest[1]) ||
+            (ct[0] === latest[0] && ct[1] === latest[1] && ct[2] < latest[2]);
+          if (!before) latest = ct;
+        }
+      }
+      return latest;
+    };
+
+    if (filters.archivedMode === "archived") {
+      list = list.filter((t) => {
+        const ct = computeCompletedTuple(t);
+        if (!ct) return false;
+        return cmpBefore(ct);
+      });
+    } else if (filters.archivedMode === "active") {
+      list = list.filter((t) => {
+        const ct = computeCompletedTuple(t);
+        if (!ct) return true;
+        return !cmpBefore(ct);
+      });
+    }
+  }
+
   return list;
 }
 
@@ -199,6 +284,7 @@ interface TaskFiltersProps {
   showVoteFilter?: boolean;
   showRoundTypeFilter?: boolean;
   roundTypeOptions?: string[];
+  periodOptions?: PeriodOptionsBundle;
 }
 
 export function TaskFilters({
@@ -211,6 +297,7 @@ export function TaskFilters({
   showVoteFilter = true,
   showRoundTypeFilter = false,
   roundTypeOptions = [],
+  periodOptions,
 }: TaskFiltersProps) {
   const { t, language } = useI18n();
   const { toast } = useToast();
@@ -235,6 +322,9 @@ export function TaskFilters({
     if (filters.roundType && filters.roundType !== "all") count++;
     if (filters.dateFrom) count++;
     if (filters.dateTo) count++;
+    if (filters.periodType && filters.periodType !== "all") count++;
+    if (filters.archivedMode && filters.archivedMode !== "active") count++;
+    if (filters.reportPeriodMode && filters.reportPeriodMode !== "overlap") count++;
     return count;
   }, [filters]);
 
@@ -419,6 +509,198 @@ export function TaskFilters({
 
       {StatusControl}
       {StaffControl}
+
+      {(() => {
+        const bundle = periodOptions ?? { months: [], quarters: [], years: [] };
+        const currentOptions: PeriodOption[] = (() => {
+          switch (filters.periodType) {
+            case "month": return bundle.months;
+            case "quarter": return bundle.quarters;
+            case "year": return bundle.years;
+            default: return [];
+          }
+        })();
+        const isPeriodAll = filters.periodType === "all" || filters.periodValue === "all";
+        const activeCls = "ring-2 ring-primary/30 bg-primary/10";
+        const baseCls =
+          "inline-flex items-center gap-1 h-9 px-3 rounded-md text-xs font-medium transition-all select-none border border-border cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 bg-background";
+        const setArchived = (m: ArchivedFilterMode) => {
+          onFiltersChange({ archivedMode: m });
+          try {
+            const el = document.querySelector<HTMLElement>("[data-task-table-root]");
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            else window.scrollBy({ top: 120, behavior: "smooth" });
+          } catch {}
+        };
+        const handleKey =
+          (m: ArchivedFilterMode) =>
+          (e: React.KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setArchived(m);
+            }
+          };
+        return (
+          <>
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
+              <Label className="text-xs text-muted-foreground">
+                {language === "vi" ? "Loại kỳ" : "Period type"}
+              </Label>
+              <Select
+                value={filters.periodType}
+                onValueChange={(v) => {
+                  const next = v as ReportPeriodType;
+                  onFiltersChange({ periodType: next, periodValue: "all" });
+                }}>
+                <SelectTrigger className="w-full sm:w-[150px] h-9 bg-background">
+                  <SelectValue placeholder={language === "vi" ? "Loại kỳ" : "Period type"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {language === "vi" ? "Tất cả" : "All"}
+                  </SelectItem>
+                  <SelectItem value="month">
+                    {language === "vi" ? "Tháng" : "Month"}
+                  </SelectItem>
+                  <SelectItem value="quarter">
+                    {language === "vi" ? "Quý" : "Quarter"}
+                  </SelectItem>
+                  <SelectItem value="year">
+                    {language === "vi" ? "Năm" : "Year"}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
+              <Label className="text-xs text-muted-foreground">
+                {language === "vi" ? "Kỳ báo cáo" : "Report period"}
+              </Label>
+              <Select
+                disabled={filters.periodType === "all" || currentOptions.length === 0}
+                value={filters.periodValue}
+                onValueChange={(v) => onFiltersChange({ periodValue: v })}>
+                <SelectTrigger className="w-full sm:w-[190px] h-9 bg-background">
+                  <SelectValue placeholder={language === "vi" ? "Chọn kỳ" : "Select period"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {language === "vi" ? "Tất cả kỳ" : "All periods"}
+                  </SelectItem>
+                  {currentOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
+              <Label className="text-xs text-muted-foreground">
+                {language === "vi" ? "Trạng thái lưu trữ" : "Archive status"}
+              </Label>
+              <div className="flex flex-nowrap gap-1.5 items-center">
+                <div
+                  role="button"
+                  tabIndex={isPeriodAll ? -1 : 0}
+                  aria-pressed={filters.archivedMode === "active" && !isPeriodAll}
+                  aria-disabled={isPeriodAll}
+                  onClick={() => !isPeriodAll && setArchived("active")}
+                  onKeyDown={handleKey("active")}
+                  className={`${baseCls} ${
+                    (isPeriodAll && filters.archivedMode === "active") ||
+                    (!isPeriodAll && filters.archivedMode === "active")
+                      ? activeCls
+                      : ""
+                  }`}>
+                  {language === "vi" ? "Đang hoạt động" : "Active"}
+                </div>
+                <div
+                  role="button"
+                  tabIndex={isPeriodAll ? -1 : 0}
+                  aria-pressed={filters.archivedMode === "archived" && !isPeriodAll}
+                  aria-disabled={isPeriodAll}
+                  onClick={() => !isPeriodAll && setArchived("archived")}
+                  onKeyDown={handleKey("archived")}
+                  className={`${baseCls} ${
+                    !isPeriodAll && filters.archivedMode === "archived" ? activeCls : ""
+                  } ${isPeriodAll ? "opacity-60" : ""}`}>
+                  {language === "vi" ? "Đã lưu trữ" : "Archived"}
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isPeriodAll || filters.archivedMode === "all"}
+                  onClick={() => setArchived("all")}
+                  onKeyDown={handleKey("all")}
+                  className={`${baseCls} ${
+                    filters.archivedMode === "all" ? activeCls : ""
+                  }`}>
+                  {language === "vi" ? "Tất cả" : "All"}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
+              <Label className="text-xs text-muted-foreground">
+                {language === "vi" ? "Cách đếm công việc" : "Task counting mode"}
+              </Label>
+              {(() => {
+                const setMode = (m: ReportPeriodMode) => {
+                  onFiltersChange({ reportPeriodMode: m });
+                  const el = document.querySelector<HTMLElement>(
+                    '[data-task-table-root="1"]',
+                  );
+                  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                };
+                const modeKey = (m: ReportPeriodMode) => (e: React.KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setMode(m);
+                  }
+                };
+                const segBase =
+                  "h-9 px-3 inline-flex items-center justify-center rounded-md text-[12px] border border-input cursor-pointer select-none transition-colors bg-background";
+                const segActive =
+                  "ring-2 ring-primary/40 border-primary/70 bg-primary/10 text-primary font-semibold";
+                const curMode: ReportPeriodMode =
+                  filters.reportPeriodMode ?? "overlap";
+                return (
+                  <div className="flex flex-nowrap rounded-md overflow-hidden ring-1 ring-input">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={curMode === "overlap"}
+                      onClick={() => setMode("overlap")}
+                      onKeyDown={modeKey("overlap")}
+                      className={`${segBase} rounded-r-none border-r-0 ${
+                        curMode === "overlap" ? segActive : ""
+                      }`}>
+                      {language === "vi"
+                        ? "Theo kỳ thực hiện"
+                        : "By execution period"}
+                    </div>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={curMode === "completion"}
+                      onClick={() => setMode("completion")}
+                      onKeyDown={modeKey("completion")}
+                      className={`${segBase} rounded-l-none ${
+                        curMode === "completion" ? segActive : ""
+                      }`}>
+                      {language === "vi"
+                        ? "Theo kỳ hoàn thành"
+                        : "By completion period"}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </>
+        );
+      })()}
 
       <Popover>
         <PopoverTrigger asChild>

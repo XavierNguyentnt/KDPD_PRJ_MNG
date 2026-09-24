@@ -360,6 +360,7 @@ export default function AdminDashboardPage() {
     tasksForStats,
     availableGroups,
     availableYears,
+    periodOptions,
   } = useTaskListControls({
     tasks,
     role,
@@ -958,6 +959,7 @@ export default function AdminDashboardPage() {
                 stages={stages}
                 yearOptions={availableYears}
                 showVoteFilter={true}
+                periodOptions={periodOptions}
               />
             </div>
 

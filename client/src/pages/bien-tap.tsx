@@ -59,6 +59,8 @@ import {
   defaultAssignmentLabel,
   getTaskStatusColor,
   getTaskPriorityColor,
+  type ReportPeriodType,
+  type ReportPeriodValue,
 } from "@/lib/utils";
 import type { TaskWithAssignmentDetails as TTask } from "@shared/schema";
 
@@ -104,6 +106,8 @@ async function handleExportTasks(
   toast: (opts: any) => any,
   works: WorkExportItem[],
   components: Array<{ id: string; name?: string | null }>,
+  periodType: ReportPeriodType,
+  periodValue: ReportPeriodValue,
 ) {
   const noData = language === "vi" ? "Không có dữ liệu" : "No data";
   const noDesc = language === "vi"
@@ -127,6 +131,8 @@ async function handleExportTasks(
       return [loaiBong, taskType, tacPham, String(hopPhan), giaiDoan];
     },
     assignmentLabelFn: getBTAssignmentLabel,
+    periodType,
+    periodValue,
   });
   if (!result.ok) {
     toast({ title: noData, description: noDesc });
@@ -208,6 +214,7 @@ export default function BienTapPage() {
     filteredTasks,
     tasksForStats,
     availableYears,
+    periodOptions,
   } = useTaskListControls({
     tasks: bienTapTasksScoped,
     role,
@@ -259,11 +266,11 @@ export default function BienTapPage() {
 
   useEffect(() => {
     function onCmdExportExcel() {
-      handleExportTasks(filteredTasks, language, toast, works, components);
+      handleExportTasks(filteredTasks, language, toast, works, components, filters.periodType, filters.periodValue);
     }
     window.addEventListener("cmd:export:excel", onCmdExportExcel);
     return () => window.removeEventListener("cmd:export:excel", onCmdExportExcel);
-  }, [filteredTasks, language, toast, works, components]);
+  }, [filteredTasks, language, toast, works, components, filters.periodType, filters.periodValue]);
 
   if (isLoading) {
     return <TaskTableSkeleton />;
@@ -412,6 +419,8 @@ export default function BienTapPage() {
                       toast,
                       works,
                       components,
+                      filters.periodType,
+                      filters.periodValue,
                     )
                   }
                   disabled={filteredTasks.length === 0}
@@ -433,6 +442,7 @@ export default function BienTapPage() {
                 yearOptions={yearOptions}
                 showVoteFilter={true}
                 showRoundTypeFilter={true}
+                periodOptions={periodOptions}
                 roundTypeOptions={roundTypeOptions}
               />
             </div>

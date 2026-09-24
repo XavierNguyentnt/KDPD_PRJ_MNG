@@ -259,6 +259,7 @@ export default function Dashboard() {
     filteredTasks: hookFilteredTasks,
     tasksForStats,
     availableYears,
+    periodOptions,
   } = useTaskListControls({
     tasks: tasksGroupYearScoped,
     role,
@@ -322,6 +323,12 @@ export default function Dashboard() {
     return list;
   }, [hookFilteredTasks, badgeFilter, selectedAssignees]);
 
+  // Nguồn tính badge assignee counts: ÁP DỤNG TẤT CẢ BỘ LỌC (period/archived/mode/search/status/priority/component + dashboardBadgeFilter)
+  // TRỪ selectedAssignees — tránh UX lỗi: click 1 badge → tất cả badge khác đếm = 0 → ẩn hết.
+  const byAssigneeScope = useMemo(() => {
+    return applyDashboardBadgeFilter(hookFilteredTasks, badgeFilter);
+  }, [hookFilteredTasks, badgeFilter]);
+
   const recentActivityItems = useMemo(() => {
     if (!baseFilteredTasks.length) return [];
     const sorted = [...baseFilteredTasks].sort((a, b) => {
@@ -366,7 +373,7 @@ export default function Dashboard() {
 
   const byAssignee = useMemo(() => {
     const counts: Record<string, number> = {};
-    baseFilteredTasks.forEach((task) => {
+    byAssigneeScope.forEach((task) => {
       const name = task.assignee?.trim() ?? "";
       if (name && partnerNameSet.has(name)) return;
       counts[name] = (counts[name] || 0) + 1;
@@ -386,7 +393,7 @@ export default function Dashboard() {
         return compareNamesByLastNameAZ(a.display, b.display);
       })
       .slice(0, 20);
-  }, [baseFilteredTasks, t]);
+  }, [byAssigneeScope, t]);
 
   const top5Assignees = useMemo(
     () => [...byAssignee].sort((a, b) => b.count - a.count).slice(0, 5),
@@ -465,6 +472,8 @@ export default function Dashboard() {
       const result = await exportTasksToExcel(filteredTasks as any, {
         fileNameSuffix: "Dashboard_Tasks",
         localize: { noDataTitle: noData, noDataDesc: noDesc },
+        periodType: filters.periodType,
+        periodValue: filters.periodValue,
       });
       if (!result.ok) {
         toast({ title: noData, description: noDesc });
@@ -486,7 +495,7 @@ export default function Dashboard() {
     } finally {
       setIsExportingTasks(false);
     }
-  }, [filteredTasks, language, toast, t]);
+  }, [filteredTasks, language, toast, t, filters.periodType, filters.periodValue]);
 
   useEffect(() => {
     function onCmdExportExcel() {
@@ -1059,6 +1068,7 @@ export default function Dashboard() {
                 stages={stages}
                 yearOptions={availableYears}
                 showVoteFilter={true}
+                periodOptions={periodOptions}
               />
             </div>
 
@@ -1108,7 +1118,7 @@ export default function Dashboard() {
                 getStatusColor={getStatusColor}
                 onCreateNew={handleCreateNew}
                 onResetFilters={clearAllFilters}
-                columnStorageKey="dashboard-tasks"
+                columnStorageKey="dashboard-tasks-v2"
               />
             ) : viewMode === "board" ? (
               <TaskKanbanBoard

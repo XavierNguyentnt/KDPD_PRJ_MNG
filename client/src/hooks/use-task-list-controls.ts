@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { TaskWithAssignmentDetails, Work } from "@shared/schema";
 import { UserRole, UserRoleType } from "./use-tasks";
-import { normalizeSearch } from "@/lib/utils";
+import { generatePeriodOptions, normalizeSearch, type PeriodOptionsBundle } from "@/lib/utils";
 import {
   applyTaskFilters,
   getDefaultTaskFilters,
@@ -81,6 +81,31 @@ export function useTaskListControls(params: {
       if (y) years.add(y);
     }
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [tasks, includedGroups, role, userId, userDisplayName]);
+
+  const periodOptions: PeriodOptionsBundle = useMemo(() => {
+    if (!tasks) return { months: [], quarters: [], years: [] };
+    let list = tasks.slice();
+    if (includedGroups && includedGroups.length > 0) {
+      list = list.filter((t) => includedGroups.includes(t.group || ""));
+    }
+    if (role === UserRole.EMPLOYEE) {
+      const uid = userId ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            (t as any).createdBy === uid ||
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else if (userDisplayName) {
+        const exact = (userDisplayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
+    }
+    return generatePeriodOptions(list);
   }, [tasks, includedGroups, role, userId, userDisplayName]);
 
   const filteredTasks = useMemo(() => {
@@ -207,5 +232,6 @@ export function useTaskListControls(params: {
     tasksForStats,
     availableGroups,
     availableYears,
+    periodOptions,
   };
 }

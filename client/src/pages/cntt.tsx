@@ -72,6 +72,8 @@ import {
   defaultAssignmentLabel,
   getTaskStatusColor,
   getTaskPriorityColor,
+  type ReportPeriodType,
+  type ReportPeriodValue,
 } from "@/lib/utils";
 import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
@@ -89,6 +91,8 @@ async function handleExportTasks(
   filteredTasks: TTask[],
   language: string,
   toast: (opts: any) => any,
+  periodType: ReportPeriodType,
+  periodValue: ReportPeriodValue,
 ) {
   const noData = language === "vi" ? "Không có dữ liệu" : "No data";
   const noDesc = language === "vi"
@@ -97,6 +101,8 @@ async function handleExportTasks(
   const result = await exportTasksToExcel(filteredTasks, {
     fileNameSuffix: "CNTT_Tasks",
     localize: { noDataTitle: noData, noDataDesc: noDesc },
+    periodType,
+    periodValue,
   });
   if (!result.ok) {
     toast({ title: noData, description: noDesc });
@@ -129,6 +135,7 @@ export default function CNTTPage() {
     tasksForStats,
     availableGroups,
     availableYears,
+    periodOptions,
   } = useTaskListControls({
     tasks,
     role,
@@ -169,11 +176,11 @@ export default function CNTTPage() {
 
   useEffect(() => {
     function onCmdExportExcel() {
-      handleExportTasks(filteredTasks, language, toast);
+      handleExportTasks(filteredTasks, language, toast, filters.periodType, filters.periodValue);
     }
     window.addEventListener("cmd:export:excel", onCmdExportExcel);
     return () => window.removeEventListener("cmd:export:excel", onCmdExportExcel);
-  }, [filteredTasks, language, toast]);
+  }, [filteredTasks, language, toast, filters.periodType, filters.periodValue]);
 
   const activeStatsKey = useMemo(
     () => getTaskStatsBadgeKeyFromFilters(filters),
@@ -338,7 +345,7 @@ export default function CNTTPage() {
               </ToggleGroupItem>
             </ToggleGroup>
             <Button
-              onClick={() => handleExportTasks(filteredTasks, language, toast)}
+              onClick={() => handleExportTasks(filteredTasks, language, toast, filters.periodType, filters.periodValue)}
               disabled={filteredTasks.length === 0}
               className="w-full sm:w-auto">
               Xuất Excel
@@ -355,6 +362,7 @@ export default function CNTTPage() {
             stages={stages}
             yearOptions={availableYears}
             showVoteFilter={true}
+            periodOptions={periodOptions}
           />
         </div>
 

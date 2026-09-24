@@ -380,11 +380,21 @@ export function TaskTable({
     status: true,
     dueDate: true,
     progress: true,
-    receivedDate: false,
-    actualCompletedAt: false,
+    receivedDate: true,
+    actualCompletedAt: true,
     vote: false,
     ...columns,
   };
+
+  // Explicit column override từ parent (props columns) => parent có quyền disable hoàn toàn cột khỏi UI
+  // (ẩn cả bảng + ẩn khỏi menu picker, user không toggle được). Nếu parent KHÔNG truyền cột đó
+  // (chỉ dùng hardcode default) => mặc dù false vẫn cho user toggle trong menu.
+  const explicitlyDisabledKeys = new Set<string>(
+    Object.keys(columns ?? {}).filter((k) => {
+      const v = (columns as any)?.[k];
+      return k !== "customColumns" && v === false;
+    })
+  );
 
   // Initialize default column visibility
   const getDefaultVisibility = (): Record<string, boolean> => {
@@ -717,7 +727,7 @@ export function TaskTable({
                 { key: "actualCompletedAt", label: getColumnLabel("actualCompletedAt", language === "vi" ? "Ngày hoàn thành thực tế" : "Completed") },
                 { key: "vote", label: getColumnLabel("vote", language === "vi" ? "Đánh giá" : "Evaluation") },
               ].map(({ key, label }) => {
-                if (defaultColumns[key as keyof typeof defaultColumns] === false) return null;
+                if (explicitlyDisabledKeys.has(key)) return null;
                 return (
                   <div key={key} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50">
                     <Checkbox
@@ -845,16 +855,6 @@ export function TaskTable({
                   className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                 />
               )}
-              {defaultColumns.dueDate !== false && isColumnVisible("dueDate") && (
-                <SortableHead
-                  label={t.task.dueDate}
-                  column="dueDate"
-                  sortBy={sortBy}
-                  sortDir={sortDir}
-                  onSort={onSort}
-                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
-                />
-              )}
               {defaultColumns.progress !== false && isColumnVisible("progress") && (
                 <SortableHead
                   label={t.task.progress}
@@ -874,6 +874,16 @@ export function TaskTable({
                   onSort={onSort}
                   className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                   title={language === "vi" ? "Ngày đầu tiên nhận công việc trong số các nhân sự" : "Earliest received date among assignees"}
+                />
+              )}
+              {defaultColumns.dueDate !== false && isColumnVisible("dueDate") && (
+                <SortableHead
+                  label={t.task.dueDate}
+                  column="dueDate"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                 />
               )}
               {defaultColumns.actualCompletedAt !== false && isColumnVisible("actualCompletedAt") && (
@@ -1016,15 +1026,15 @@ export function TaskTable({
                       </Badge>
                     </td>
                   )}
-                  {defaultColumns.dueDate !== false && isColumnVisible("dueDate") && (
-                    <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
-                      {formatDateDDMMYYYY(task.dueDate) || "-"}
-                    </td>
-                  )}
                   {defaultColumns.progress !== false && isColumnVisible("progress") && renderProgressCell(task)}
                   {defaultColumns.receivedDate !== false && isColumnVisible("receivedDate") && (
                     <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
                       {formatDateDDMMYYYY((task as TaskWithAssignmentDetails & { receivedAt?: string | Date | null }).receivedAt) || "—"}
+                    </td>
+                  )}
+                  {defaultColumns.dueDate !== false && isColumnVisible("dueDate") && (
+                    <td className="p-4 align-middle text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDateDDMMYYYY(task.dueDate) || "-"}
                     </td>
                   )}
                   {defaultColumns.actualCompletedAt !== false && isColumnVisible("actualCompletedAt") && (

@@ -56,12 +56,16 @@ import {
   exportTasksToExcel,
   getTaskStatusColor,
   getTaskPriorityColor,
+  type ReportPeriodType,
+  type ReportPeriodValue,
 } from "@/lib/utils";
 
 async function handleExportTasks(
   filteredTasks: TTask[],
   language: string,
   toast: (opts: any) => any,
+  periodType: ReportPeriodType,
+  periodValue: ReportPeriodValue,
 ) {
   const noData = language === "vi" ? "Không có dữ liệu" : "No data";
   const noDesc = language === "vi"
@@ -70,6 +74,8 @@ async function handleExportTasks(
   const result = await exportTasksToExcel(filteredTasks, {
     fileNameSuffix: "CV_Chung_Tasks",
     localize: { noDataTitle: noData, noDataDesc: noDesc },
+    periodType,
+    periodValue,
   });
   if (!result.ok) {
     toast({ title: noData, description: noDesc });
@@ -128,6 +134,7 @@ export default function CVChungPage() {
     filteredTasks,
     tasksForStats,
     availableYears,
+    periodOptions,
   } = useTaskListControls({
     tasks: datasetForList,
     role,
@@ -154,11 +161,11 @@ export default function CVChungPage() {
 
   useEffect(() => {
     function onCmdExportExcel() {
-      handleExportTasks(filteredTasks, language, toast);
+      handleExportTasks(filteredTasks, language, toast, filters.periodType, filters.periodValue);
     }
     window.addEventListener("cmd:export:excel", onCmdExportExcel);
     return () => window.removeEventListener("cmd:export:excel", onCmdExportExcel);
-  }, [filteredTasks, language, toast]);
+  }, [filteredTasks, language, toast, filters.periodType, filters.periodValue]);
 
   if (isLoading) {
     return <TaskTableSkeleton />;
@@ -289,7 +296,7 @@ export default function CVChungPage() {
               </ToggleGroupItem>
             </ToggleGroup>
             <Button
-              onClick={() => handleExportTasks(filteredTasks, language, toast)}
+              onClick={() => handleExportTasks(filteredTasks, language, toast, filters.periodType, filters.periodValue)}
               disabled={filteredTasks.length === 0}
               className="w-full sm:w-auto">
               Xuất Excel
@@ -306,6 +313,7 @@ export default function CVChungPage() {
             stages={stages}
             yearOptions={yearOptions}
             showVoteFilter={true}
+            periodOptions={periodOptions}
           />
         </div>
 

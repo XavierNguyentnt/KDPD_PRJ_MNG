@@ -57,7 +57,7 @@ export function compareNamesByLastNameAZ(a: string, b: string): number {
 }
 
 /** Parse to local date (no UTC shift). Returns [year, month0, day] or null. */
-function parseToLocalDate(value: string | Date | null | undefined): [number, number, number] | null {
+export function parseToLocalDate(value: string | Date | null | undefined): [number, number, number] | null {
   if (value == null || value === "") return null;
   if (typeof value === "object" && "getFullYear" in value) {
     const d = value as Date;
@@ -406,6 +406,10 @@ export interface ExportTasksOptions<
   dateColumnIndices?: number[];
   /** Indices cột merge khi 1 task có nhiều assignment rows. Default = [0,1,2,3,4,5,6,7,12,13,14] */
   mergeSharedColumns?: number[];
+  /** Loại kỳ báo cáo (để thêm suffix filename). Default = "all" → không suffix */
+  periodType?: ReportPeriodType;
+  /** Giá trị kỳ báo cáo (format: month="YYYY-MM", quarter="YYYY-QN", year="YYYY"). Default = "all" */
+  periodValue?: ReportPeriodValue;
 }
 
 const DEFAULT_STATUS_VI: Record<string, string> = {
@@ -447,6 +451,8 @@ export async function exportTasksToExcel<T extends TaskWithAssignmentDetails>(
     extraRowFields,
     assignmentLabelFn = defaultAssignmentLabel,
     includeVoteColumn = true,
+    periodType = "all",
+    periodValue = "all",
   } = opts;
 
   if (!filteredTasks || filteredTasks.length === 0) {
@@ -485,44 +491,87 @@ export async function exportTasksToExcel<T extends TaskWithAssignmentDetails>(
 
   filteredTasks.forEach((task) => {
     const assignments = Array.isArray(task.assignments) ? (task.assignments as any[]) : [];
-    const persons: Array<{
-      label: string; name: string; received: string; due: string; completed: string;
-    }> = assignments.length
-      ? assignments.map((a: any) => ({
-          label: assignmentLabelFn(a.stageType || ""),
-          name:  a.displayName ?? a.userId ?? "",
-          received: formatDateDDMMYYYY(a.receivedAt),
-          due:      formatDateDDMMYYYY(a.dueDate),
-          completed:formatDateDDMMYYYY(a.completedAt),
-        }))
-      : [{ label: "", name: "", received: "", due: "", completed: "" }];
+    // === G25 Period Reporting Rule: UI TaskTable = 1 task / 1 DÒNG DUY NHẤT ===
+    // Trước đây: persons.forEach(p) sheetData.push → N dòng/task theo assignments
+    // → UI 31 tasks 62 assignment = Excel 65 rows (NGƯỢC LẠI SINGLE SOURCE OF TRUTH).
+    // Fix: 1 task = 1 dòng DUY NHẤT (1-1 vs UI TaskTable):
+    //   - Aggregate assignments (label + name) vào cột "Nhân sự" join bằng ";"
+    //   - received = earliest assignment.receivedAt hoặc task.receivedAt
+    //   - due = task.dueDate
+    //   - completed = latest assignment.completedAt hoặc task.actualCompletedAt
+    const primary = assignments.length
+      ? assignments.find((a: any) =>
+          (a.stageType || "").toLowerCase() === "primary"
+        ) ?? assignments[0]
+      : null;
 
-    const startRow = sheetData.length + 1;
-    rowBlocks.push({ startRow, height: persons.length });
+    const personsJoined = assignments.length
+      ? assignments
+        .map((a: any) => {
+          const lbl = assignmentLabelFn(a.stageType || "");
+          const nm = a.displayName ?? a.userId ?? "";
+          if (!lbl) return nm;
+          return `${lbl}: ${nm}`;
+        })
+        .filter(Boolean)
+        .join("; ")
+      : (task.assignee ?? "");
+
+    const receivedAgg = (() => {
+      let earliest: Date | string | null = primary?.receivedAt ?? null;
+      for (const a of assignments) {
+        const r = a.receivedAt ?? null;
+        if (!r) continue;
+        if (!earliest || new Date(r).getTime() < new Date(earliest).getTime()) {
+          earliest = r;
+        }
+      }
+      if (task.receivedAt) {
+        const t = new Date(task.receivedAt as any).getTime();
+        if (!isNaN(t) && earliest && t < new Date(earliest).getTime()) earliest = task.receivedAt;
+      }
+      if (!earliest && task.createdAt) earliest = task.createdAt as any;
+      return formatDateDDMMYYYY(earliest as any);
+    })();
+
+    const completedAgg = (() => {
+      let latest: Date | string | null = primary?.completedAt ?? task.actualCompletedAt ?? null;
+      for (const a of assignments) {
+        const c = a.completedAt ?? null;
+        if (!c) continue;
+        if (!latest || new Date(c).getTime() > new Date(latest).getTime()) {
+          latest = c;
+        }
+      }
+      const tac = task.actualCompletedAt as any;
+      if (tac) {
+        const t = new Date(tac).getTime();
+        if (!isNaN(t) && latest && t > new Date(latest).getTime()) latest = tac;
+      }
+      return formatDateDDMMYYYY(latest as any);
+    })();
 
     const voteExtra: string[] = includeVoteColumn ? [getVoteColor((task as any).vote).label] : [];
     const extraVals: (string | number)[] = extraRowFields ? extraRowFields(task) : Array(extraLen).fill("");
 
-    persons.forEach((p) => {
-      sheetData.push([
-        task.id ?? "",
-        task.title ?? "",
-        task.group ?? "",
-        statusMap[String(task.status ?? "")] ?? String(task.status ?? ""),
-        priorityMap[String(task.priority ?? "")] ?? String(task.priority ?? ""),
-        typeof task.progress === "number" ? task.progress : "",
-        task.description ?? "",
-        ...voteExtra,
-        (p.label ? `${p.label}: ` : "") + (p.name || ""),
-        p.received,
-        p.due,
-        p.completed,
-        (task as any).notes ?? "",
-        formatDateDDMMYYYY(task.createdAt as any),
-        formatDateDDMMYYYY(task.updatedAt as any),
-        ...extraVals,
-      ]);
-    });
+    sheetData.push([
+      task.id ?? "",
+      task.title ?? "",
+      task.group ?? "",
+      statusMap[String(task.status ?? "")] ?? String(task.status ?? ""),
+      priorityMap[String(task.priority ?? "")] ?? String(task.priority ?? ""),
+      typeof task.progress === "number" ? task.progress : "",
+      task.description ?? "",
+      ...voteExtra,
+      personsJoined,
+      receivedAgg,
+      formatDateDDMMYYYY(task.dueDate as any),
+      completedAgg,
+      (task as any).notes ?? "",
+      formatDateDDMMYYYY(task.createdAt as any),
+      formatDateDDMMYYYY(task.updatedAt as any),
+      ...extraVals,
+    ]);
   });
 
   const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
@@ -587,7 +636,8 @@ export async function exportTasksToExcel<T extends TaskWithAssignmentDetails>(
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
-  const fileName = `${buildExportPrefix()}_${fileNameSuffix}.xlsx`;
+  const periodSuffix = buildExportPeriodSuffix(periodType, periodValue);
+  const fileName = `${buildExportPrefix()}_${fileNameSuffix}${periodSuffix}.xlsx`;
   XLSX.writeFile(workbook, fileName);
   return { ok: true, rows: filteredTasks.length, fileName };
 }
@@ -733,5 +783,345 @@ export function hasGroupPermission(input: GroupPermissionInput): boolean {
           return byCode || byName;
         });
   return hasGroupMatch;
+}
+
+/* =========================================================================
+ * [G25-P0] Period Reporting Helpers — Xem & Báo cáo công việc theo Kỳ
+ * Một nguồn sự thật duy nhất cho: bounds tính, overlap logic, options UI,
+ * và suffix filename Excel. Đảm bảo UI và file export dùng chung logic.
+ * ========================================================================= */
+
+export type ReportPeriodType = "all" | "month" | "quarter" | "year";
+export type ReportPeriodValue = string;
+
+export interface PeriodOption {
+  value: string;
+  label: string;
+}
+
+export interface PeriodOptionsBundle {
+  months: PeriodOption[];
+  quarters: PeriodOption[];
+  years: PeriodOption[];
+}
+
+export interface ReportPeriodBounds {
+  start: Date;
+  end: Date;
+  label: string;
+}
+
+const QUARTER_TO_MONTHS: Record<number, [number, number]> = {
+  1: [0, 2],
+  2: [3, 5],
+  3: [6, 8],
+  4: [9, 11],
+};
+
+function localDateOnly(y: number, m0: number, d: number): Date {
+  const dt = new Date(y, m0, d, 0, 0, 0, 0);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function compareDateOnlyTuple(
+  a: [number, number, number] | null,
+  b: [number, number, number] | null,
+): number {
+  if (!a && !b) return 0;
+  if (!a) return -1;
+  if (!b) return 1;
+  const [ay, am, ad] = a;
+  const [by, bm, bd] = b;
+  if (ay !== by) return ay - by;
+  if (am !== bm) return am - bm;
+  return ad - bd;
+}
+
+export function getReportPeriodBounds(
+  periodType: ReportPeriodType,
+  periodValue: ReportPeriodValue,
+): ReportPeriodBounds {
+  const pt = String(periodType ?? "all").trim().toLowerCase() as ReportPeriodType;
+  const pv = String(periodValue ?? "all").trim();
+
+  if (pt === "all" || pv === "all" || pv === "") {
+    return {
+      start: localDateOnly(1970, 0, 1),
+      end: localDateOnly(2100, 11, 31),
+      label: "Toàn bộ thời gian",
+    };
+  }
+
+  if (pt === "month") {
+    const m = pv.match(/^(\d{4})-(\d{1,2})$/);
+    if (!m) {
+      return {
+        start: localDateOnly(1970, 0, 1),
+        end: localDateOnly(2100, 11, 31),
+        label: "Tháng không hợp lệ",
+      };
+    }
+    const y = parseInt(m[1], 10);
+    const m0 = parseInt(m[2], 10) - 1;
+    const lastDay = new Date(y, m0 + 1, 0).getDate();
+    const labelMM = String(m0 + 1).padStart(2, "0");
+    return {
+      start: localDateOnly(y, m0, 1),
+      end: localDateOnly(y, m0, lastDay),
+      label: `Tháng ${labelMM}/${y}`,
+    };
+  }
+
+  if (pt === "quarter") {
+    const q = pv.match(/^(\d{4})-Q([1-4])$/i);
+    if (!q) {
+      return {
+        start: localDateOnly(1970, 0, 1),
+        end: localDateOnly(2100, 11, 31),
+        label: "Quý không hợp lệ",
+      };
+    }
+    const y = parseInt(q[1], 10);
+    const qn = parseInt(q[2], 10);
+    const [mStart, mEnd] = QUARTER_TO_MONTHS[qn];
+    const lastDay = new Date(y, mEnd + 1, 0).getDate();
+    const roman = ["I", "II", "III", "IV"][qn - 1] ?? String(qn);
+    return {
+      start: localDateOnly(y, mStart, 1),
+      end: localDateOnly(y, mEnd, lastDay),
+      label: `Quý ${roman}/${y}`,
+    };
+  }
+
+  if (pt === "year") {
+    const y = pv.match(/^(\d{4})$/);
+    if (!y) {
+      return {
+        start: localDateOnly(1970, 0, 1),
+        end: localDateOnly(2100, 11, 31),
+        label: "Năm không hợp lệ",
+      };
+    }
+    const yn = parseInt(y[1], 10);
+    return {
+      start: localDateOnly(yn, 0, 1),
+      end: localDateOnly(yn, 11, 31),
+      label: `Năm ${yn}`,
+    };
+  }
+
+  return {
+    start: localDateOnly(1970, 0, 1),
+    end: localDateOnly(2100, 11, 31),
+    label: "Toàn bộ thời gian",
+  };
+}
+
+export type ReportPeriodMode = "overlap" | "completion";
+
+export function isTaskInReportPeriod<
+  T extends {
+    status: string;
+    createdAt?: string | Date | null;
+    receivedAt?: string | Date | null;
+    actualCompletedAt?: string | Date | null;
+    assignments?: Array<{
+      receivedAt?: string | Date | null;
+      completedAt?: string | Date | null;
+      stageType?: string | null;
+    }> | null;
+  },
+>(
+  task: T,
+  periodStart: Date,
+  periodEnd: Date,
+  mode: ReportPeriodMode = "overlap",
+): boolean {
+  const psTuple: [number, number, number] = [
+    periodStart.getFullYear(),
+    periodStart.getMonth(),
+    periodStart.getDate(),
+  ];
+  const peTuple: [number, number, number] = [
+    periodEnd.getFullYear(),
+    periodEnd.getMonth(),
+    periodEnd.getDate(),
+  ];
+
+  // ---------- Compute taskStartTuple từ task-level + backup assignments[] MIN ----------
+  let earliestStart: [number, number, number] | null = null;
+  const topStart = parseToLocalDate(task.receivedAt ?? task.createdAt ?? null);
+  if (topStart) earliestStart = topStart;
+  if (task.assignments && task.assignments.length > 0) {
+    for (const a of task.assignments) {
+      const st = parseToLocalDate(a.receivedAt ?? null);
+      if (!st) continue;
+      if (!earliestStart || compareDateOnlyTuple(st, earliestStart) < 0) {
+        earliestStart = st;
+      }
+    }
+  }
+  const taskStartTuple = earliestStart;
+  if (!taskStartTuple) return false;
+
+  // ---------- Compute completedTuple từ task-level + backup assignments[] MAX ----------
+  let latestCompleted: [number, number, number] | null = null;
+  const topComplete = parseToLocalDate(task.actualCompletedAt ?? null);
+  if (topComplete) latestCompleted = topComplete;
+  if (task.assignments && task.assignments.length > 0) {
+    for (const a of task.assignments) {
+      const ct = parseToLocalDate(a.completedAt ?? null);
+      if (!ct) continue;
+      if (!latestCompleted || compareDateOnlyTuple(ct, latestCompleted) > 0) {
+        latestCompleted = ct;
+      }
+    }
+  }
+  const completedTuple = latestCompleted;
+
+  // ---------- Detect status completed đa ngôn ngữ VI + EN ----------
+  const statusNorm = String(task.status ?? "").trim().toLowerCase();
+  const statusCompleted =
+    statusNorm === "completed" ||
+    statusNorm === "hoàn thành" ||
+    statusNorm === "đã hoàn thành" ||
+    statusNorm === "hoan thanh" ||
+    statusNorm === "da hoan thanh" ||
+    statusNorm === "done" ||
+    statusNorm === "finished" ||
+    statusNorm === "closed";
+  const isCompleted = completedTuple != null || statusCompleted;
+
+  // =============== MODE SELECTION ===============
+  if (mode === "completion") {
+    // === COMPLETION MODE: Ưu tiên kỳ HOÀN THÀNH ===
+    // Case A: Đã hoàn thành → CHỈ đếm DUY NHẤT ở kỳ có actualCompletedAt
+    if (isCompleted && completedTuple) {
+      const afterStart = compareDateOnlyTuple(completedTuple, psTuple) >= 0;
+      const beforeEnd = compareDateOnlyTuple(completedTuple, peTuple) <= 0;
+      return afterStart && beforeEnd;
+    }
+    // Case B: Status là hoàn thành nhưng KHÔNG có actualCompletedAt (edge case): fallback overlap
+    if (isCompleted) {
+      return compareDateOnlyTuple(taskStartTuple, peTuple) <= 0;
+    }
+    // Case C: Chưa hoàn thành → giống TH2 / TH6: overlap start (xuất hiện ở mọi kỳ có mặt đến khi hoàn thành)
+    return compareDateOnlyTuple(taskStartTuple, peTuple) <= 0;
+  }
+
+  // =============== OVERLAP MODE (default, cũ) ===============
+  if (compareDateOnlyTuple(taskStartTuple, peTuple) > 0) {
+    return false;
+  }
+  if (!isCompleted) {
+    return true;
+  }
+  if (completedTuple) {
+    return compareDateOnlyTuple(completedTuple, psTuple) >= 0;
+  }
+  return true;
+}
+
+export function generatePeriodOptions<
+  T extends {
+    createdAt?: string | Date | null;
+    receivedAt?: string | Date | null;
+    actualCompletedAt?: string | Date | null;
+  },
+>(
+  tasks: T[],
+  currentDate: Date = new Date(),
+): PeriodOptionsBundle {
+  const years = new Set<number>();
+  const pushTuple = (tpl: [number, number, number] | null) => {
+    if (tpl) years.add(tpl[0]);
+  };
+
+  for (const t of tasks) {
+    pushTuple(parseToLocalDate(t.receivedAt ?? t.createdAt ?? null));
+    pushTuple(parseToLocalDate(t.actualCompletedAt ?? null));
+  }
+
+  const curY = currentDate.getFullYear();
+  years.add(curY);
+  if (years.size === 0) years.add(curY);
+
+  const sortedYears = Array.from(years).sort((a, b) => b - a);
+
+  const todayMidnight = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    currentDate.getDate(),
+  );
+  const todayTs = todayMidnight.getTime();
+  const periodAlreadyStarted = (b: { start: Date; end: Date }): boolean =>
+    b.start.getTime() <= todayTs;
+
+  const yearOpts: PeriodOption[] = sortedYears
+    .map((y) => ({ value: String(y), label: `Năm ${y}` }))
+    .filter((opt) => {
+      const b = getReportPeriodBounds("year", opt.value);
+      return periodAlreadyStarted(b);
+    });
+
+  const monthOpts: PeriodOption[] = [];
+  const monthsSeen = new Set<string>();
+  for (const y of sortedYears) {
+    for (let m0 = 11; m0 >= 0; m0--) {
+      const mm = String(m0 + 1).padStart(2, "0");
+      const v = `${y}-${mm}`;
+      if (monthsSeen.has(v)) continue;
+      monthsSeen.add(v);
+      const opt: PeriodOption = { value: v, label: `Tháng ${mm}/${y}` };
+      const b = getReportPeriodBounds("month", v);
+      if (!periodAlreadyStarted(b)) continue;
+      monthOpts.push(opt);
+    }
+  }
+
+  const quarterOpts: PeriodOption[] = [];
+  const qSeen = new Set<string>();
+  const romanQ = ["I", "II", "III", "IV"];
+  for (const y of sortedYears) {
+    for (let q = 4; q >= 1; q--) {
+      const v = `${y}-Q${q}`;
+      if (qSeen.has(v)) continue;
+      qSeen.add(v);
+      const opt: PeriodOption = { value: v, label: `Quý ${romanQ[q - 1]}/${y}` };
+      const b = getReportPeriodBounds("quarter", v);
+      if (!periodAlreadyStarted(b)) continue;
+      quarterOpts.push(opt);
+    }
+  }
+
+  return { months: monthOpts, quarters: quarterOpts, years: yearOpts };
+}
+
+export function buildExportPeriodSuffix(
+  periodType: ReportPeriodType,
+  periodValue: ReportPeriodValue,
+): string {
+  const pt = String(periodType ?? "all").trim().toLowerCase() as ReportPeriodType;
+  const pv = String(periodValue ?? "all").trim();
+  if (pt === "all" || pv === "all" || pv === "") return "";
+
+  if (pt === "month") {
+    const m = pv.match(/^(\d{4})-(\d{1,2})$/);
+    if (!m) return "";
+    const mm = String(parseInt(m[2], 10)).padStart(2, "0");
+    return `_Thang${mm}_${m[1]}`;
+  }
+  if (pt === "quarter") {
+    const q = pv.match(/^(\d{4})-Q([1-4])$/i);
+    if (!q) return "";
+    return `_Quy${q[2]}_${q[1]}`;
+  }
+  if (pt === "year") {
+    const y = pv.match(/^(\d{4})$/);
+    if (!y) return "";
+    return `_Nam${y[1]}`;
+  }
+  return "";
 }
 
