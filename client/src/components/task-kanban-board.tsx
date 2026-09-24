@@ -244,8 +244,14 @@ export function TaskKanbanBoard({
             duration: 6500,
           });
         }
+        const payload: Record<string, unknown> = { id: taskId, status: targetStatus };
+        if (targetStatus === "Completed") {
+          payload.actualCompletedAt = new Date().toISOString();
+        } else {
+          payload.actualCompletedAt = null;
+        }
         updateTask(
-          { id: taskId, status: targetStatus },
+          payload as any,
           {
             onSuccess: () => {
               toast({

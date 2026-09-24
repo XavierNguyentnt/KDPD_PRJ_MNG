@@ -656,7 +656,40 @@ export function TaskCalendarView({
       return;
     }
 
-    updateTask({ id: taskId, assignments } as any);
+    const payload: Record<string, unknown> = { id: taskId, assignments };
+
+    if (assignments.length > 0) {
+      const maxCompleted = assignments.reduce((acc: Date | null, a: any) => {
+        if (!a?.completedAt) return acc;
+        const d = new Date(a.completedAt);
+        if (isNaN(d.getTime())) return acc;
+        if (!acc || d > acc) return d;
+        return acc;
+      }, null);
+      payload.actualCompletedAt = maxCompleted ? maxCompleted.toISOString() : null;
+
+      if (dateField === "dueDate") {
+        const maxDue = assignments.reduce((acc: Date | null, a: any) => {
+          if (!a?.dueDate) return acc;
+          const d = new Date(a.dueDate);
+          if (isNaN(d.getTime())) return acc;
+          if (!acc || d > acc) return d;
+          return acc;
+        }, null);
+        payload.dueDate = maxDue ? maxDue.toISOString() : null;
+      } else {
+        const minReceived = assignments.reduce((acc: Date | null, a: any) => {
+          if (!a?.receivedAt) return acc;
+          const d = new Date(a.receivedAt);
+          if (isNaN(d.getTime())) return acc;
+          if (!acc || d < acc) return d;
+          return acc;
+        }, null);
+        payload.receivedAt = minReceived ? minReceived.toISOString() : null;
+      }
+    }
+
+    updateTask(payload as any);
   };
 
   const activeDragTask = useMemo(() => {
