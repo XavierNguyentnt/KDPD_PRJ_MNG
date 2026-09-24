@@ -41,42 +41,42 @@ const GROUP_META: Record<GroupCode, GroupMeta> = {
   cvchung: {
     title: "Công việc chung",
     subtitle:
-      "Công việc văn phòng chung · Phối hợp đa bộ phận · 3 vai trò: Kiểm soát + Nhân sự + Thực hiện chính",
+      "Công việc chung của Ban Thư ký · Phối hợp đa bộ phận ",
     Icon: ClipboardList,
     accentVar: "group-cvchung",
   },
   bientap: {
-    title: "Biên tập Hán Nôm",
+    title: "Nghiệp vụ Biên tập",
     subtitle:
-      "Quy trình 3 giai đoạn biên tập · BTV 1 → BTV 2 → Người đọc duyệt · Loại bông · Liên kết tác phẩm & hợp đồng",
+      "Biên tập các sản phẩm dịch thuật & sản phẩm KHCN của Dự án · Các nhiệm vụ liên quan đến xuất bản và bản quyền",
     Icon: BookOpenCheck,
     accentVar: "group-bientap",
   },
   thietke: {
     title: "Thiết kế",
     subtitle:
-      "4 vai trò · KTV chính + Trợ lý N + BTV phê duyệt + Kiểm soát · Sao chép kế thừa phân công",
+      "Thiết kế, dàn trang các ấn phẩm của Dự án KĐPĐ · Dành cho: KTV chính + Trợ lý N + BTV phê duyệt + Kiểm soát",
     Icon: Palette,
     accentVar: "group-thietke",
   },
   cntt: {
     title: "Công nghệ thông tin",
     subtitle:
-      "Hỗ trợ kỹ thuật phần mềm · Quét trùng lặp Hán Nôm đa nhân sự song song · Kiểm soát bản quyền",
+      "Hỗ trợ kỹ thuật CNTT · Phát triển phần mềm, ứng dụng phục vụ nhiệm vụ của Dự án",
     Icon: ServerCog,
     accentVar: "group-cntt",
   },
   thuky: {
     title: "Thư ký hợp phần",
     subtitle:
-      "4 modules nghiệp vụ · Công việc + Danh mục tác phẩm + HĐ dịch thuật + HĐ hiệu đính · Tài chính & công nợ",
+      "Quản lý hợp phần dịch thuật · Đảm bảo tiến độ và quản lý rủi ro  · Công việc + Danh mục tác phẩm + HĐ dịch thuật + HĐ hiệu đính · Tài chính & công nợ",
     Icon: ScrollText,
     accentVar: "group-thuky",
   },
   admin: {
     title: "Quản trị hệ thống",
     subtitle:
-      "Tổng quan hệ thống · Quản lý tài khoản · Phân quyền vai trò · Audit logs toàn bộ hoạt động",
+      "Tổng quan hệ thống · Quản lý tài khoản · Phân quyền vai trò · Audit logs toàn bộ hoạt động · Sao lưu & Khôi phục dữ liệu",
     Icon: ShieldAlert,
     accentVar: "group-admin",
   },

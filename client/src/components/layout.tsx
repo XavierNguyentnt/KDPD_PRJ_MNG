@@ -1289,7 +1289,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           />
           {/* Text content z-10 trên tất cả layer (pattern + scrim + base card) → không bị ảnh hưởng filter */}
           <div className="relative z-10 text-center text-xs text-muted-foreground">
-            Copyright of Văn phòng Dự án Kinh điển phương Đông
+            © 2026 KDPD · All rights reserved | Bản quyền thuộc về Văn phòng Dự án Kinh điển phương Đông
           </div>
         </footer>
       </main>

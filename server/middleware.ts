@@ -138,13 +138,23 @@ export function securityHeaders(
     "Permissions-Policy",
     "geolocation=(), microphone=(), camera=()",
   );
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
   const xfProto = String(req.headers["x-forwarded-proto"] || "")
     .split(",")[0]
     ?.trim()
     .toLowerCase();
   const isHttps = req.secure || xfProto === "https";
+  const host = String(req.headers["host"] || "")
+    .split(":")[0]
+    ?.trim()
+    .toLowerCase();
+  const isLocalhost =
+    host === "localhost" || host === "127.0.0.1" || host === "::1";
+  // COOP + CORP chỉ gửi trên origin "potentially trustworthy" (HTTPS hoặc localhost).
+  // Với HTTP LAN (như task.kdpd.local) browser sẽ ignore và log cảnh báo, nên tránh gửi.
+  if (isHttps || isLocalhost) {
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  }
   if (isHttps) {
     res.setHeader(
       "Strict-Transport-Security",
