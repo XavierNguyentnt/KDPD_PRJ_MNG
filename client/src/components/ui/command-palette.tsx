@@ -82,7 +82,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { path: "/", labelVi: "Bảng điều khiển", labelEn: "Dashboard", icon: LayoutDashboard },
+  { path: "/", labelVi: "Báo cáo", labelEn: "Dashboard", icon: LayoutDashboard },
   { path: "/cv-chung", labelVi: "Công việc chung", labelEn: "All tasks", icon: ClipboardList, perm: "canViewCVChung" },
   { path: "/bien-tap", labelVi: "Biên tập", labelEn: "Editorial", icon: Edit3, perm: "canViewEditorial" },
   { path: "/thiet-ke", labelVi: "Thiết kế", labelEn: "Design", icon: Palette, perm: "canViewDesign" },

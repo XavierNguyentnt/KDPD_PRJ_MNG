@@ -2,6 +2,7 @@
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<string | { url: string; revision: string }> | undefined;
+  __WB_DISABLE_DEV_LOGS?: boolean;
 };
 
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
@@ -18,6 +19,12 @@ setCacheNameDetails({
   runtime: "runtime",
   googleAnalytics: "ga",
 });
+
+try {
+  self.__WB_DISABLE_DEV_LOGS = true;
+} catch {
+  /* ignore */
+}
 
 clientsClaim();
 self.addEventListener("install", (_event) => {

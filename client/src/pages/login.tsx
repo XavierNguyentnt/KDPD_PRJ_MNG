@@ -92,14 +92,19 @@ export default function LoginPage() {
 
         <div className="relative z-10 flex flex-col justify-between p-10 lg:p-16 w-full h-full min-h-[100dvh]">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-lg">
-              <BookOpen className="w-7 h-7 text-secondary" strokeWidth={2.2} />
+            <div className="h-20 flex items-center justify-center overflow-hidden p-1.5">
+              <img
+                src="/logo-duan.png"
+                alt="Văn phòng Dự án Kinh điển phương Đông"
+                className="w-full h-full object-contain select-none"
+                draggable={false}
+              />
             </div>
             <div className="flex flex-col leading-tight">
               <span className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight">
-                KDPD
+                Văn phòng Dự án
               </span>
-              <span className="text-xs text-white/70 font-medium tracking-wide uppercase">
+              <span className="py-1 text-xs text-white/70 font-medium tracking-wide uppercase">
                 Kinh điển phương Đông
               </span>
             </div>
@@ -109,7 +114,7 @@ export default function LoginPage() {
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 px-3 py-1.5 text-xs font-medium text-secondary/95">
                 <Sparkles className="w-3.5 h-3.5" />
-                Nền tảng số hóa di sản văn hóa
+                Nền tảng quản lý công việc
               </div>
               <h1 className="font-[family-name:var(--font-display)] text-4xl lg:text-5xl font-bold tracking-tight leading-[1.1]">
                 Văn phòng Dự án
@@ -128,9 +133,7 @@ export default function LoginPage() {
               <blockquote className="text-base italic text-white/80 leading-relaxed">
                 "Truyền tải ngàn năm văn hiến, kiến tạo tương lai cùng di sản."
               </blockquote>
-              <figcaption className="mt-3 text-sm text-secondary/85 font-medium">
-                — Sứ mệnh KDPD
-              </figcaption>
+              
             </figure>
           </div>
 
@@ -152,8 +155,13 @@ export default function LoginPage() {
         <Card className="w-full max-w-md shadow-xl border-border/80 bg-card animate-in">
           <CardHeader className="space-y-1 pb-2">
             <div className="md:hidden flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-primary/12 flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-primary" strokeWidth={2.2} />
+              <div className="w-9 h-9 rounded-xl bg-primary/12 flex items-center justify-center overflow-hidden p-1">
+                <img
+                  src="/logo-duan.png"
+                  alt="KDPD"
+                  className="w-full h-full object-contain select-none"
+                  draggable={false}
+                />
               </div>
               <span className="font-[family-name:var(--font-display)] font-bold text-lg tracking-tight">
                 KDPD

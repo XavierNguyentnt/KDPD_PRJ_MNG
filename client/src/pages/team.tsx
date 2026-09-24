@@ -24,6 +24,7 @@ import { api } from "@shared/routes";
 import { useRefreshTasks } from "@/hooks/use-tasks";
 import { GroupPageHero } from "@/components/group-page-hero";
 import { MemberHeatmap12m } from "@/components/member-heatmap-12m";
+import { GroupTabsFilter } from "@/components/group-tabs-filter";
 import {
   ArrowUpRight,
   BarChart3,
@@ -48,6 +49,37 @@ import {
 
 function normalizeDisplayName(s: string) {
   return s.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function taskParseDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === "number") {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof v === "string") {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+function taskIsCompleted(task: { status?: unknown; actualCompletedAt?: unknown; completedAt?: unknown }) {
+  return (
+    String(task?.status || "") === "Completed" ||
+    task?.actualCompletedAt != null ||
+    (task as any)?.completedAt != null
+  );
+}
+
+function taskIsOverdue(task: { status?: unknown; actualCompletedAt?: unknown; completedAt?: unknown; dueDate?: unknown; deadline?: unknown; due?: string | null }) {
+  if (taskIsCompleted(task as any)) return false;
+  const d = taskParseDate(task?.dueDate ?? task?.deadline ?? (task as any).due);
+  if (!d) return false;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return d.getTime() < todayStart.getTime();
 }
 
 export default function Team() {
@@ -83,17 +115,23 @@ export default function Team() {
     if (!tasks) return [];
 
     const userGroupByName = new Map<string, string>();
+    const userGroupIdsByName = new Map<string, Array<{ id: string; name: string }>>();
     for (const u of (users ?? []) as any[]) {
       const name = typeof u?.displayName === "string" ? u.displayName : "";
       const key = normalizeDisplayName(name);
       if (!key) continue;
       const groups = Array.isArray(u?.groups) ? u.groups : [];
-      const groupNames = groups
-        .map((g: any) => (typeof g?.name === "string" ? g.name : ""))
-        .map((s: string) => s.trim())
-        .filter(Boolean);
-      if (groupNames.length > 0)
-        userGroupByName.set(key, groupNames.join(", "));
+      const groupEntries = groups
+        .map((g: any) => {
+          const id = typeof g?.id === "string" ? g.id : "";
+          const nm = typeof g?.name === "string" ? g.name.trim() : "";
+          if (!id && !nm) return null;
+          return { id: id || nm, name: nm || id };
+        })
+        .filter(Boolean) as Array<{ id: string; name: string }>;
+      const groupNames = groupEntries.map((g) => g.name).filter(Boolean);
+      if (groupNames.length > 0) userGroupByName.set(key, groupNames.join(", "));
+      if (groupEntries.length > 0) userGroupIdsByName.set(key, groupEntries);
     }
 
     const UNASSIGNED_KEY = "__unassigned__";
@@ -109,6 +147,7 @@ export default function Team() {
       assignedGroups: Set<string>;
       averageVote: number;
       votedTasks: number;
+      userGroups: Array<{ id: string; name: string }>;
       recentTasks: {
         id: number | string;
         title: string;
@@ -200,6 +239,7 @@ export default function Team() {
             assignedGroups: new Set<string>(),
             averageVote: 0,
             votedTasks: 0,
+            userGroups: [],
             recentTasks: [],
           };
         }
@@ -243,6 +283,7 @@ export default function Team() {
             assignedGroups: new Set<string>(),
             averageVote: 0,
             votedTasks: 0,
+            userGroups: userGroupIdsByName.get(k) ?? [],
             recentTasks: [],
           };
         }
@@ -298,6 +339,7 @@ export default function Team() {
     assignedGroups: Set<string>;
     averageVote: number;
     votedTasks: number;
+    userGroups: Array<{ id: string; name: string }>;
     recentTasks: {
       id: number | string;
       title: string;
@@ -309,6 +351,14 @@ export default function Team() {
   };
 
   const [drillMember, setDrillMember] = useState<DrillStat | null>(null);
+
+  type DrillPresetKey = "all" | "completed" | "active" | "overdue";
+  const [drillPreset, setDrillPreset] = useState<DrillPresetKey>("all");
+
+  const openDrillWithPreset = (member: DrillStat, preset: DrillPresetKey) => {
+    setDrillPreset(preset);
+    setDrillMember(member);
+  };
 
   const monthlyTrend = useMemo(() => {
     if (!drillMember) return [] as { month: string; done: number; overdue: number; total: number }[];
@@ -352,6 +402,58 @@ export default function Team() {
     return buckets;
   }, [drillMember]);
 
+  const userGroups = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string; count: number }>();
+    const noGroupKey = "__nogroup__";
+    for (const m of teamStats) {
+      const isUnassigned =
+        m.name === (language === "vi" ? "Chưa giao" : "Unassigned");
+      if (isUnassigned) continue;
+      const gs = Array.isArray(m.userGroups) ? m.userGroups : [];
+      if (gs.length === 0) {
+        const existing = seen.get(noGroupKey);
+        if (existing) existing.count += 1;
+        else
+          seen.set(noGroupKey, {
+            id: noGroupKey,
+            name: language === "vi" ? "Chưa phân nhóm" : "No group",
+            count: 1,
+          });
+        continue;
+      }
+      for (const g of gs) {
+        const existing = seen.get(g.id);
+        if (existing) existing.count += 1;
+        else seen.set(g.id, { id: g.id, name: g.name, count: 1 });
+      }
+    }
+    const list = Array.from(seen.values()).sort((a, b) => {
+      const an = String(a.id) === noGroupKey ? 1 : 0;
+      const bn = String(b.id) === noGroupKey ? 1 : 0;
+      if (an !== bn) return an - bn;
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name, "vi");
+    });
+    return list;
+  }, [teamStats, language]);
+
+  type GroupTabKey = "all" | string;
+  const [activeGroupTab, setActiveGroupTab] = useState<GroupTabKey>("all");
+
+  const filteredTeamStats = useMemo(() => {
+    if (activeGroupTab === "all") return teamStats;
+    const noGroupKey = "__nogroup__";
+    const isNoGroup = activeGroupTab === noGroupKey;
+    return teamStats.filter((m) => {
+      const isUnassigned =
+        m.name === (language === "vi" ? "Chưa giao" : "Unassigned");
+      if (isUnassigned) return true;
+      const gs = Array.isArray(m.userGroups) ? m.userGroups : [];
+      if (isNoGroup) return gs.length === 0;
+      return gs.some((g) => String(g.id) === String(activeGroupTab));
+    });
+  }, [teamStats, activeGroupTab, language]);
+
   if (isLoading) {
     return <CardGridSkeleton cards={6} withHeader cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" />;
   }
@@ -388,8 +490,22 @@ export default function Team() {
         }}
       />
 
+      {userGroups.length > 0 ? (
+        <GroupTabsFilter
+          headerIcon={<UsersRound className="h-4 w-4" />}
+          headerLabel={
+            language === "vi" ? "Phân nhóm nhân viên" : "Group members by team"
+          }
+          tabs={userGroups.map((g) => ({ id: g.id, name: g.name, count: g.count }))}
+          activeTab={activeGroupTab}
+          allTabCount={teamStats.length}
+          noGroupTabId="__nogroup__"
+          onTabChange={(v) => setActiveGroupTab(v)}
+        />
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {teamStats.map((member) => (
+        {filteredTeamStats.map((member) => (
           <Card
             key={member.name}
             className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
@@ -423,7 +539,11 @@ export default function Team() {
                   {member.overdue > 0 ? (
                     <Badge
                       variant="outline"
-                      className="h-5 border-status-danger/30 bg-status-danger/10 text-status-danger">
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openDrillWithPreset(member as DrillStat, "overdue")}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDrillWithPreset(member as DrillStat, "overdue"); } }}
+                      className="h-5 border-status-danger/30 bg-status-danger/10 text-status-danger cursor-pointer hover:shadow-md hover:bg-status-danger/15 transition-all duration-200 ring-1 ring-status-danger/20">
                       ⚠️ {language === "vi" ? `${member.overdue} quá hạn` : `${member.overdue} overdue`}
                     </Badge>
                   ) : null}
@@ -438,7 +558,12 @@ export default function Team() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="flex flex-col p-2 bg-muted/30 rounded-lg">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDrillWithPreset(member as DrillStat, "all")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDrillWithPreset(member as DrillStat, "all"); } }}
+                  className="flex flex-col p-2 bg-muted/30 rounded-lg cursor-pointer hover:shadow-md transition-all duration-200 hover:bg-muted/50 ring-1 ring-transparent hover:ring-primary/20">
                   <span className="text-xl font-bold font-display">
                     {member.total}
                   </span>
@@ -446,7 +571,12 @@ export default function Team() {
                     {language === "vi" ? "Tổng" : "Total"}
                   </span>
                 </div>
-                <div className="flex flex-col p-2 rounded-lg bg-status-success/10 text-status-success">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDrillWithPreset(member as DrillStat, "completed")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDrillWithPreset(member as DrillStat, "completed"); } }}
+                  className="flex flex-col p-2 rounded-lg bg-status-success/10 text-status-success cursor-pointer hover:shadow-md transition-all duration-200 hover:bg-status-success/15 ring-1 ring-transparent hover:ring-status-success/30">
                   <span className="text-xl font-bold font-display">
                     {member.completed}
                   </span>
@@ -454,7 +584,12 @@ export default function Team() {
                     {language === "vi" ? "Hoàn thành" : "Done"}
                   </span>
                 </div>
-                <div className="flex flex-col p-2 rounded-lg bg-status-info/10 text-status-info">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDrillWithPreset(member as DrillStat, "active")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDrillWithPreset(member as DrillStat, "active"); } }}
+                  className="flex flex-col p-2 rounded-lg bg-status-info/10 text-status-info cursor-pointer hover:shadow-md transition-all duration-200 hover:bg-status-info/15 ring-1 ring-transparent hover:ring-status-info/30">
                   <span className="text-xl font-bold font-display">
                     {member.active}
                   </span>
@@ -496,7 +631,7 @@ export default function Team() {
                 variant="outline"
                 size="sm"
                 className="w-full h-9 gap-1.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-                onClick={() => setDrillMember(member as DrillStat)}>
+                onClick={() => openDrillWithPreset(member as DrillStat, "all")}>
                 {language === "vi" ? "Xem chi tiết" : "View details"}
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </Button>
@@ -539,18 +674,39 @@ export default function Team() {
                       {drillMember.teamLabel} · {language === "vi" ? "Thành viên nhóm" : "Team member"}
                     </DialogDescription>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary" className="h-6">
+                      <Badge
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setDrillPreset("all")}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDrillPreset("all"); } }}
+                        variant="secondary"
+                        className={`h-6 cursor-pointer hover:shadow-md transition-all duration-200 select-none ${drillPreset === "all" ? "ring-2 ring-primary/40 ring-offset-1" : ""}`}>
                         <Briefcase className="h-3 w-3 mr-1.5" />
                         {language === "vi" ? `${drillMember.total} nhiệm vụ` : `${drillMember.total} tasks`}
                       </Badge>
-                      <Badge className="h-6 bg-status-success/15 text-status-success border-status-success/30">
+                      <Badge
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setDrillPreset("completed")}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDrillPreset("completed"); } }}
+                        className={`h-6 bg-status-success/15 text-status-success border-status-success/30 cursor-pointer hover:shadow-md transition-all duration-200 select-none ${drillPreset === "completed" ? "ring-2 ring-status-success/50 ring-offset-1" : ""}`}>
                         ✅ {drillMember.completed}
                       </Badge>
-                      <Badge className="h-6 bg-status-info/15 text-status-info border-status-info/30">
+                      <Badge
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setDrillPreset("active")}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDrillPreset("active"); } }}
+                        className={`h-6 bg-status-info/15 text-status-info border-status-info/30 cursor-pointer hover:shadow-md transition-all duration-200 select-none ${drillPreset === "active" ? "ring-2 ring-status-info/50 ring-offset-1" : ""}`}>
                         ⚡ {drillMember.active}
                       </Badge>
                       {drillMember.overdue > 0 ? (
-                        <Badge className="h-6 bg-status-danger/15 text-status-danger border-status-danger/30">
+                        <Badge
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setDrillPreset("overdue")}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDrillPreset("overdue"); } }}
+                          className={`h-6 bg-status-danger/15 text-status-danger border-status-danger/30 cursor-pointer hover:shadow-md transition-all duration-200 select-none ${drillPreset === "overdue" ? "ring-2 ring-status-danger/50 ring-offset-1" : ""}`}>
                           ⚠️ {drillMember.overdue}
                         </Badge>
                       ) : null}
@@ -598,14 +754,32 @@ export default function Team() {
                       <div className="col-span-2 text-right">{language === "vi" ? "Hạn / Vote" : "Due / Vote"}</div>
                     </div>
                     <div className="max-h-[420px] overflow-auto">
-                      {drillMember.recentTasks.length === 0 ? (
-                        <div className="p-10 text-center text-sm text-muted-foreground">
-                          {language === "vi"
-                            ? "Chưa có công việc nào gán cho thành viên này."
-                            : "No tasks assigned yet."}
-                        </div>
-                      ) : (
-                        drillMember.recentTasks.map((t) => (
+                      {(() => {
+                        const filtered = drillMember.recentTasks.filter((t) => {
+                          switch (drillPreset) {
+                            case "completed":
+                              return taskIsCompleted(t as any);
+                            case "overdue":
+                              return taskIsOverdue(t as any);
+                            case "active":
+                              return (
+                                !taskIsCompleted(t as any) && !taskIsOverdue(t as any)
+                              );
+                            case "all":
+                            default:
+                              return true;
+                          }
+                        });
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="p-10 text-center text-sm text-muted-foreground">
+                              {language === "vi"
+                                ? "Chưa có công việc nào phù hợp bộ lọc."
+                                : "No matching tasks."}
+                            </div>
+                          );
+                        }
+                        return filtered.map((t) => (
                           <div
                             key={`${t.id}-${t.title}`}
                             className="grid grid-cols-12 items-center gap-2 px-4 py-3 text-sm border-b border-border/60 last:border-b-0 hover:bg-muted/30 transition-colors">
@@ -648,8 +822,8 @@ export default function Team() {
                               ) : null}
                             </div>
                           </div>
-                        ))
-                      )}
+                        ));
+                      })()}
                     </div>
                   </div>
                 </TabsContent>

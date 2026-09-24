@@ -112,6 +112,15 @@ export interface GroupPageHeroProps {
   /** Additional children rendered on the right side (ex: segmented toggle CNTT / Quét TL) */
   extra?: React.ReactNode;
   className?: string;
+  /**
+   * Use Truc Lam mountain artwork as hero background (default true).
+   * Disable explicitly for pages that prefer solid background only.
+   */
+  withArtworkBackground?: boolean;
+  /** Relative URL or absolute URL to an alternative background image. */
+  backgroundImageUrl?: string;
+  /** Controls how strong the gradient/scrim over the artwork is. Default 0.82. */
+  backgroundScrimOpacity?: number;
 }
 
 function formatSyncedAt(value: Date | string | null | undefined): string | null {
@@ -140,6 +149,9 @@ function GroupPageHeroImpl(props: GroupPageHeroProps) {
     countBadge,
     extra,
     className,
+    withArtworkBackground = true,
+    backgroundImageUrl = "/The_Mahasattva_of_Truc_Lam_leaves_the_Mountain.jpg",
+    backgroundScrimOpacity = 0.82,
   } = props;
 
   const meta = GROUP_META[groupCode];
@@ -159,15 +171,38 @@ function GroupPageHeroImpl(props: GroupPageHeroProps) {
     [meta.accentVar],
   ) as React.CSSProperties;
 
+  const scrimAlpha = Math.min(
+    1,
+    Math.max(0, Number.isFinite(+backgroundScrimOpacity) ? +backgroundScrimOpacity! : 0.82),
+  );
+  const scrimRgb =
+    "hsl(var(--card) / <alpha-value>)".replace(" / <alpha-value>", "");
+  const scrim = withArtworkBackground
+    ? `linear-gradient(110deg, hsl(var(--card) / ${scrimAlpha}) 0%, hsl(var(--card) / ${scrimAlpha - 0.08}) 45%, hsl(var(--card) / ${scrimAlpha}) 100%), radial-gradient(circle at 80% 20%, hsl(var(--${meta.accentVar}) / 0.28) 0%, transparent 55%), radial-gradient(circle at 15% 85%, hsl(var(--accent) / 0.18) 0%, transparent 60%)`
+    : null;
+
   const syncedText = formatSyncedAt(syncedAt);
 
   return (
     <section
       data-group-hero={groupCode}
-      style={accentStyle}
+      style={{
+        ...accentStyle,
+        ...(withArtworkBackground
+          ? ({
+              backgroundImage: `${scrim}, url("${backgroundImageUrl}")`,
+              backgroundSize: "cover",
+              backgroundPosition: "center 32%",
+              backgroundRepeat: "no-repeat",
+              backgroundBlendMode: "normal, normal, normal",
+            } as React.CSSProperties)
+          : null),
+      }}
       className={cn(
         "relative overflow-hidden rounded-xl border border-border bg-card/60 backdrop-blur-sm",
         "transition-shadow duration-200 hover:shadow-[0_1px_0_hsl(var(--border))_inset,0_10px_30px_-12px_hsl(var(--muted-foreground)/0.25)]",
+        withArtworkBackground &&
+          "shadow-[0_1px_0_hsl(var(--border))_inset,0_10px_30px_-14px_hsl(var(--muted-foreground)/0.35)]",
         className,
       )}>
       {/* 4px accent bar (left) */}
@@ -176,13 +211,24 @@ function GroupPageHeroImpl(props: GroupPageHeroProps) {
         className="absolute inset-y-0 left-0 w-1 rounded-l-xl"
         style={{ background: "var(--hero-accent-100)" }}
       />
+      {/* Subtle vignette over artwork edges for balanced visual weight */}
+      {withArtworkBackground ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, transparent 55%, hsl(var(--card) / 0.28) 100%)",
+          }}
+        />
+      ) : null}
 
-      <div className="flex flex-col gap-4 p-5 pl-6 md:flex-row md:items-start md:justify-between md:gap-6">
+      <div className="relative z-10 flex flex-col gap-4 p-5 pl-6 md:flex-row md:items-start md:justify-between md:gap-6">
         <div className="flex items-start gap-3.5 min-w-0 flex-1">
           <div
             aria-hidden
             className={cn(
-              "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+              "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl backdrop-blur-[1.5px]",
             )}
             style={{ background: "var(--hero-accent-15)" }}>
             <Icon
@@ -201,7 +247,7 @@ function GroupPageHeroImpl(props: GroupPageHeroProps) {
               {countBadge ? (
                 <span
                   className={cn(
-                    "inline-flex h-6 items-center rounded-full border px-2.5 text-xs font-medium",
+                    "inline-flex h-6 items-center rounded-full border px-2.5 text-xs font-medium backdrop-blur-[1.5px]",
                     countBadge.tone === "secondary" || !countBadge.tone
                       ? "border-border bg-muted/70 text-muted-foreground"
                       : "",
@@ -231,7 +277,7 @@ function GroupPageHeroImpl(props: GroupPageHeroProps) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative z-10 flex flex-wrap items-center gap-2">
           {extra}
           {showRefresh ? (
             <Button
@@ -241,7 +287,7 @@ function GroupPageHeroImpl(props: GroupPageHeroProps) {
               onClick={onRefresh}
               disabled={isRefreshing}
               className={cn(
-                "h-9 gap-1.5 pl-3 pr-3.5",
+                "h-9 gap-1.5 pl-3 pr-3.5 backdrop-blur-[1.5px]",
                 isRefreshing && "pointer-events-none",
               )}>
               <RefreshCw

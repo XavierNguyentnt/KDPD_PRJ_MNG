@@ -214,7 +214,7 @@ const translations: Record<Language, Translations> = {
       confirmDelete: "Bạn có chắc chắn muốn xóa công việc này?",
     },
     dashboard: {
-      title: "Bảng điều khiển",
+      title: "Báo cáo",
       overview: "Tổng quan",
       tasks: "Công việc",
       lastSynced: "Đồng bộ lần cuối",
@@ -359,7 +359,7 @@ const translations: Record<Language, Translations> = {
       navigateGroup: "Điều hướng",
       tasksGroup: "Công việc",
       actionsGroup: "Hành động nhanh",
-      dashboardTabsGroup: "Tab Bảng điều khiển",
+      dashboardTabsGroup: "Tab Báo cáo",
       openTask: "Mở chi tiết công việc",
       createTask: "Tạo công việc mới",
       exportExcel: "Xuất danh sách Excel",

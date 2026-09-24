@@ -2,6 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import bcrypt from "bcrypt";
 import path from "path";
+import fs from "fs";
 import { mkdir, unlink, writeFile } from "fs/promises";
 import { randomInt, randomUUID } from "crypto";
 import { storage } from "./storage";
@@ -2845,17 +2846,38 @@ export async function registerRoutes(
         ? req.params.id[0]
         : req.params.id;
       const user = await dbStorage.getUserById(id);
-      if (!user) return res.status(404).json({ message: "User not found" });
+      if (!user) {
+        res.setHeader("Cache-Control", "public, max-age=600");
+        return res
+          .status(404)
+          .type("image/svg+xml")
+          .send(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" viewBox="0 0 1 1"><title/></svg>',
+          );
+      }
       if (!user.avatarPath) {
-        return res.status(404).json({ message: "Avatar not found" });
+        res.setHeader("Cache-Control", "private, max-age=600");
+        return res
+          .status(204)
+          .end();
       }
       const fileName = path.basename(String(user.avatarPath));
       const abs = path.join(avatarsDir, fileName);
+      if (
+        !fs.existsSync(abs) ||
+        !fs.statSync(abs, { throwIfNoEntry: false })?.isFile()
+      ) {
+        res.setHeader("Cache-Control", "private, max-age=600");
+        return res
+          .status(204)
+          .end();
+      }
       res.setHeader("Cache-Control", "private, max-age=3600");
       return res.sendFile(abs, (err) => {
         if (err) {
           if (String((err as any)?.code || "").toUpperCase() === "ENOENT") {
-            return res.status(404).json({ message: "Avatar not found" });
+            res.setHeader("Cache-Control", "private, max-age=600");
+            return res.status(204).end();
           }
           return res.status(500).json({
             message:

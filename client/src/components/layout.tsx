@@ -8,6 +8,8 @@ import {
   LogOut,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
+  ChevronLeft,
   Bell,
   Languages,
   Sun,
@@ -89,6 +91,7 @@ import {
 import { TaskDialog } from "@/components/task-dialog";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
 
 function getPasswordRequirementState(password: string) {
   const lengthOk = password.length >= 8;
@@ -165,6 +168,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // Refs for layout structure
   const sidebarRef = useRef<HTMLElement>(null);
   const mainContentRef = useRef<HTMLElement>(null);
+  const sidebarNavRef = useRef<HTMLElement | null>(null);
+  const activeNavItemRef = useRef<HTMLDivElement | null>(null);
+  const lastSidebarSyncAtRef = useRef<number>(0);
+  const userIsInteractingSidebarRef = useRef<boolean>(false);
 
   // Save sidebar state to localStorage
   useEffect(() => {
@@ -184,13 +191,62 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const onScroll = () => {
       setShowBackToTop(window.scrollY > 300);
+
+      if (!sidebarOpen) return;
+      const nav = sidebarNavRef.current;
+      if (!nav) return;
+
+      if (userIsInteractingSidebarRef.current) return;
+
+      const now = Date.now();
+      if (now - lastSidebarSyncAtRef.current < 80) return;
+      lastSidebarSyncAtRef.current = now;
+
+      const mainEl = document.scrollingElement || document.documentElement;
+      const mainScrollTop = mainEl.scrollTop || 0;
+      const mainScrollHeight =
+        (mainEl.scrollHeight || window.innerHeight) - window.innerHeight;
+      const mainProgress = mainScrollHeight > 0
+        ? Math.max(0, Math.min(1, mainScrollTop / mainScrollHeight))
+        : 0;
+
+      const navMaxScroll = Math.max(
+        0,
+        (nav.scrollHeight || 0) - (nav.clientHeight || 0),
+      );
+      if (navMaxScroll <= 0) return;
+
+      const target = navMaxScroll * mainProgress;
+      const current = nav.scrollTop;
+      const diff = target - current;
+      if (Math.abs(diff) > 1.5) {
+        nav.scrollTop = current + diff * 0.35;
+      }
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
     };
-  }, []);
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const nav = sidebarNavRef.current;
+    const active = activeNavItemRef.current;
+    if (!nav || !active) return;
+
+    const navRect = nav.getBoundingClientRect();
+    const itemRect = active.getBoundingClientRect();
+    const above = itemRect.top < navRect.top + 18;
+    const below = itemRect.bottom > navRect.bottom - 18;
+    if (above || below) {
+      active.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+    }
+  }, [location, sidebarOpen]);
 
   useEffect(() => {
     if (settingsOpen) {
@@ -392,34 +448,97 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="min-h-[100dvh] bg-gray-50/50 md:grid overflow-x-hidden"
+      className="min-h-[100dvh] bg-gray-50/50 md:grid overflow-x-hidden relative"
       style={{
         gridTemplateColumns: sidebarOpen ? "16rem 1fr" : "0px 1fr",
         transition: "grid-template-columns 300ms ease-in-out",
       }}>
+      {/* Floating sidebar toggle — always reachable anywhere on page (md+).
+          - Sidebar closed: left-edge thin gold bar → click = OPEN
+          - Sidebar open: right-edge of sidebar → click = CLOSE */}
+      <button
+        type="button"
+        aria-label={
+          sidebarOpen
+            ? language === "vi"
+              ? "Đóng thanh điều hướng"
+              : "Close navigation sidebar"
+            : language === "vi"
+            ? "Mở thanh điều hướng"
+            : "Open navigation sidebar"
+        }
+        aria-expanded={sidebarOpen}
+        aria-controls="sidebar-nav"
+        onClick={() => setSidebarOpen((v) => !v)}
+        className={cn(
+          "group fixed z-[60] top-1/2 -translate-y-1/2",
+          "hidden md:flex items-center justify-center cursor-pointer",
+          "h-28 w-3 rounded-r-md md:w-[10px]",
+          "outline-none transition-all duration-300 ease-in-out",
+          "backdrop-blur-[2px]",
+          sidebarOpen
+            ? "translate-x-[calc(16rem-1px)] rounded-l-md rounded-r-none"
+            : "left-0 rounded-r-md rounded-l-none",
+        )}
+        style={{
+          background: sidebarOpen
+            ? "linear-gradient(270deg, hsl(var(--sidebar-glow) / 0.82) 0%, hsl(var(--sidebar-glow) / 0.22) 100%)"
+            : "linear-gradient(90deg, hsl(var(--sidebar-glow) / 0.72) 0%, hsl(var(--sidebar-glow) / 0.18) 100%)",
+          boxShadow: sidebarOpen
+            ? "-1px 0 0 hsl(var(--sidebar-glow) / 0.9) inset, 0 -10px 22px -10px hsl(var(--sidebar-glow) / 0.65), 0 0 0 1px hsl(var(--sidebar-border) / 0.7)"
+            : "1px 0 0 hsl(var(--sidebar-glow) / 0.9) inset, 0 10px 22px -10px hsl(var(--sidebar-glow) / 0.65), 0 0 0 1px hsl(var(--sidebar-border) / 0.7)",
+          color: "hsl(var(--sidebar-active-fg))",
+        }}>
+        <span className="sr-only">
+          {sidebarOpen
+            ? language === "vi"
+              ? "Đóng thanh điều hướng"
+              : "Close sidebar"
+            : language === "vi"
+            ? "Mở thanh điều hướng"
+            : "Open sidebar"}
+        </span>
+        {sidebarOpen ? (
+          <ChevronLeft
+            className="h-5 w-5 transition-transform duration-200 group-hover:-translate-x-[2px]"
+            strokeWidth={2.4}
+          />
+        ) : (
+          <ChevronRight
+            className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-[2px]"
+            strokeWidth={2.4}
+          />
+        )}
+      </button>
+
       {/* Sidebar */}
       <aside
+        id="sidebar-nav"
         ref={sidebarRef}
         className={`
-          bg-card border-r border-border/50 hidden md:block overflow-hidden
+          sidebar-shell hidden md:block h-screen overflow-hidden
           transition-[opacity,transform] duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"}
         `}
         style={{ willChange: "transform,opacity" }}>
-        <div className="md:sticky md:top-0 md:h-screen flex flex-col">
-          <div className="p-6">
+        <div className="h-full flex flex-col">
+          <div className="p-6 border-b border-[hsl(var(--sidebar-border))]/70 bg-gradient-to-b from-[hsl(var(--sidebar-bg-elevated))] to-transparent flex-shrink-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-display font-bold text-2xl text-primary">
+              <div className="flex items-center gap-2 font-display font-bold text-2xl">
                 <img
                   src="/logo-duan.png"
                   alt="Logo"
                   className="h-16 w-auto rounded"
+                  style={{
+                    filter:
+                      "drop-shadow(0 1px 0 hsl(var(--sidebar-border) / 0.6)) drop-shadow(0 6px 12px -8px hsl(var(--sidebar-glow) / 0.45))",
+                  }}
                 />
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                className={`h-8 w-8 transition-opacity duration-200 hover:bg-[hsl(var(--sidebar-active-bg))]/60 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
                 onClick={() => setSidebarOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
@@ -427,21 +546,50 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav
-            className={`flex-1 px-4 space-y-1 transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+            ref={(el) => {
+              sidebarNavRef.current = el;
+            }}
+            onWheel={() => {
+              userIsInteractingSidebarRef.current = true;
+              window.clearTimeout(
+                (userIsInteractingSidebarRef as any)._t as number | undefined,
+              );
+              (userIsInteractingSidebarRef as any)._t = window.setTimeout(() => {
+                userIsInteractingSidebarRef.current = false;
+              }, 1200);
+            }}
+            onPointerDown={() => {
+              userIsInteractingSidebarRef.current = true;
+            }}
+            onPointerUp={() => {
+              window.clearTimeout(
+                (userIsInteractingSidebarRef as any)._t as number | undefined,
+              );
+              (userIsInteractingSidebarRef as any)._t = window.setTimeout(() => {
+                userIsInteractingSidebarRef.current = false;
+              }, 900);
+            }}
+            className={`flex-1 px-4 py-4 space-y-1 overflow-y-auto overscroll-contain transition-opacity duration-200 ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
             {navItems.map((item) => {
               const isActive = location === item.href;
               return (
                 <Link key={item.href} href={item.href}>
                   <div
-                    className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-colors duration-200
-                      ${
+                    ref={(el) => {
+                      if (isActive) activeNavItemRef.current = el;
+                    }}
+                    className={cn(
+                      "sidebar-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-colors duration-200",
+                      isActive && "sidebar-nav-item-active",
+                    )}>
+                    <item.icon
+                      className="w-4 h-4"
+                      style={
                         isActive
-                          ? "bg-primary/12 text-primary dark:bg-primary/25 shadow-sm"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          ? { color: "hsl(var(--sidebar-active-fg))" }
+                          : undefined
                       }
-                    `}>
-                    <item.icon className="w-4 h-4" />
+                    />
                     {item.label}
                   </div>
                 </Link>
@@ -453,17 +601,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Sidebar */}
       <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-        <SheetContent side="left" className="w-64 p-0">
+        <SheetContent side="left" className="w-64 p-0 sidebar-shell border-0">
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
           </SheetHeader>
           <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-border/50">
-              <div className="flex items-center gap-2 font-display font-bold text-2xl text-primary">
+            <div className="p-6 border-b border-[hsl(var(--sidebar-border))]/70">
+              <div className="flex items-center gap-2 font-display font-bold text-2xl">
                 <img
                   src="/logo-duan.png"
                   alt="Logo"
                   className="h-10 w-auto rounded"
+                  style={{
+                    filter:
+                      "drop-shadow(0 6px 12px -8px hsl(var(--sidebar-glow) / 0.5))",
+                  }}
                 />
               </div>
             </div>
@@ -476,15 +628,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     onClick={() => setMobileSidebarOpen(false)}>
                     <div
-                      className={`
-                        flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200
-                        ${
+                      className={cn(
+                        "sidebar-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200",
+                        isActive && "sidebar-nav-item-active",
+                      )}>
+                      <item.icon
+                        className="w-4 h-4"
+                        style={
                           isActive
-                            ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 shadow-sm"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            ? { color: "hsl(var(--sidebar-active-fg))" }
+                            : undefined
                         }
-                      `}>
-                      <item.icon className="w-4 h-4" />
+                      />
                       {item.label}
                     </div>
                   </Link>
@@ -501,7 +656,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         id="main-content"
         role="main"
         aria-label="Nội dung chính"
-        className="flex flex-col min-h-[100dvh] min-w-0">
+        className="flex flex-col min-h-[100dvh] min-w-0 bg-[hsl(var(--background))]">
         {/* Header */}
         <header className="h-16 px-4 sm:px-8 flex items-center justify-between sticky-app-header">
           <div className="flex items-center gap-4">
