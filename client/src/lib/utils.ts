@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { TaskWithAssignmentDetails } from "@shared/schema";
+import type { TaskWithAssignmentDetails, User } from "@shared/schema";
 
 let XLSX_LAZY: any = null;
 let XLSX_LOADING: Promise<any> | null = null;
@@ -54,6 +54,132 @@ export function compareNamesByLastNameAZ(a: string, b: string): number {
     ignorePunctuation: true,
     numeric: true,
   });
+}
+
+function normalizeAssigneeNameSingle(
+  value: string | null | undefined,
+): string | null {
+  const s = String(value ?? "").trim();
+  return s ? s : null;
+}
+
+/**
+ * Extract TẤT CẢ display names nhân sự tham gia task từ 3 nguồn:
+ *  1. Nhóm Biên tập có workflow JSON: stages[].assignee (BTV2 / BTV1 / Độc duyệt)
+ *  2. assignments[] array: displayName mỗi entry — bao gồm Người kiểm soát,
+ *     Nhân sự 1..N, KTV chính, Trợ lý N (thiếu này là bug user báo pills thiếu).
+ *  3. Fallback: trường đơn task.assignee (split by "," nếu nhiều người)
+ * Trả về mảng unique names đã trim, không rỗng.
+ */
+export function getAllTaskAssigneeNames(
+  task: TaskWithAssignmentDetails | null | undefined,
+): string[] {
+  if (!task) return [];
+  const names: string[] = [];
+
+  const pushName = (v: string | null | undefined) => {
+    const s = normalizeAssigneeNameSingle(v);
+    if (s) names.push(s);
+  };
+
+  // Nguồn 1: Biên tập workflow stages
+  if (String(task.group ?? "").toLowerCase().includes("biên tập") && (task as any).workflow) {
+    try {
+      const w = typeof (task as any).workflow === "string"
+        ? JSON.parse((task as any).workflow)
+        : (task as any).workflow;
+      const rounds = Array.isArray(w?.rounds) ? w.rounds : [];
+      for (const r of rounds) {
+        const stages = Array.isArray(r?.stages) ? r.stages : [];
+        for (const st of stages) {
+          pushName(st?.assignee);
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Nguồn 2: task.assignments[].displayName (thuộc mọi nhóm CV chung/CNTT/TKHP/Thiết kế...)
+  const asns = Array.isArray((task as any).assignments) ? (task as any).assignments : null;
+  if (asns && asns.length > 0) {
+    for (const a of asns) {
+      pushName(a?.displayName);
+    }
+  }
+
+  // Nguồn 3: task.assignee đơn (fallback) — split dấu phẩy nếu danh sách
+  const fieldRaw = normalizeAssigneeNameSingle(task.assignee as any);
+  if (fieldRaw) {
+    const parts = fieldRaw.split(",").map(s => s.trim()).filter(Boolean);
+    for (const p of parts) pushName(p);
+  }
+
+  return Array.from(new Set(names));
+}
+
+/**
+ * Build staff picker list (User shape {id, displayName}) cho bộ lọc nhân sự ở các
+ * trang nhóm công việc (Công việc chung, Biên tập, Thiết kế, CNTT).
+ *
+ * Ưu tiên 1: users có mặt TRONG SCOPE TASK CỦA NHÓM — unique qua assignments.userId
+ *            hoặc assigneeId — đảm bảo không có người ngoài nhóm.
+ * Ưu tiên 2: fallback activeUsers nếu scope rỗng (chưa có task).
+ * Lọc bỏ partner user và inactive user.
+ * Sắp xếp theo tên (last name AZ).
+ */
+export function buildStaffUsersForGroupScope(
+  scopeTasks: TaskWithAssignmentDetails[],
+  activeUsers: User[] = [],
+): User[] {
+  const active = (activeUsers || []).filter((u) => {
+    if (!u) return false;
+    if ((u as any).isActive === false) return false;
+    const roles = Array.isArray((u as any).roles) ? (u as any).roles : [];
+    const isPartner = roles.some(
+      (r: any) =>
+        (r && typeof r.code === "string" && String(r.code).toLowerCase() === "partner") ||
+        (r &&
+          typeof r.name === "string" &&
+          String(r.name)
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/\s+/g, "")
+            .includes("doitac")),
+    );
+    return !isPartner;
+  });
+  const byId = new Map<string, User>();
+  active.forEach((u) => {
+    if (u?.id) byId.set(String(u.id), u);
+  });
+
+  const wantedIds = new Set<string>();
+  const tasks = Array.isArray(scopeTasks) ? scopeTasks : [];
+  for (const t of tasks) {
+    if ((t as any).assigneeId) wantedIds.add(String((t as any).assigneeId));
+    const asns = Array.isArray((t as any).assignments) ? (t as any).assignments : [];
+    for (const a of asns) {
+      if (a?.userId) wantedIds.add(String(a.userId));
+    }
+  }
+
+  const results: User[] = [];
+  if (wantedIds.size > 0) {
+    wantedIds.forEach((uid) => {
+      const u = byId.get(uid);
+      if (u) results.push(u);
+    });
+  } else {
+    results.push(...active);
+  }
+
+  results.sort((a, b) => {
+    const la = String(a?.displayName || a?.email || a?.id || "");
+    const lb = String(b?.displayName || b?.email || b?.id || "");
+    return compareNamesByLastNameAZ(la, lb);
+  });
+
+  return results;
 }
 
 /** Parse to local date (no UTC shift). Returns [year, month0, day] or null. */

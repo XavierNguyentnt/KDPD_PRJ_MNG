@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useWorks,
   useComponents,
-  useTaskFilterStaffUsers,
+  useUsers,
 } from "@/hooks/use-works-and-components";
 import {
   getTaskStatsBadgeKeyFromFilters,
@@ -72,6 +72,7 @@ import {
   defaultAssignmentLabel,
   getTaskStatusColor,
   getTaskPriorityColor,
+  buildStaffUsersForGroupScope,
   type ReportPeriodType,
   type ReportPeriodValue,
 } from "@/lib/utils";
@@ -151,8 +152,11 @@ export default function CNTTPage() {
   const deleteConfirm = useConfirmDialog<TaskWithAssignmentDetails>();
 
   const { data: components = [] } = useComponents();
-  const usersQuery = useTaskFilterStaffUsers();
-  const users = usersQuery.data ?? [];
+  const { data: activeUsers = [] } = useUsers();
+  const users = useMemo(
+    () => buildStaffUsersForGroupScope(filteredTasks, activeUsers),
+    [filteredTasks, activeUsers],
+  );
   const stages = useMemo(
     () =>
       Array.from(

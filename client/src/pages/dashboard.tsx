@@ -23,7 +23,7 @@ import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
-import { compareNamesByLastNameAZ, getTaskStatusColor, getTaskPriorityColor, exportTasksToExcel } from "@/lib/utils";
+import { compareNamesByLastNameAZ, getTaskStatusColor, getTaskPriorityColor, exportTasksToExcel, getAllTaskAssigneeNames } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -318,7 +318,13 @@ export default function Dashboard() {
     let list = applyDashboardBadgeFilter(hookFilteredTasks, badgeFilter);
     if (selectedAssignees.length > 0) {
       const set = new Set(selectedAssignees.map((s) => (s ?? "").trim()));
-      list = list.filter((t) => set.has((t.assignee ?? "").trim()));
+      list = list.filter((t) => {
+        const names = getAllTaskAssigneeNames(t);
+        if (names.length === 0) {
+          return set.has((t.assignee ?? "").trim());
+        }
+        return names.some((n) => set.has(n));
+      });
     }
     return list;
   }, [hookFilteredTasks, badgeFilter, selectedAssignees]);
@@ -374,9 +380,15 @@ export default function Dashboard() {
   const byAssignee = useMemo(() => {
     const counts: Record<string, number> = {};
     byAssigneeScope.forEach((task) => {
-      const name = task.assignee?.trim() ?? "";
-      if (name && partnerNameSet.has(name)) return;
-      counts[name] = (counts[name] || 0) + 1;
+      const names = getAllTaskAssigneeNames(task);
+      const list = names.length > 0
+        ? names
+        : [task.assignee?.trim() ?? ""].filter(Boolean);
+      list.forEach((name) => {
+        if (!name) return;
+        if (partnerNameSet.has(name)) return;
+        counts[name] = (counts[name] || 0) + 1;
+      });
     });
     return Object.entries(counts)
       .map(([name, count]) => ({
@@ -393,7 +405,7 @@ export default function Dashboard() {
         return compareNamesByLastNameAZ(a.display, b.display);
       })
       .slice(0, 20);
-  }, [byAssigneeScope, t]);
+  }, [byAssigneeScope, t, partnerNameSet]);
 
   const top5Assignees = useMemo(
     () => [...byAssignee].sort((a, b) => b.count - a.count).slice(0, 5),

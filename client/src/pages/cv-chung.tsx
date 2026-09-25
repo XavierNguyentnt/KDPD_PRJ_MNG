@@ -13,7 +13,7 @@ import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import {
   useWorks,
   useComponents,
-  useTaskFilterStaffUsers,
+  useUsers,
 } from "@/hooks/use-works-and-components";
 import {
   getTaskStatsBadgeKeyFromFilters,
@@ -56,6 +56,7 @@ import {
   exportTasksToExcel,
   getTaskStatusColor,
   getTaskPriorityColor,
+  buildStaffUsersForGroupScope,
   type ReportPeriodType,
   type ReportPeriodValue,
 } from "@/lib/utils";
@@ -104,7 +105,7 @@ export default function CVChungPage() {
 
   const { data: works = [] } = useWorks();
   const { data: components = [] } = useComponents();
-  const { data: users = [] } = useTaskFilterStaffUsers();
+  const { data: activeUsers = [] } = useUsers();
 
   const stages = useMemo(
     () =>
@@ -143,6 +144,10 @@ export default function CVChungPage() {
     works,
     includedGroups: INCLUDED_GROUPS,
   });
+  const users = useMemo(
+    () => buildStaffUsersForGroupScope(filteredTasks, activeUsers),
+    [filteredTasks, activeUsers],
+  );
   const yearOptions = availableYears;
 
   const activeStatsKey = useMemo(

@@ -13,7 +13,7 @@ import { useTaskListControls } from "@/hooks/use-task-list-controls";
 import {
   useWorks,
   useComponents,
-  useTaskFilterStaffUsers,
+  useUsers,
 } from "@/hooks/use-works-and-components";
 import {
   getTaskStatsBadgeKeyFromFilters,
@@ -59,6 +59,7 @@ import {
   defaultAssignmentLabel,
   getTaskStatusColor,
   getTaskPriorityColor,
+  buildStaffUsersForGroupScope,
   type ReportPeriodType,
   type ReportPeriodValue,
 } from "@/lib/utils";
@@ -164,7 +165,7 @@ export default function BienTapPage() {
 
   const { data: works = [] } = useWorks();
   const { data: components = [] } = useComponents();
-  const { data: users = [] } = useTaskFilterStaffUsers();
+  const { data: activeUsers = [] } = useUsers();
   const stages = useMemo(
     () =>
       Array.from(
@@ -223,6 +224,10 @@ export default function BienTapPage() {
     works,
     includedGroups: null,
   });
+  const users = useMemo(
+    () => buildStaffUsersForGroupScope(filteredTasks, activeUsers),
+    [filteredTasks, activeUsers],
+  );
   const yearOptions = availableYears;
 
   const roundTypeOptions = useMemo(() => {

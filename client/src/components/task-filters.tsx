@@ -433,7 +433,7 @@ export function TaskFilters({
             align="start"
             side="bottom"
             sideOffset={6}
-            className="w-[260px] p-0 shadow-lg">
+            className="w-[320px] p-0 shadow-lg">
             <div className="p-2 pb-1 border-b">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
@@ -446,7 +446,7 @@ export function TaskFilters({
                 />
               </div>
             </div>
-            <ScrollArea className="max-h-[280px]">
+            <ScrollArea className="max-h-[480px]">
               <div className="p-1">
                 <button
                   type="button"
