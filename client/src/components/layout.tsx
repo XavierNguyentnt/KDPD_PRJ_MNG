@@ -58,6 +58,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import type { TaskWithAssignmentDetails, Notification } from "@shared/schema";
 import { api } from "@shared/routes";
@@ -792,6 +793,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <SheetContent side="left" className="w-64 p-0 sidebar-shell border-0">
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
+            <SheetDescription>Menu điều hướng hệ thống</SheetDescription>
           </SheetHeader>
           <div className="flex flex-col h-full">
             <div className="p-6 border-b border-[hsl(var(--sidebar-border))]/70">

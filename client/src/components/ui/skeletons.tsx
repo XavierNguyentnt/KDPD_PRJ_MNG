@@ -213,3 +213,114 @@ export function FullPageSkeleton({
     </div>
   );
 }
+
+
+export function SubTableSkeleton({
+  rows = 3,
+  className,
+}: {
+  rows?: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn("w-full space-y-2 rounded-lg border border-border/60 p-3 bg-muted/10 animate-in", className)}>
+      <div className="flex items-center justify-between pb-2 border-b border-border/40">
+        <Skeleton className="h-4 w-28 shimmer rounded" />
+        <Skeleton className="h-4 w-16 shimmer rounded" />
+      </div>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={"sub-" + i} className="flex items-center gap-3 py-1.5">
+          <Skeleton className="h-4 w-16 shimmer rounded" />
+          <Skeleton className="h-4 flex-1 shimmer rounded" />
+          <Skeleton className="h-4 w-20 shimmer rounded" />
+          <Skeleton className="h-6 w-12 shimmer rounded-md" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function UserTableSkeleton({
+  rows = 6,
+  className,
+}: {
+  rows?: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn("w-full space-y-3 rounded-xl border border-border bg-card p-4 animate-in", className)}>
+      <div className="flex items-center justify-between pb-3 border-b border-border">
+        <Skeleton className="h-6 w-36 shimmer-primary rounded-md" />
+        <Skeleton className="h-8 w-28 shimmer rounded-md" />
+      </div>
+      <div className="space-y-2.5">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div
+            key={"user-" + i}
+            className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border/40 bg-muted/15"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <Skeleton className="h-10 w-10 shrink-0 rounded-full shimmer" />
+              <div className="space-y-1.5 min-w-0">
+                <Skeleton className="h-4 w-36 shimmer rounded" />
+                <Skeleton className="h-3 w-48 shimmer rounded" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-20 shimmer rounded-full" />
+              <Skeleton className="h-8 w-16 shimmer rounded-md" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function FormSkeleton({
+  fields = 6,
+  className,
+}: {
+  fields?: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-5 animate-in w-full p-4", className)}>
+      <div className="space-y-2 border-b border-border pb-3">
+        <Skeleton className="h-7 w-48 shimmer-primary rounded-md" />
+        <Skeleton className="h-4 w-72 shimmer rounded" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {Array.from({ length: fields }).map((_, i) => (
+          <div key={"field-" + i} className={cn("space-y-1.5", i === fields - 1 ? "sm:col-span-2" : "")}>
+            <Skeleton className="h-3.5 w-24 shimmer rounded" />
+            <Skeleton className={cn("w-full shimmer rounded-md", i === fields - 1 ? "h-20" : "h-10")} />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Skeleton className="h-9 w-20 shimmer rounded-md" />
+        <Skeleton className="h-9 w-28 shimmer-primary rounded-md" />
+      </div>
+    </div>
+  );
+}
+
+export function PageHeaderSkeleton({
+  className,
+}: {
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border animate-in", className)}>
+      <div className="space-y-1.5">
+        <Skeleton className="h-8 w-56 shimmer-primary rounded-md" />
+        <Skeleton className="h-4 w-80 shimmer rounded" />
+      </div>
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-9 w-28 shimmer rounded-md" />
+        <Skeleton className="h-9 w-32 shimmer-primary rounded-md" />
+      </div>
+    </div>
+  );
+}

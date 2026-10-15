@@ -32,18 +32,29 @@ export function useTaskListControls(params: {
 
   const availableGroups = useMemo(() => {
     if (!tasks) return [];
-    const groups = new Set(
-      tasks
-        .filter((t) =>
-          includedGroups && includedGroups.length > 0
-            ? includedGroups.includes(t.group || "")
-            : true,
-        )
-        .map((t) => t.group)
-        .filter(Boolean),
-    );
+    let list = tasks.slice();
+    if (includedGroups && includedGroups.length > 0) {
+      list = list.filter((t) => includedGroups.includes(t.group || ""));
+    }
+    if (role === UserRole.EMPLOYEE) {
+      const uid = userId ?? null;
+      if (uid) {
+        list = list.filter(
+          (t) =>
+            (t as any).createdBy === uid ||
+            t.assigneeId === uid ||
+            (Array.isArray(t.assignments)
+              ? t.assignments.some((a: any) => a?.userId === uid)
+              : false),
+        );
+      } else if (userDisplayName) {
+        const exact = (userDisplayName ?? "").trim();
+        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
+      }
+    }
+    const groups = new Set(list.map((t) => t.group).filter(Boolean));
     return Array.from(groups).sort();
-  }, [tasks, includedGroups]);
+  }, [tasks, includedGroups, role, userId, userDisplayName]);
 
   const availableYears = useMemo(() => {
     if (!tasks) return [];

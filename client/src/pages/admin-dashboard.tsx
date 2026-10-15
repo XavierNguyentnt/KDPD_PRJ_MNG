@@ -1,3 +1,4 @@
+import { TaskTableSkeleton } from "@/components/ui/skeletons";
 import { useMemo, useState, lazy, Suspense } from "react";
 import {
   useTasks,
@@ -964,14 +965,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>
-                    {language === "vi" ? "Đang tải..." : "Loading..."}
-                  </span>
-                </div>
-              </div>
+              <TaskTableSkeleton rows={6} />
             ) : isError ? (
               <div className="p-8 text-center text-muted-foreground">
                 {language === "vi"

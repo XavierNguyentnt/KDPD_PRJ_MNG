@@ -308,4 +308,29 @@ select[class*="dropdown"]:focus {
       0 0 0 1px hsl(var(--sidebar-active-bg) / 0.6) inset,
       0 8px 20px -14px hsl(var(--sidebar-active-bg) / 0.7);
   }
+
+  /* Mobile UX & Touch Targets (WCAG 2.5.5 / 2.5.8 compliant) */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Smooth horizontal scrolling for mobile navigation & tabs */
+  .touch-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .touch-scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+
 }

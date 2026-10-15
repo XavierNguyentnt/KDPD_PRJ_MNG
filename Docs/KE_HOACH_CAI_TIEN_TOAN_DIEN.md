@@ -153,8 +153,8 @@ Tách modal thành 4 tab con:
 | 1 | Sửa side-effect điều hướng trong Guarded Routes | [client/src/App.tsx](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/client/src/App.tsx) | **P0** (Khẩn cấp) | ✅ Hoàn thành |
 | 2 | Gia cố bảo mật endpoint fix password dev | [server/routes.ts](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/server/routes.ts) | **P0** (Khẩn cấp) | ✅ Hoàn thành |
 | 3 | Tách module `server/routes.ts` thành thư mục `server/routes/` | [server/routes.ts](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/server/routes.ts) | **P1** (Cao) | ✅ Hoàn thành |
-| 4 | Phân rã trang `thu-ky-hop-phan.tsx` thành các sub-components | [client/src/pages/thu-ky-hop-phan.tsx](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/client/src/pages/thu-ky-hop-phan.tsx) | **P1** (Cao) | ⏳ Sẵn sàng |
-| 5 | Phân rã modal `task-dialog.tsx` theo tab | [client/src/components/task-dialog.tsx](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/client/src/components/task-dialog.tsx) | **P2** (Trung bình) | ⏳ Sẵn sàng |
-| 6 | Thêm Skeleton loading đồng bộ toàn bộ trang | `client/src/components/ui/skeletons.tsx` | **P2** (Trung bình) | ⏳ Sẵn sàng |
-| 7 | Tối ưu hóa vendor chunks trong `vite.config.ts` | [vite.config.ts](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/vite.config.ts) | **P2** (Trung bình) | ⏳ Sẵn sàng |
-| 8 | Cập nhật tài liệu triển khai Nginx & Production | [Docs/DEPLOY.md](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/Docs/DEPLOY.md) | **P3** (Tiêu chuẩn) | ⏳ Sẵn sàng |
+| 4 | Phân rã trang `thu-ky-hop-phan.tsx` thành các sub-components | [client/src/pages/thu-ky-hop-phan.tsx](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/client/src/pages/thu-ky-hop-phan.tsx) | **P1** (Cao) | ✅ Hoàn thành |
+| 5 | Phân rã modal `task-dialog.tsx` theo tab | [client/src/components/task-dialog.tsx](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/client/src/components/task-dialog.tsx) | **P2** (Trung bình) | ✅ Hoàn thành |
+| 6 | Thêm Skeleton loading đồng bộ & tối ưu Mobile UX | `client/src/components/ui/skeletons.tsx` | **P2** (Trung bình) | ✅ Hoàn thành |
+| 7 | Tối ưu hóa vendor chunks trong `vite.config.ts` | [vite.config.ts](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/vite.config.ts) | **P2** (Trung bình) | ✅ Hoàn thành |
+| 8 | Cập nhật tài liệu triển khai Nginx & Production | [Docs/DEPLOY.md](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/Docs/DEPLOY.md) | **P3** (Tiêu chuẩn) | ✅ Hoàn thành |

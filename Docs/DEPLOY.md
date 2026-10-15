@@ -430,6 +430,39 @@ server {
   # ---- Nâng buffer cho upload lớn ----
   client_max_body_size 20m;
 
+  # ---- Bật nén Gzip tối ưu Core Web Vitals (FCP, LCP) ----
+  gzip on;
+  gzip_vary on;
+  gzip_proxied any;
+  gzip_comp_level 6;
+  gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
+
+  # ---- Security Headers (OWASP Recommended) ----
+  add_header X-Frame-Options "SAMEORIGIN" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+  add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+  # ---- Cache vĩnh viễn (Immutable) cho assets tĩnh do Vite sinh ra (có hash) ----
+  location /assets/ {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    expires 1y;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+    access_log off;
+  }
+
+  # ---- Không cache index.html & service worker để luôn nhận bản cập nhật mới nhất ----
+  location ~* (?:index\.html|sw\.js|pwa-sw\.mjs|manifest\.webmanifest)$ {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+    add_header Pragma "no-cache";
+    expires 0;
+  }
+
   location / {
     proxy_pass http://127.0.0.1:5000;
     proxy_http_version 1.1;

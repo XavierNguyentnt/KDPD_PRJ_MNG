@@ -190,11 +190,34 @@ export default function Dashboard() {
     return set;
   }, [users, isPartnerUser]);
 
-  const availableGroups = useMemo(() => {
+    // 1. Phân quyền dữ liệu theo vai trò người dùng (Data Scoping):
+  // - Admin / Manager: Được xem toàn bộ danh mục công việc của dự án.
+  // - Employee: Chỉ được xem các công việc do mình tạo, được giao, hoặc có phân công tham gia.
+  const userPermittedTasks = useMemo(() => {
     if (!datasetForList) return [];
+    if (role !== UserRole.EMPLOYEE) return datasetForList;
+    const uid = user?.id ?? null;
+    if (uid) {
+      return datasetForList.filter(
+        (t) =>
+          (t as any).createdBy === uid ||
+          t.assigneeId === uid ||
+          (Array.isArray(t.assignments)
+            ? t.assignments.some((a: any) => a?.userId === uid)
+            : false),
+      );
+    }
+    const exact = (user?.displayName ?? "").trim();
+    return datasetForList.filter((t) => (t.assignee ?? "").trim() === exact);
+  }, [datasetForList, role, user?.id, user?.displayName]);
+
+  // 2. Danh sách nhóm phòng ban:
+  // - Với Employee: Lọc đúng theo nhóm người dùng tham gia hoặc có công việc, tránh hiển thị các nhóm không liên quan.
+  const availableGroups = useMemo(() => {
+    if (!userPermittedTasks) return [];
     const groups = new Set<string>();
     let hasNoGroup = false;
-    for (const t of datasetForList) {
+    for (const t of userPermittedTasks) {
       const g = (t.group ?? "").trim();
       if (!g) {
         hasNoGroup = true;
@@ -202,10 +225,15 @@ export default function Dashboard() {
       }
       groups.add(g);
     }
+    if (role === UserRole.EMPLOYEE && Array.isArray(user?.groups)) {
+      for (const ug of user.groups) {
+        if (ug?.name?.trim()) groups.add(ug.name.trim());
+      }
+    }
     const ordered = Array.from(groups).sort();
     if (hasNoGroup) ordered.push(noGroupLabel);
     return ordered;
-  }, [datasetForList, noGroupLabel]);
+  }, [userPermittedTasks, role, user?.groups, noGroupLabel]);
 
   const stages = useMemo(() => {
     const set = new Set<string>();
@@ -216,9 +244,10 @@ export default function Dashboard() {
     return Array.from(set).sort();
   }, [works]);
 
+  // 3. Phân vùng công việc theo bộ lọc Nhóm và Năm nhận việc của người dùng
   const tasksGroupYearScoped = useMemo(() => {
-    if (!datasetForList) return [];
-    let list = datasetForList;
+    if (!userPermittedTasks) return [];
+    let list = userPermittedTasks;
     if (groupFilter !== "all") {
       if (groupFilter === noGroupLabel) {
         list = list.filter((t) => !(t.group ?? "").trim());
@@ -242,8 +271,10 @@ export default function Dashboard() {
       });
     }
     return list;
-  }, [datasetForList, groupFilter, receivedYearFilter, noGroupLabel]);
+  }, [userPermittedTasks, groupFilter, receivedYearFilter, noGroupLabel]);
 
+  // 4. Nguồn tính Badges và Cards Thống kê:
+  // Đảm bảo khớp chính xác 100% với số lượng thực tế của đối tượng người dùng, không thừa/thiếu
   const tasksForDashboardStats = tasksGroupYearScoped;
 
   const {
@@ -286,33 +317,12 @@ export default function Dashboard() {
     [setHookViewMode],
   );
 
+  // 5. Danh sách công việc nền áp dụng badgeFilter:
   const baseFilteredTasks = useMemo(() => {
     let list = tasksGroupYearScoped;
-    if (role === UserRole.EMPLOYEE) {
-      const uid = user?.id ?? null;
-      if (uid) {
-        list = list.filter(
-          (t) =>
-            (t as any).createdBy === uid ||
-            t.assigneeId === uid ||
-            (Array.isArray(t.assignments)
-              ? t.assignments.some((a: any) => a?.userId === uid)
-              : false),
-        );
-      } else {
-        const exact = (user?.displayName ?? "").trim();
-        list = list.filter((t) => (t.assignee ?? "").trim() === exact);
-      }
-    }
     if (badgeFilter) list = applyDashboardBadgeFilter(list, badgeFilter);
     return list;
-  }, [
-    tasksGroupYearScoped,
-    role,
-    user?.id,
-    user?.displayName,
-    badgeFilter,
-  ]);
+  }, [tasksGroupYearScoped, badgeFilter]);
 
   const filteredTasks = useMemo(() => {
     let list = applyDashboardBadgeFilter(hookFilteredTasks, badgeFilter);

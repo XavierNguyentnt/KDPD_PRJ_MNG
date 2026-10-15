@@ -54,6 +54,14 @@ import {
   formatNumberAccounting,
   maxDateString,
 } from "@/lib/utils";
+import {
+  formatStageDisplay,
+  roundNumberFromRoundType,
+  DueDateBlock,
+  TaskOverviewTab,
+  TaskLinksTab,
+} from "./task-dialog/index";
+
 import React, { useEffect, useMemo, useState } from "react";
 import { Loader2, AlertCircle, FileText, Users, Link2 } from "lucide-react";
 import {
@@ -132,131 +140,6 @@ const updateSchema = z.object({
 });
 
 type FormData = z.infer<typeof updateSchema>;
-
-interface DueDateBlockProps {
-  isNewTask: boolean;
-  dueDateLabel: string;
-  actualCompletedAtLabel: string;
-  closeLabel: string;
-  dueDateValue: string;
-  actualCompletedAtValue: string;
-  onDueDateChange: (value: string) => void;
-  onActualCompletedAtChange: (value: string) => void;
-  onActualCompletedAtSetProgress: () => void;
-  canEditMeta: boolean;
-  /** Khi Biên tập: hiển thị read-only theo ngày lớn nhất của các stage (dd/mm/yyyy). */
-  isBienTap?: boolean;
-  computedDueDisplay?: string;
-  computedActualDisplay?: string;
-}
-
-/** Hiển thị giai đoạn: 1,2,3 → "GĐ 1", "GĐ 2". */
-function formatStageDisplay(stage: string | null | undefined): string {
-  if (stage == null || stage === "") return "—";
-  const num = String(stage).replace(/\D/g, "");
-  return num ? "GĐ " + num : "GĐ " + stage;
-}
-
-/** Lấy round_number từ Loại bông theo quy ước biên tập. */
-function roundNumberFromRoundType(
-  roundType: string | null | undefined,
-  maxRoundHint?: number | null,
-): number {
-  if (!roundType || typeof roundType !== "string") return 1;
-  const raw = roundType.trim();
-  const normalized = raw
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d");
-
-  if (normalized.includes("tien bien tap")) return 1;
-  if (normalized.includes("bong chuyen in")) {
-    const base = maxRoundHint && maxRoundHint > 0 ? maxRoundHint : 2;
-    return base + 1;
-  }
-  const m = raw.match(/Bông\s*(\d+)/i);
-  if (m) {
-    const n = Math.max(1, parseInt(m[1], 10));
-    // Bông 1 (thô/tinh) = round 3, Bông 2 = round 4, ...
-    return n + 2;
-  }
-  if (normalized.includes("bong tho")) return 2;
-  return 1;
-}
-
-/** Ngày hoàn thành dự kiến + Ngày hoàn thành thực tế. Với Biên tập: tự động = max(stages), chỉ đọc, dd/mm/yyyy. */
-const DueDateBlock: React.FC<DueDateBlockProps> = ({
-  isNewTask,
-  dueDateLabel,
-  actualCompletedAtLabel,
-  closeLabel: _closeLabel,
-  dueDateValue,
-  actualCompletedAtValue,
-  onDueDateChange,
-  onActualCompletedAtChange,
-  onActualCompletedAtSetProgress,
-  canEditMeta,
-  isBienTap,
-  computedDueDisplay,
-  computedActualDisplay,
-}) => {
-  const showAsTotal =
-    isBienTap ||
-    (computedDueDisplay !== undefined && computedActualDisplay !== undefined);
-  const canEdit = !showAsTotal && (isNewTask || canEditMeta);
-  if (showAsTotal) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label>
-            {dueDateLabel}
-            {!isBienTap ? " (Tổng)" : ""}
-          </Label>
-          <div className="py-2.5 px-3 rounded-md border bg-muted/30 text-sm text-muted-foreground">
-            {computedDueDisplay || "—"}
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>
-            {actualCompletedAtLabel}
-            {!isBienTap ? " (Tổng)" : ""}
-          </Label>
-          <div className="py-2.5 px-3 rounded-md border bg-muted/30 text-sm text-muted-foreground">
-            {computedActualDisplay || "—"}
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-      <div className="space-y-2">
-        <Label>{dueDateLabel}</Label>
-        <DateInput
-          value={dueDateValue || null}
-          onChange={(v) => onDueDateChange(v || "")}
-          disabled={!canEdit}
-          placeholder="dd/mm/yyyy"
-          className="bg-background"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>{actualCompletedAtLabel}</Label>
-        <DateInput
-          value={actualCompletedAtValue || null}
-          onChange={(v) => {
-            onActualCompletedAtChange(v || "");
-            if (v) onActualCompletedAtSetProgress();
-          }}
-          disabled={!canEdit}
-          placeholder="dd/mm/yyyy"
-          className="bg-background"
-        />
-      </div>
-    </div>
-  );
-};
 
 export function TaskDialog({
   open,
@@ -409,7 +292,7 @@ export function TaskDialog({
           "Thư ký hợp phần",
         ]
       : (() => {
-          const groups = new Set(allTasks.map((t) => t.group).filter(Boolean));
+          const groups = new Set(allTasks.map((t) => t.group).filter((g): g is string => Boolean(g)));
           const list = Array.from(groups);
           return list.length > 0
             ? list
@@ -2677,284 +2560,55 @@ export function TaskDialog({
           className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="overflow-y-auto flex-1 min-h-0 px-6 pb-4 space-y-0">
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid grid-cols-2 md:grid-cols-3 mb-4 gap-1 w-full">
-                <TabsTrigger value="overview" className="flex items-center justify-center gap-1.5">
-                  <FileText className="h-4 w-4 shrink-0" />
+              <TabsList className="grid grid-cols-3 mb-4 gap-1 w-full h-auto p-1 text-xs sm:text-sm">
+                <TabsTrigger value="overview" className="flex items-center justify-center gap-1.5 py-2 px-1">
+                  <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                   <span className="truncate">Tổng quan</span>
                 </TabsTrigger>
-                <TabsTrigger value="assignments" className="flex items-center justify-center gap-1.5">
-                  <Users className="h-4 w-4 shrink-0" />
-                  <span className="truncate">Phân công & Quy trình</span>
+                <TabsTrigger value="assignments" className="flex items-center justify-center gap-1.5 py-2 px-1" title="Phân công & Quy trình">
+                  <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="truncate sm:inline">Phân công</span>
                 </TabsTrigger>
-                <TabsTrigger value="links" className="flex items-center justify-center gap-1.5">
-                  <Link2 className="h-4 w-4 shrink-0" />
+                <TabsTrigger value="links" className="flex items-center justify-center gap-1.5 py-2 px-1">
+                  <Link2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                   <span className="truncate">Liên kết</span>
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="mt-0 space-y-6">
-                <div className="space-y-2">
-                  <Label>{t.task.title} *</Label>
-              <Input
-                {...form.register("title")}
-                placeholder={t.task.title + "..."}
-                className="bg-background"
-                disabled={!canEditMeta}
-                autoFocus={shouldFocusTitle}
-              />
-              {form.formState.errors.title && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.title.message}
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              <div className="space-y-2">
-                <Label>{t.task.status}</Label>
-                <Select
-                  disabled={!canEditMeta}
-                  value={form.watch("status")}
-                  onValueChange={(val) => {
-                    form.setValue("status", val);
-                    setIsTaskStatusAutoCompleted(false);
-                    if (val !== "Completed") setLastManualTaskStatus(val);
-                  }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.task.selectStatus} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Not Started">
-                      {t.status.notStarted}
-                    </SelectItem>
-                    <SelectItem value="In Progress">
-                      {t.status.inProgress}
-                    </SelectItem>
-                    <SelectItem value="Pending">{t.status.pending}</SelectItem>
-                    <SelectItem value="Cancelled">
-                      {t.status.cancelled}
-                    </SelectItem>
-                    <SelectItem value="Completed">
-                      {t.status.completed}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t.task.priority}</Label>
-                <Select
-                  disabled={!canEditMeta}
-                  value={form.watch("priority")}
-                  onValueChange={(val) => form.setValue("priority", val)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.task.selectPriority} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">{t.priority.low}</SelectItem>
-                    <SelectItem value="Medium">{t.priority.medium}</SelectItem>
-                    <SelectItem value="High">{t.priority.high}</SelectItem>
-                    <SelectItem value="Critical">
-                      {t.priority.critical}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Ẩn ô Người thực hiện đơn khi nhóm dùng workflow / Thiết kế / nhiều nhân sự */}
-              {form.watch("group") !== "Biên tập" &&
-                form.watch("group") !== "Thiết kế" &&
-                form.watch("group") !== "Công việc chung" &&
-                form.watch("group") !== "CNTT" &&
-                form.watch("group") !== "Quét trùng lặp" &&
-                form.watch("group") !== "Thư ký hợp phần" && (
-                  <div className="sm:col-span-2">
-                    <AssigneePicker
-                      label={t.task.assignee as string}
-                      value={form.watch("assignee") ?? ""}
-                      assigneeId={form.watch("assigneeId") ?? null}
-                      onChange={(assignee, assigneeId) => {
-                        form.setValue("assignee", assignee);
-                        form.setValue("assigneeId", assigneeId);
-                      }}
-                      disabled={!canEditMeta}
-                      placeholder={
-                        language === "vi"
-                          ? "Tìm theo tên hoặc email nhân sự..."
-                          : "Search by name or email..."
-                      }
-                      autoFocus={shouldFocusAssignee}
-                    />
-                  </div>
-                )}
-
-              <div className="space-y-2 sm:col-span-2">
-                <Label>{t.task.group}</Label>
-                <Select
-                  disabled={!canEditMeta || !isNewTask}
-                  value={form.watch("group") || ""}
-                  onValueChange={(val) => form.setValue("group", val)}>
-                  <SelectTrigger className="bg-muted/30">
-                    <SelectValue placeholder={t.task.selectGroup} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableGroups.map((group) => (
-                      <SelectItem key={String(group)} value={String(group)}>
-                        {group}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* ===== MERGED FROM TAB "Tổng kết" (Summary) ===== */}
-            <div className="space-y-4 pt-4 mt-2 border-t border-border/60">
-              {(() => {
-                const group = form.watch("group");
-                let value = 0;
-                if (group === "Biên tập") {
-                  const w = BienTapWorkflowHelpers.createWorkflow(1);
-                  const r = w.rounds[0];
-                  r.stages[0].status = form.watch("btv2CompleteDate")
-                    ? StageStatus.COMPLETED
-                    : ((form.watch("btv2Status") as StageStatus) ??
-                      StageStatus.NOT_STARTED);
-                  r.stages[1].status = form.watch("btv1CompleteDate")
-                    ? StageStatus.COMPLETED
-                    : ((form.watch("btv1Status") as StageStatus) ??
-                      StageStatus.NOT_STARTED);
-                  r.stages[2].status = form.watch("docDuyetCompleteDate")
-                    ? StageStatus.COMPLETED
-                    : ((form.watch("docDuyetStatus") as StageStatus) ??
-                      StageStatus.NOT_STARTED);
-                  value = BienTapWorkflowHelpers.calculateProgress(w);
-                } else if (group === "Thiết kế") {
-                  const slots = [
-                    thietKeKtvChinh.userId ? thietKeKtvChinh : null,
-                    ...thietKeTroLyList.filter((s) => s.userId),
-                  ].filter(Boolean) as Array<{ completeDate?: string | null }>;
-                  const n = slots.length;
-                  const m = slots.filter(
-                    (s) =>
-                      s.completeDate != null &&
-                      String(s.completeDate).trim() !== "",
-                  ).length;
-                  value = n === 0 ? 0 : Math.round((100 / n) * m);
-                } else if (
-                  group === "Công việc chung" ||
-                  group === "CNTT" ||
-                  group === "Quét trùng lặp" ||
-                  group === "Thư ký hợp phần"
-                ) {
-                  const staff = multiAssigneesList.filter(
-                    (s) => s.label !== "Người kiểm soát" && s.userId,
-                  );
-                  const n = staff.length;
-                  const m = staff.filter(
-                    (s) => !!s.completedAt || s.status === "completed",
-                  ).length;
-                  value = n === 0 ? 0 : Math.round((100 / n) * m);
-                } else {
-                  value =
-                    form.watch("actualCompletedAt") != null &&
-                    String(form.watch("actualCompletedAt")).trim() !== ""
-                      ? 100
-                      : 0;
-                }
-                return (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center gap-2">
-                      <Label>{t.task.progress}</Label>
-                      <span className="text-sm font-medium text-muted-foreground shrink-0">
-                        {value}%
-                      </span>
-                    </div>
-                    <Progress value={value} className="h-2 w-full" />
-                  </div>
-                );
-              })()}
-
-              <div className="space-y-2">
-                <Label>{t.task.notes}</Label>
-                <Textarea
-                  {...form.register("notes")}
-                  placeholder={t.task.notes + "..."}
-                  className="min-h-[100px] resize-none"
-                  disabled={
-                    !isNewTask &&
-                    (!isEditing || !(canEditMetaRaw || canEditNotesRaw))
-                  }
+                <TaskOverviewTab
+                  form={form}
+                  t={t}
+                  language={language}
+                  canEditMeta={canEditMeta}
+                  shouldFocusTitle={shouldFocusTitle}
+                  setIsTaskStatusAutoCompleted={setIsTaskStatusAutoCompleted}
+                  setLastManualTaskStatus={setLastManualTaskStatus}
+                  shouldFocusAssignee={shouldFocusAssignee}
+                  availableGroups={availableGroups}
+                  isNewTask={isNewTask}
+                  isEditing={isEditing}
+                  canEditMetaRaw={canEditMetaRaw}
+                  canEditNotesRaw={canEditNotesRaw}
+                  thietKeKtvChinh={thietKeKtvChinh}
+                  thietKeTroLyList={thietKeTroLyList}
+                  multiAssigneesList={multiAssigneesList}
                 />
-              </div>
-            </div>
-
               </TabsContent>
 
               <TabsContent value="links" className="mt-0 space-y-6">
-                {/* Liên kết tài liệu dịch thuật: Biên tập, Công việc chung, Thiết kế, CNTT */}
-                {isWorkLinkGroup && (
-              <div className="space-y-4 pt-4 border-t border-border/50">
-                <h3 className="text-base font-semibold">
-                  Thông tin của tài liệu dịch thuật
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {form.watch("group") === "Biên tập"
-                    ? language === "vi"
-                      ? "Chọn tác phẩm (tài liệu) cần biên tập."
-                      : "Select work (document) to proofread."
-                    : language === "vi"
-                      ? "Tùy chọn: liên kết công việc với một tài liệu dịch thuật."
-                      : "Optional: link this task to a translation document."}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <WorkPicker
-                      label="Tên tài liệu dịch thuật"
-                      works={worksList}
-                      components={componentsList}
-                      value={form.watch("relatedWorkId") ?? null}
-                      onChange={(id) => form.setValue("relatedWorkId", id)}
-                      disabled={!canEditMeta && !isNewTask}
-                      placeholder={
-                        language === "vi"
-                          ? "Tìm theo tiêu đề, mã tài liệu, hợp phần, giai đoạn..."
-                          : "Search by title, document code..."
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground">Hợp phần</Label>
-                    <div className="py-2.5 px-3 rounded-md border bg-muted/30 text-sm">
-                      {componentName}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground">Giai đoạn</Label>
-                    <div className="py-2.5 px-3 rounded-md border bg-muted/30 text-sm">
-                      {stageDisplay}
-                    </div>
-                  </div>
-                  {form.watch("group") === "Biên tập" && (
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label className="text-muted-foreground">
-                        Số trang tài liệu cần biên tập
-                      </Label>
-                      <div className="py-2.5 px-3 rounded-md border bg-muted/30 text-sm">
-                        {pageCountBienTap != null
-                          ? `${formatNumberAccounting(pageCountBienTap)} trang`
-                          : "—"}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {language === "vi"
-                          ? "Lấy từ tổng số trang của các hợp đồng hiệu đính gắn với tác phẩm đã chọn."
-                          : "From proofreading contracts linked to selected work."}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              )}
+                <TaskLinksTab
+                  isWorkLinkGroup={isWorkLinkGroup}
+                  form={form}
+                  language={language}
+                  worksList={worksList}
+                  componentsList={componentsList}
+                  canEditMeta={canEditMeta}
+                  isNewTask={isNewTask}
+                  componentName={componentName}
+                  stageDisplay={stageDisplay}
+                  pageCountBienTap={pageCountBienTap}
+                />
               </TabsContent>
 
               <TabsContent value="assignments" className="mt-0 space-y-6">
@@ -4432,7 +4086,7 @@ export function TaskDialog({
               closeLabel={t.common.close}
               dueDateValue={form.watch("dueDate") ?? ""}
               actualCompletedAtValue={form.watch("actualCompletedAt") ?? ""}
-              onDueDateChange={(v) => form.setValue("dueDate", v || null)}
+              onDueDateChange={(v: string) => form.setValue("dueDate", v || null)}
               onActualCompletedAtChange={(v) =>
                 form.setValue("actualCompletedAt", v || null)
               }

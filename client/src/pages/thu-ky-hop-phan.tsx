@@ -80,6 +80,7 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
   DropdownMenuLabel,
@@ -96,6 +97,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -122,6 +124,9 @@ import {
   ArrowDown,
   LayoutGrid,
   List,
+  Rows3,
+  Table2,
+  MoreHorizontal,
   Eye,
   X,
   CheckCircle2,
@@ -158,614 +163,46 @@ import {
   loadXLSX,
 } from "@/lib/utils";
 
-const PAGE_SIZE = 10;
-
-// Sort types for each table
-export type WorkSortColumn =
-  | "component"
-  | "titleVi"
-  | "titleHannom"
-  | "stage"
-  | "documentCode"
-  | "baseWordCount"
-  | "basePageCount"
-  | "estimateFactor"
-  | "estimateWordCount"
-  | "estimatePageCount";
-export type TranslationContractSortColumn =
-  | "contractNumber"
-  | "component"
-  | "unitPrice"
-  | "overviewValue"
-  | "translationValue"
-  | "contractValue"
-  | "startDate"
-  | "endDate"
-  | "extensionStartDate"
-  | "extensionEndDate"
-  | "actualCompletionDate"
-  | "actualWordCount"
-  | "actualPageCount"
-  | "completionRate"
-  | "settlementValue";
-export type ProofreadingContractSortColumn =
-  | "contractNumber"
-  | "component"
-  | "contractValue"
-  | "startDate"
-  | "endDate"
-  | "actualCompletionDate"
-  | "pageCount"
-  | "rateRatio";
-
-type WorksProgressFilter =
-  | "all"
-  | "signed_contract"
-  | "progress_check"
-  | "expert_review"
-  | "project_acceptance"
-  | "settlement"
-  | "proofreading_completed"
-  | "editing_completed"
-  | "design_completed";
-
-// Sort functions with multi-column support
-function sortWorks(
-  works: Work[],
-  sortColumns: Array<{ column: WorkSortColumn; dir: "asc" | "desc" }>,
-  getComponentName: (id: string | null) => string,
-): Work[] {
-  if (sortColumns.length === 0) return works.slice();
-
-  const sorted = works.slice().sort((a, b) => {
-    for (const { column: sortBy, dir: sortDir } of sortColumns) {
-      const dir = sortDir === "asc" ? 1 : -1;
-      let av: any, bv: any;
-
-      if (sortBy === "component") {
-        av = getComponentName(a.componentId);
-        bv = getComponentName(b.componentId);
-        const as = String(av ?? "");
-        const bs = String(bv ?? "");
-        const cmp = as.localeCompare(bs, undefined, { numeric: true });
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else if (sortBy === "stage") {
-        av = a.stage ?? "";
-        bv = b.stage ?? "";
-        const as = String(av ?? "");
-        const bs = String(bv ?? "");
-        const cmp = as.localeCompare(bs, undefined, { numeric: true });
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else if (
-        sortBy === "baseWordCount" ||
-        sortBy === "basePageCount" ||
-        sortBy === "estimateWordCount" ||
-        sortBy === "estimatePageCount"
-      ) {
-        av = a[sortBy] ?? null;
-        bv = b[sortBy] ?? null;
-        if (av === null && bv === null) continue;
-        if (av === null) return 1 * dir;
-        if (bv === null) return -1 * dir;
-        const cmp = Number(av) - Number(bv);
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else if (sortBy === "estimateFactor") {
-        av = a.estimateFactor ?? null;
-        bv = b.estimateFactor ?? null;
-        if (av === null && bv === null) continue;
-        if (av === null) return 1 * dir;
-        if (bv === null) return -1 * dir;
-        const cmp = Number(av) - Number(bv);
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else {
-        av = a[sortBy as keyof Work] ?? "";
-        bv = b[sortBy as keyof Work] ?? "";
-        const as = String(av ?? "");
-        const bs = String(bv ?? "");
-        const cmp = as.localeCompare(bs, undefined, { numeric: true });
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      }
-    }
-    return 0;
-  });
-  return sorted;
-}
-
-function sortTranslationContracts(
-  contracts: TranslationContract[],
-  sortColumns: Array<{
-    column: TranslationContractSortColumn;
-    dir: "asc" | "desc";
-  }>,
-  getComponentName: (id: string | null) => string,
-): TranslationContract[] {
-  if (sortColumns.length === 0) return contracts.slice();
-
-  const sorted = contracts.slice().sort((a, b) => {
-    for (const { column: sortBy, dir: sortDir } of sortColumns) {
-      const dir = sortDir === "asc" ? 1 : -1;
-      let av: any, bv: any;
-
-      if (sortBy === "component") {
-        av = getComponentName(a.componentId);
-        bv = getComponentName(b.componentId);
-        const as = String(av ?? "");
-        const bs = String(bv ?? "");
-        const cmp = as.localeCompare(bs, undefined, { numeric: true });
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else if (
-        sortBy === "startDate" ||
-        sortBy === "endDate" ||
-        sortBy === "extensionStartDate" ||
-        sortBy === "extensionEndDate" ||
-        sortBy === "actualCompletionDate"
-      ) {
-        av = a[sortBy]
-          ? typeof a[sortBy] === "string"
-            ? a[sortBy].slice(0, 10)
-            : (a[sortBy] as Date).toISOString().slice(0, 10)
-          : "";
-        bv = b[sortBy]
-          ? typeof b[sortBy] === "string"
-            ? b[sortBy].slice(0, 10)
-            : (b[sortBy] as Date).toISOString().slice(0, 10)
-          : "";
-        if (av === bv) continue;
-        const cmp = av < bv ? -1 : 1;
-        return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else if (
-        sortBy === "unitPrice" ||
-        sortBy === "overviewValue" ||
-        sortBy === "translationValue" ||
-        sortBy === "contractValue" ||
-        sortBy === "actualWordCount" ||
-        sortBy === "actualPageCount" ||
-        sortBy === "completionRate" ||
-        sortBy === "settlementValue"
-      ) {
-        av = a[sortBy] ?? null;
-        bv = b[sortBy] ?? null;
-        if (av === null && bv === null) continue;
-        if (av === null) return 1 * dir;
-        if (bv === null) return -1 * dir;
-        const avNum = typeof av === "string" ? parseFloat(av) : Number(av);
-        const bvNum = typeof bv === "string" ? parseFloat(bv) : Number(bv);
-        const cmp = avNum - bvNum;
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else {
-        av = a[sortBy as keyof TranslationContract] ?? "";
-        bv = b[sortBy as keyof TranslationContract] ?? "";
-        const as = String(av ?? "");
-        const bs = String(bv ?? "");
-        const cmp = as.localeCompare(bs, undefined, { numeric: true });
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      }
-    }
-    return 0;
-  });
-  return sorted;
-}
-
-function sortProofreadingContracts(
-  contracts: ProofreadingContract[],
-  sortColumns: Array<{
-    column: ProofreadingContractSortColumn;
-    dir: "asc" | "desc";
-  }>,
-  getComponentName: (id: string | null) => string,
-): ProofreadingContract[] {
-  if (sortColumns.length === 0) return contracts.slice();
-
-  const sorted = contracts.slice().sort((a, b) => {
-    for (const { column: sortBy, dir: sortDir } of sortColumns) {
-      const dir = sortDir === "asc" ? 1 : -1;
-      let av: any, bv: any;
-
-      if (sortBy === "component") {
-        av = getComponentName(a.componentId);
-        bv = getComponentName(b.componentId);
-        const as = String(av ?? "");
-        const bs = String(bv ?? "");
-        const cmp = as.localeCompare(bs, undefined, { numeric: true });
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else if (
-        sortBy === "startDate" ||
-        sortBy === "endDate" ||
-        sortBy === "actualCompletionDate"
-      ) {
-        av = a[sortBy]
-          ? typeof a[sortBy] === "string"
-            ? a[sortBy].slice(0, 10)
-            : (a[sortBy] as Date).toISOString().slice(0, 10)
-          : "";
-        bv = b[sortBy]
-          ? typeof b[sortBy] === "string"
-            ? b[sortBy].slice(0, 10)
-            : (b[sortBy] as Date).toISOString().slice(0, 10)
-          : "";
-        if (av === bv) continue;
-        const cmp = av < bv ? -1 : 1;
-        return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else if (
-        sortBy === "contractValue" ||
-        sortBy === "pageCount" ||
-        sortBy === "rateRatio"
-      ) {
-        av = a[sortBy] ?? null;
-        bv = b[sortBy] ?? null;
-        if (av === null && bv === null) continue;
-        if (av === null) return 1 * dir;
-        if (bv === null) return -1 * dir;
-        if (sortBy === "rateRatio") {
-          av = typeof av === "string" ? parseFloat(av) : Number(av);
-          bv = typeof bv === "string" ? parseFloat(bv) : Number(bv);
-        }
-        const cmp = Number(av) - Number(bv);
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      } else {
-        av = a[sortBy as keyof ProofreadingContract] ?? "";
-        bv = b[sortBy as keyof ProofreadingContract] ?? "";
-        const as = String(av ?? "");
-        const bs = String(bv ?? "");
-        const cmp = as.localeCompare(bs, undefined, { numeric: true });
-        if (cmp !== 0) return cmp * dir;
-        continue; // Equal values, try next sort column
-      }
-    }
-    return 0;
-  });
-  return sorted;
-}
-
-// Sortable header component with multi-sort support
-function SortableHead<T extends string>({
-  label,
-  column,
-  sortColumns,
-  onSort,
-  className,
-  style,
-}: {
-  label: React.ReactNode;
-  column: T;
-  sortColumns?: Array<{ column: T; dir: "asc" | "desc" }>;
-  onSort?: (column: T, e?: React.MouseEvent) => void;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
-  const sortInfo = sortColumns?.find((s) => s.column === column);
-  const sortIndex = sortInfo
-    ? sortColumns!.findIndex((s) => s.column === column)
-    : -1;
-  const Icon = sortInfo
-    ? sortInfo.dir === "asc"
-      ? ArrowUp
-      : ArrowDown
-    : ArrowUpDown;
-
-  return (
-    <TableHead
-      className={className}
-      style={style}
-      onClick={onSort ? (e) => onSort(column, e) : undefined}
-      role={onSort ? "button" : undefined}
-      tabIndex={onSort ? 0 : undefined}
-      onKeyDown={
-        onSort ? (e) => e.key === "Enter" && onSort(column) : undefined
-      }
-      title={
-        onSort
-          ? "Click để thêm sắp xếp. Click lại để đổi hướng (↑→↓). Click lần 3 để xóa."
-          : undefined
-      }>
-      <div
-        className={`flex items-center gap-1 ${
-          onSort ? "cursor-pointer select-none hover:opacity-80" : ""
-        }`}>
-        {label}
-        {onSort && (
-          <div className="flex items-center gap-0.5">
-            {sortIndex >= 0 && (
-              <span
-                className="text-xs font-medium text-primary"
-                title={`Ưu tiên ${sortIndex + 1}`}>
-                {sortIndex + 1}
-              </span>
-            )}
-            <Icon className="w-3.5 h-3.5 opacity-70" />
-          </div>
-        )}
-      </div>
-    </TableHead>
-  );
-}
-
-/** Quy ước: 350 chữ = 1 trang cơ sở. Số trang = số chữ / 350 (làm tròn). */
-const CHARS_PER_PAGE = 350;
-function charsToPages(chars: number): number {
-  return Math.round(chars / CHARS_PER_PAGE);
-}
-
-/** Hiển thị giai đoạn: lưu 1,2,3... → hiển thị "GĐ 1", "GĐ 2", "GĐ 3". */
-function formatStageDisplay(stage: string | null | undefined): string {
-  if (stage == null || stage === "") return "—";
-  const num = String(stage).replace(/\D/g, "");
-  return num ? "GĐ " + num : "GĐ " + stage;
-}
-
-function parseDateOnly(value: string | Date | null | undefined): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) return null;
-    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-  }
-  const s = String(value);
-  const isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (isoMatch) {
-    const y = Number.parseInt(isoMatch[1], 10);
-    const m = Number.parseInt(isoMatch[2], 10) - 1;
-    const d = Number.parseInt(isoMatch[3], 10);
-    if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(d)) {
-      return new Date(y, m, d);
-    }
-  }
-  const parsed = new Date(s);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
-}
-
-function getTcDueDate(c: TranslationContract): Date | null {
-  return parseDateOnly(c.extensionEndDate ?? c.endDate);
-}
-
-function getPcDueDate(c: ProofreadingContract): Date | null {
-  return parseDateOnly(c.endDate);
-}
-
-function daysUntil(from: Date, to: Date): number {
-  const MS_PER_DAY = 24 * 60 * 60 * 1000;
-  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
-  return Math.ceil((end.getTime() - start.getTime()) / MS_PER_DAY);
-}
-
-function formatDurationMonths(
-  startDate: string | Date | null | undefined,
-  endDate: string | Date | null | undefined,
-): string {
-  const start = parseDateOnly(startDate);
-  const end = parseDateOnly(endDate);
-  if (!start || !end) return "—";
-  if (end.getTime() < start.getTime()) return "—";
-  const months =
-    (end.getFullYear() - start.getFullYear()) * 12 +
-    (end.getMonth() - start.getMonth()) +
-    (end.getDate() - start.getDate()) / 30;
-  const rounded = Math.max(0, months);
-  const str = rounded.toFixed(1);
-  return str.endsWith(".0") ? str.slice(0, -2) : str;
-}
-
-type ContractPill = {
-  label: string;
-  tone: "muted" | "info" | "success" | "warning" | "danger";
-};
-
-const contractPillClass: Record<ContractPill["tone"], string> = {
-  muted: "bg-slate-100 text-slate-700 border-slate-300",
-  info: "bg-blue-100 text-blue-700 border-blue-300",
-  success: "bg-green-100 text-green-700 border-green-300",
-  warning: "bg-amber-100 text-amber-700 border-amber-300",
-  danger: "bg-red-100 text-red-700 border-red-300",
-};
-
-function buildTranslationContractPills(
-  contract: TranslationContract,
-  opts: { proofreadingCompletedDate?: string; editingCompletedDate?: string },
-): ContractPill[] {
-  const pills: ContractPill[] = [];
-  const proofreadingCompleted =
-    contract.proofreadingCompleted || !!opts.proofreadingCompletedDate;
-  const editingCompleted =
-    contract.editingCompleted || !!opts.editingCompletedDate;
-  if (!contract.progressCheckDate) {
-    pills.push({ label: "Chưa kiểm tra tiến độ", tone: "muted" });
-  } else {
-    pills.push({
-      label: `Đã kiểm tra tiến độ (${formatDateDDMMYYYY(
-        contract.progressCheckDate,
-      )})`,
-      tone: "info",
-    });
-  }
-  if (contract.expertReviewDate) {
-    pills.push({
-      label: `Đã thẩm định cấp chuyên gia (${formatDateDDMMYYYY(
-        contract.expertReviewDate,
-      )})`,
-      tone: "info",
-    });
-  }
-  if (contract.projectAcceptanceDate) {
-    pills.push({
-      label: `Đã nghiệm thu cấp Dự án (${formatDateDDMMYYYY(
-        contract.projectAcceptanceDate,
-      )})`,
-      tone: "success",
-    });
-  }
-  if (contract.proofreadingInProgress) {
-    pills.push({ label: "Đang hiệu đính", tone: "info" });
-  }
-  if (proofreadingCompleted) {
-    pills.push({
-      label: `Hoàn thành hiệu đính (${
-        opts.proofreadingCompletedDate
-          ? formatDateDDMMYYYY(opts.proofreadingCompletedDate)
-          : "—"
-      })`,
-      tone: "success",
-    });
-  }
-  if (contract.editingInProgress) {
-    pills.push({ label: "Đang biên tập", tone: "info" });
-  }
-  if (editingCompleted) {
-    pills.push({
-      label: `Hoàn thành biên tập (${
-        opts.editingCompletedDate
-          ? formatDateDDMMYYYY(opts.editingCompletedDate)
-          : "—"
-      })`,
-      tone: "success",
-    });
-  }
-  if (contract.printTransferDate) {
-    pills.push({
-      label: `Chuyển in (${formatDateDDMMYYYY(contract.printTransferDate)})`,
-      tone: "warning",
-    });
-  }
-  if (contract.publishedDate) {
-    pills.push({
-      label: `Đã xuất bản (${formatDateDDMMYYYY(contract.publishedDate)})`,
-      tone: "success",
-    });
-  }
-  if (contract.status === "Cancel" && contract.cancelledAt) {
-    pills.push({
-      label: `Đã hủy (${formatDateDDMMYYYY(contract.cancelledAt)})`,
-      tone: "danger",
-    });
-  }
-  return pills;
-}
-
-/** Lấy phần số từ giá trị giai đoạn (để hiển thị trong ô nhập). */
-function parseStageNumber(stage: string | null | undefined): string {
-  if (stage == null || stage === "") return "";
-  const num = String(stage).replace(/\D/g, "");
-  return num || String(stage);
-}
-
-// Helper function to generate pagination items with ellipsis
-function generatePaginationItems(
-  currentPage: number,
-  totalPages: number,
-): (number | "ellipsis")[] {
-  if (totalPages <= 7) {
-    // Show all pages if 7 or fewer
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-
-  const items: (number | "ellipsis")[] = [];
-
-  if (currentPage <= 3) {
-    // Show first 5 pages, ellipsis, last page
-    for (let i = 1; i <= 5; i++) {
-      items.push(i);
-    }
-    items.push("ellipsis");
-    items.push(totalPages);
-  } else if (currentPage >= totalPages - 2) {
-    // Show first page, ellipsis, last 5 pages
-    items.push(1);
-    items.push("ellipsis");
-    for (let i = totalPages - 4; i <= totalPages; i++) {
-      items.push(i);
-    }
-  } else {
-    // Show first page, ellipsis, current-1, current, current+1, ellipsis, last page
-    items.push(1);
-    items.push("ellipsis");
-    items.push(currentPage - 1);
-    items.push(currentPage);
-    items.push(currentPage + 1);
-    items.push("ellipsis");
-    items.push(totalPages);
-  }
-
-  return items;
-}
-
-// --- API fetchers ---
-async function fetchWorks(): Promise<Work[]> {
-  const res = await fetch(api.works.list.path, { credentials: "include" });
-  if (!res.ok) throw new Error("Không tải được danh mục tác phẩm");
-  return res.json();
-}
-
-async function fetchTranslationContracts(): Promise<TranslationContract[]> {
-  const res = await fetch(api.translationContracts.list.path, {
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("Không tải được hợp đồng dịch thuật");
-  return res.json();
-}
-
-async function fetchProofreadingContracts(): Promise<ProofreadingContract[]> {
-  const res = await fetch(api.proofreadingContracts.list.path, {
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("Không tải được hợp đồng hiệu đính");
-  return res.json();
-}
-
-async function fetchComponents(): Promise<Component[]> {
-  const res = await fetch(api.components.list.path, { credentials: "include" });
-  if (!res.ok) throw new Error("Không tải được danh sách hợp phần");
-  return res.json();
-}
-
-async function fetchFinanceSummary(
-  contractId: string,
-): Promise<{ totalPaid: number; totalAdvance: number; outstanding: number }> {
-  const res = await fetch(
-    buildUrl(api.finance.translationContractSummary.path, { id: contractId }),
-    {
-      credentials: "include",
-    },
-  );
-  if (!res.ok) throw new Error("Không tải được tóm tắt tài chính");
-  return res.json();
-}
-
-async function fetchFinanceSummaryPc(
-  contractId: string,
-): Promise<{ totalPaid: number; totalAdvance: number; outstanding: number }> {
-  const res = await fetch(
-    buildUrl(api.finance.proofreadingContractSummary.path, { id: contractId }),
-    {
-      credentials: "include",
-    },
-  );
-  if (!res.ok) throw new Error("Không tải được tóm tắt tài chính");
-  return res.json();
-}
-
-async function fetchContractPayments(contractId: string): Promise<Payment[]> {
-  const res = await fetch(
-    buildUrl(api.payments.listByTranslationContract.path, { id: contractId }),
-    { credentials: "include" },
-  );
-  if (!res.ok) throw new Error("Không tải được danh sách chi trả");
-  return res.json();
-}
-
-const ROLE_THU_KY_NAME = "Thư ký hợp phần";
-const ROLE_THU_KY_CODE = "prj_secretary";
+import {
+  PAGE_SIZE,
+  CHARS_PER_PAGE,
+  ROLE_THU_KY_NAME,
+  ROLE_THU_KY_CODE,
+  type WorkSortColumn,
+  type TranslationContractSortColumn,
+  type ProofreadingContractSortColumn,
+  type WorksProgressFilter,
+  type ContractPill,
+  contractPillClass,
+  charsToPages,
+  formatStageDisplay,
+  parseDateOnly,
+  getTcDueDate,
+  getPcDueDate,
+  daysUntil,
+  formatDurationMonths,
+  buildTranslationContractPills,
+  parseStageNumber,
+  generatePaginationItems,
+  SortableHead,
+  sortWorks,
+  sortTranslationContracts,
+  sortProofreadingContracts,
+  fetchWorks,
+  fetchTranslationContracts,
+  fetchProofreadingContracts,
+  fetchComponents,
+  fetchFinanceSummary,
+  fetchFinanceSummaryPc,
+  fetchContractPayments,
+  fetchPaymentsByTcId,
+  fetchPaymentsByPcId,
+  ContractStagesSection,
+  PaymentsSection,
+  WorkForm,
+  TranslationContractForm,
+  ProofreadingContractForm,
+} from "@/components/thu-ky-hop-phan";
 
 export default function ThuKyHopPhanPage() {
   const [location, setLocation] = useLocation();
@@ -1170,6 +607,22 @@ export default function ThuKyHopPhanPage() {
     workPipelineCtx,
   } = worksDerived;
   const { handleWorksSort } = worksHandlers;
+
+  const [mobileWorksFilterOpen, setMobileWorksFilterOpen] = useState(false);
+
+  const activeWorksFilterCount = useMemo(() => {
+    let count = 0;
+    if (worksComponentFilter !== "all") count++;
+    if (worksStageFilter !== "all") count++;
+    if (worksProgressFilter !== "all") count++;
+    return count;
+  }, [worksComponentFilter, worksStageFilter, worksProgressFilter]);
+
+  const handleResetWorksFilters = useCallback(() => {
+    setWorksComponentFilter("all");
+    setWorksStageFilter("all");
+    setWorksProgressFilter("all");
+  }, [setWorksComponentFilter, setWorksStageFilter, setWorksProgressFilter]);
 
   const tasksHook = useThuKyTasksTab({
     tasks,
@@ -3104,301 +2557,596 @@ export default function ThuKyHopPhanPage() {
         {/* Tab: Danh mục tác phẩm (Works) */}
         <TabsContent value="works" className="mt-6">
           <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="p-4 border-b flex flex-col gap-4 bg-muted/20">
-              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:w-64">
+            <div className="p-3 sm:p-4 border-b flex flex-col gap-3 bg-muted/20">
+              {/* MOBILE-ONLY ACTION & FILTER BAR (Monday.com / ClickUp Mobile UX) */}
+              <div className="flex flex-col gap-2.5 sm:hidden">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Tìm tác phẩm..."
-                      className="pl-9"
+                      className="pl-8 h-9 text-xs bg-background"
                       value={worksSearch}
                       onChange={(e) => setWorksSearch(e.target.value)}
                     />
+                    {worksSearch && (
+                      <button
+                        onClick={() => setWorksSearch("")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
-                  <Badge variant="secondary">
-                    {filteredWorks.length} tác phẩm
-                  </Badge>
-                </div>
-                <div className="flex gap-2">
+
+                  {/* Filter Trigger Button with badge */}
+                  <Button
+                    size="sm"
+                    variant={activeWorksFilterCount > 0 ? "default" : "outline"}
+                    className="h-9 px-2.5 shrink-0 text-xs gap-1"
+                    onClick={() => setMobileWorksFilterOpen(true)}>
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>Lọc</span>
+                    {activeWorksFilterCount > 0 && (
+                      <span className="ml-0.5 bg-primary-foreground text-primary text-[10px] rounded-full h-4 min-w-4 px-1 flex items-center justify-center font-bold">
+                        {activeWorksFilterCount}
+                      </span>
+                    )}
+                  </Button>
+
+                  {/* View Mode Toggle: Compact (Monday) | Card | Table */}
                   <ToggleGroup
                     type="single"
                     value={worksViewMode}
-                    onValueChange={(v) =>
-                      v && (v === "table" || v === "card") && setWorksViewMode(v)
-                    }
-                    className="border rounded-md bg-background">
-                    <ToggleGroupItem value="table" aria-label="Bảng">
-                      <List className="h-4 w-4 mr-1.5" />
-                      Bảng
+                    onValueChange={(v) => v && setWorksViewMode(v as any)}
+                    className="border rounded-md bg-background h-9 shrink-0">
+                    <ToggleGroupItem value="compact" aria-label="Gọn" className="h-8 w-8 p-0" title="Chế độ gọn (Monday)">
+                      <Rows3 className="h-4 w-4" />
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="card" aria-label="Thẻ">
-                      <LayoutGrid className="h-4 w-4 mr-1.5" />
-                      Thẻ
+                    <ToggleGroupItem value="card" aria-label="Thẻ" className="h-8 w-8 p-0" title="Chế độ thẻ">
+                      <LayoutGrid className="h-4 w-4" />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="table" aria-label="Bảng" className="h-8 w-8 p-0" title="Chế độ bảng">
+                      <Table2 className="h-4 w-4" />
                     </ToggleGroupItem>
                   </ToggleGroup>
-                  {selectedWorkIds.length > 0 && (
+                </div>
+
+                {/* Secondary Row: Count + Actions + Add */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground font-medium">
+                    {filteredWorks.length} tác phẩm
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {selectedWorkIds.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-8 text-xs px-2"
+                        onClick={() => setBulkDeleteWorksOpen(true)}>
+                        Xóa ({selectedWorkIds.length})
+                      </Button>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 px-2 text-xs">
+                          <MoreHorizontal className="w-3.5 h-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setWorksImportOpen(true)}>
+                          <Upload className="w-4 h-4 mr-2" /> Import Excel
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void handleExportWorks(filteredWorks, toast)}>
+                          <FileText className="w-4 h-4 mr-2" /> Xuất Excel
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
                     <Button
                       size="sm"
-                      variant="destructive"
-                      onClick={() => setBulkDeleteWorksOpen(true)}>
-                      Xóa đã chọn ({selectedWorkIds.length})
+                      className="h-8 text-xs px-2.5 font-medium"
+                      onClick={() => setWorkDialog({ open: true, work: null })}>
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Thêm
                     </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setWorksImportOpen(true)}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Import Excel
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      void handleExportWorks(filteredWorks, toast)
-                    }>
-                    <FileText className="w-4 h-4 mr-2" />
-                    Xuất Excel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => setWorkDialog({ open: true, work: null })}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Thêm tác phẩm
-                  </Button>
+                  </div>
                 </div>
+
+                {/* Active Filter Chips */}
+                {activeWorksFilterCount > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+                    {worksComponentFilter !== "all" && (
+                      <Badge variant="secondary" className="text-[11px] gap-1 shrink-0 font-normal">
+                        Hợp phần: {getComponentName(worksComponentFilter)}
+                        <X className="w-3 h-3 cursor-pointer" onClick={() => setWorksComponentFilter("all")} />
+                      </Badge>
+                    )}
+                    {worksStageFilter !== "all" && (
+                      <Badge variant="secondary" className="text-[11px] gap-1 shrink-0 font-normal">
+                        {formatStageDisplay(worksStageFilter)}
+                        <X className="w-3 h-3 cursor-pointer" onClick={() => setWorksStageFilter("all")} />
+                      </Badge>
+                    )}
+                    {worksProgressFilter !== "all" && (
+                      <Badge variant="secondary" className="text-[11px] gap-1 shrink-0 font-normal">
+                        Tiến độ
+                        <X className="w-3 h-3 cursor-pointer" onClick={() => setWorksProgressFilter("all")} />
+                      </Badge>
+                    )}
+                    <button
+                      onClick={handleResetWorksFilters}
+                      className="text-[11px] text-primary underline shrink-0 font-medium ml-1">
+                      Xóa bộ lọc
+                    </button>
+                  </div>
+                )}
               </div>
-              {/* Filters */}
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 text-muted-foreground shrink-0">
-                  <Filter className="w-3.5 h-3.5" />
-                  <span className="text-xs font-medium">Lọc:</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Hợp phần
-                  </Label>
-                  <Select
-                    value={worksComponentFilter}
-                    onValueChange={setWorksComponentFilter}>
-                    <SelectTrigger className="w-[180px] h-9 bg-background">
-                      <SelectValue placeholder="Tất cả hợp phần" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả hợp phần</SelectItem>
-                      {componentsList.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Giai đoạn
-                  </Label>
-                  <Select
-                    value={worksStageFilter}
-                    onValueChange={setWorksStageFilter}>
-                    <SelectTrigger className="w-[140px] h-9 bg-background">
-                      <SelectValue placeholder="Tất cả giai đoạn" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả giai đoạn</SelectItem>
-                      {worksStages.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {formatStageDisplay(s)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Tiến độ tác phẩm
-                  </Label>
-                  <Select
-                    value={worksProgressFilter}
-                    onValueChange={(v) =>
-                      setWorksProgressFilter(v as WorksProgressFilter)
-                    }>
-                    <SelectTrigger className="w-[220px] h-9 bg-background">
-                      <SelectValue placeholder="Tất cả tiến độ" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả</SelectItem>
-                      <SelectItem value="signed_contract">
-                        Ký hợp đồng
-                      </SelectItem>
-                      <SelectItem value="progress_check">
-                        Kiểm tra tiến độ
-                      </SelectItem>
-                      <SelectItem value="expert_review">
-                        Thẩm định cấp chuyên gia
-                      </SelectItem>
-                      <SelectItem value="project_acceptance">
-                        Nghiệm thu cấp Dự án
-                      </SelectItem>
-                      <SelectItem value="settlement">Quyết toán</SelectItem>
-                      <SelectItem value="proofreading_completed">
-                        Hiệu đính (hoàn thành)
-                      </SelectItem>
-                      <SelectItem value="editing_completed">
-                        Biên tập (hoàn thành)
-                      </SelectItem>
-                      <SelectItem value="design_completed">
-                        Thiết kế (hoàn thành)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Bộ cột
-                  </Label>
-                  <ToggleGroup
-                    type="single"
-                    value={(() => {
-                      const allFalse =
-                        !tcColumnVis.contractNumber &&
-                        !tcColumnVis.translators &&
-                        !tcColumnVis.overviewValue &&
-                        !tcColumnVis.translationValue &&
-                        !tcColumnVis.contractValue &&
-                        !tcColumnVis.settlementValue &&
-                        !tcColumnVis.outstanding;
-                      const allTrue =
-                        tcColumnVis.contractNumber &&
-                        tcColumnVis.translators &&
-                        tcColumnVis.overviewValue &&
-                        tcColumnVis.translationValue &&
-                        tcColumnVis.contractValue &&
-                        tcColumnVis.settlementValue &&
-                        tcColumnVis.outstanding;
-                      if (allFalse) return "basic";
-                      if (allTrue) return "finance";
-                      return "estimate";
-                    })()}
-                    onValueChange={(v) => {
-                      if (!v) return;
-                      if (v === "basic") {
-                        setTcColumnVis({
-                          contractNumber: false,
-                          translators: false,
-                          overviewValue: false,
-                          translationValue: false,
-                          contractValue: false,
-                          settlementValue: false,
-                          outstanding: false,
-                        });
-                      } else if (v === "finance") {
-                        setTcColumnVis({
-                          contractNumber: true,
-                          translators: true,
-                          overviewValue: true,
-                          translationValue: true,
-                          contractValue: true,
-                          settlementValue: true,
-                          outstanding: true,
-                        });
-                      } else if (v === "estimate") {
-                        setTcColumnVis({
-                          contractNumber: false,
-                          translators: false,
-                          overviewValue: false,
-                          translationValue: false,
-                          contractValue: false,
-                          settlementValue: false,
-                          outstanding: false,
-                        });
-                      }
-                    }}
-                    className="border rounded-md bg-background h-9">
-                    <ToggleGroupItem
-                      value="basic"
-                      aria-label="Cơ bản"
-                      className="text-xs h-8 px-3">
-                      Cơ bản
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                      value="finance"
-                      aria-label="Tài chính"
-                      className="text-xs h-8 px-3">
-                      Tài chính
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                      value="estimate"
-                      aria-label="Ước tính"
-                      className="text-xs h-8 px-3">
-                      Ước tính
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-                <div className="flex-1" />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="shrink-0">
-                      Hiển thị cột
+
+              {/* MOBILE BOTTOM SHEET FILTER MODAL (ClickUp / Monday Drawer) */}
+              <Sheet open={mobileWorksFilterOpen} onOpenChange={setMobileWorksFilterOpen}>
+                <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto p-5">
+                  <SheetHeader className="text-left pb-3 border-b">
+                    <div className="flex items-center justify-between">
+                      <SheetTitle className="text-base font-bold">Bộ lọc tác phẩm</SheetTitle>
+                      {activeWorksFilterCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleResetWorksFilters}
+                          className="text-xs h-7 text-destructive px-2">
+                          Đặt lại
+                        </Button>
+                      )}
+                    </div>
+                    <SheetDescription className="text-xs text-muted-foreground">
+                      Lọc danh sách theo hợp phần, giai đoạn và tiến độ thực tế
+                    </SheetDescription>
+                  </SheetHeader>
+
+                  <div className="space-y-4 py-4">
+                    {/* Hợp phần */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Hợp phần</Label>
+                      <Select
+                        value={worksComponentFilter}
+                        onValueChange={setWorksComponentFilter}>
+                        <SelectTrigger className="w-full h-10 bg-background">
+                          <SelectValue placeholder="Tất cả hợp phần" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả hợp phần</SelectItem>
+                          {componentsList.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Giai đoạn */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Giai đoạn</Label>
+                      <Select
+                        value={worksStageFilter}
+                        onValueChange={setWorksStageFilter}>
+                        <SelectTrigger className="w-full h-10 bg-background">
+                          <SelectValue placeholder="Tất cả giai đoạn" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả giai đoạn</SelectItem>
+                          {worksStages.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {formatStageDisplay(s)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Tiến độ */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Tiến độ tác phẩm</Label>
+                      <Select
+                        value={worksProgressFilter}
+                        onValueChange={(v) =>
+                          setWorksProgressFilter(v as WorksProgressFilter)
+                        }>
+                        <SelectTrigger className="w-full h-10 bg-background">
+                          <SelectValue placeholder="Tất cả tiến độ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả tiến độ</SelectItem>
+                          <SelectItem value="signed_contract">Ký hợp đồng</SelectItem>
+                          <SelectItem value="progress_check">Kiểm tra tiến độ</SelectItem>
+                          <SelectItem value="expert_review">Thẩm định cấp chuyên gia</SelectItem>
+                          <SelectItem value="project_acceptance">Nghiệm thu cấp Dự án</SelectItem>
+                          <SelectItem value="settlement">Quyết toán</SelectItem>
+                          <SelectItem value="proofreading_completed">Hiệu đính (hoàn thành)</SelectItem>
+                          <SelectItem value="editing_completed">Biên tập (hoàn thành)</SelectItem>
+                          <SelectItem value="design_completed">Thiết kế (hoàn thành)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Bộ cột */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Bộ cột hiển thị</Label>
+                      <ToggleGroup
+                        type="single"
+                        value={(() => {
+                          const allFalse =
+                            !tcColumnVis.contractNumber &&
+                            !tcColumnVis.translators &&
+                            !tcColumnVis.overviewValue &&
+                            !tcColumnVis.translationValue &&
+                            !tcColumnVis.contractValue &&
+                            !tcColumnVis.settlementValue &&
+                            !tcColumnVis.outstanding;
+                          const allTrue =
+                            tcColumnVis.contractNumber &&
+                            tcColumnVis.translators &&
+                            tcColumnVis.overviewValue &&
+                            tcColumnVis.translationValue &&
+                            tcColumnVis.contractValue &&
+                            tcColumnVis.settlementValue &&
+                            tcColumnVis.outstanding;
+                          if (allFalse) return "basic";
+                          if (allTrue) return "finance";
+                          return "estimate";
+                        })()}
+                        onValueChange={(v) => {
+                          if (!v) return;
+                          if (v === "basic") {
+                            setTcColumnVis({
+                              contractNumber: false,
+                              translators: false,
+                              overviewValue: false,
+                              translationValue: false,
+                              contractValue: false,
+                              settlementValue: false,
+                              outstanding: false,
+                            });
+                          } else if (v === "finance") {
+                            setTcColumnVis({
+                              contractNumber: true,
+                              translators: true,
+                              overviewValue: true,
+                              translationValue: true,
+                              contractValue: true,
+                              settlementValue: true,
+                              outstanding: true,
+                            });
+                          } else if (v === "estimate") {
+                            setTcColumnVis({
+                              contractNumber: false,
+                              translators: false,
+                              overviewValue: false,
+                              translationValue: false,
+                              contractValue: false,
+                              settlementValue: false,
+                              outstanding: false,
+                            });
+                          }
+                        }}
+                        className="border rounded-md bg-background w-full justify-start p-0.5">
+                        <ToggleGroupItem value="basic" className="flex-1 text-xs h-8">Cơ bản</ToggleGroupItem>
+                        <ToggleGroupItem value="finance" className="flex-1 text-xs h-8">Tài chính</ToggleGroupItem>
+                        <ToggleGroupItem value="estimate" className="flex-1 text-xs h-8">Ước tính</ToggleGroupItem>
+                      </ToggleGroup>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t">
+                    <Button className="w-full h-10 font-semibold" onClick={() => setMobileWorksFilterOpen(false)}>
+                      Xem kết quả ({filteredWorks.length} tác phẩm)
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>Cột hợp đồng</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuCheckboxItem
-                      checked={tcColumnVis.contractNumber}
-                      onCheckedChange={(v) =>
-                        setTcColumnVis((s) => ({ ...s, contractNumber: !!v }))
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              {/* DESKTOP ACTION & FILTER BAR */}
+              <div className="hidden sm:flex flex-col gap-4">
+                <div className="flex flex-row gap-4 justify-between items-center">
+                  <div className="flex items-center gap-2 w-auto">
+                    <div className="relative w-64">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Tìm tác phẩm..."
+                        className="pl-9 bg-background"
+                        value={worksSearch}
+                        onChange={(e) => setWorksSearch(e.target.value)}
+                      />
+                    </div>
+                    <Badge variant="secondary">
+                      {filteredWorks.length} tác phẩm
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <ToggleGroup
+                      type="single"
+                      value={worksViewMode}
+                      onValueChange={(v) =>
+                        v && setWorksViewMode(v as any)
+                      }
+                      className="border rounded-md bg-background">
+                      <ToggleGroupItem value="compact" aria-label="Gọn" title="Chế độ gọn (Monday)">
+                        <Rows3 className="h-4 w-4 mr-1.5" />
+                        Gọn
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="card" aria-label="Thẻ" title="Chế độ thẻ">
+                        <LayoutGrid className="h-4 w-4 mr-1.5" />
+                        Thẻ
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="table" aria-label="Bảng" title="Chế độ bảng">
+                        <Table2 className="h-4 w-4 mr-1.5" />
+                        Bảng
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    {selectedWorkIds.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setBulkDeleteWorksOpen(true)}>
+                        Xóa đã chọn ({selectedWorkIds.length})
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setWorksImportOpen(true)}>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Import Excel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        void handleExportWorks(filteredWorks, toast)
                       }>
-                      Số hợp đồng
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={tcColumnVis.translators}
-                      onCheckedChange={(v) =>
-                        setTcColumnVis((s) => ({ ...s, translators: !!v }))
+                      <FileText className="w-4 h-4 mr-2" />
+                      Xuất Excel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setWorkDialog({ open: true, work: null })}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Thêm tác phẩm
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Filters Row */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+                    <Filter className="w-3.5 h-3.5" />
+                    <span className="text-xs font-medium">Lọc:</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Hợp phần
+                    </Label>
+                    <Select
+                      value={worksComponentFilter}
+                      onValueChange={setWorksComponentFilter}>
+                      <SelectTrigger className="w-[180px] h-9 bg-background">
+                        <SelectValue placeholder="Tất cả hợp phần" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả hợp phần</SelectItem>
+                        {componentsList.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Giai đoạn
+                    </Label>
+                    <Select
+                      value={worksStageFilter}
+                      onValueChange={setWorksStageFilter}>
+                      <SelectTrigger className="w-[140px] h-9 bg-background">
+                        <SelectValue placeholder="Tất cả giai đoạn" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả giai đoạn</SelectItem>
+                        {worksStages.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {formatStageDisplay(s)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Tiến độ tác phẩm
+                    </Label>
+                    <Select
+                      value={worksProgressFilter}
+                      onValueChange={(v) =>
+                        setWorksProgressFilter(v as WorksProgressFilter)
                       }>
-                      Dịch giả
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuLabel>Cột tài chính</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuCheckboxItem
-                      checked={tcColumnVis.overviewValue}
-                      onCheckedChange={(v) =>
-                        setTcColumnVis((s) => ({ ...s, overviewValue: !!v }))
-                      }>
-                      Kinh phí tổng quan
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={tcColumnVis.translationValue}
-                      onCheckedChange={(v) =>
-                        setTcColumnVis((s) => ({ ...s, translationValue: !!v }))
-                      }>
-                      Kinh phí dịch thuật
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={tcColumnVis.contractValue}
-                      onCheckedChange={(v) =>
-                        setTcColumnVis((s) => ({ ...s, contractValue: !!v }))
-                      }>
-                      Giá trị HĐ
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={tcColumnVis.settlementValue}
-                      onCheckedChange={(v) =>
-                        setTcColumnVis((s) => ({ ...s, settlementValue: !!v }))
-                      }>
-                      Giá trị quyết toán
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={tcColumnVis.outstanding}
-                      onCheckedChange={(v) =>
-                        setTcColumnVis((s) => ({ ...s, outstanding: !!v }))
-                      }>
-                      Công nợ
-                    </DropdownMenuCheckboxItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <SelectTrigger className="w-[220px] h-9 bg-background">
+                        <SelectValue placeholder="Tất cả tiến độ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="signed_contract">
+                          Ký hợp đồng
+                        </SelectItem>
+                        <SelectItem value="progress_check">
+                          Kiểm tra tiến độ
+                        </SelectItem>
+                        <SelectItem value="expert_review">
+                          Thẩm định cấp chuyên gia
+                        </SelectItem>
+                        <SelectItem value="project_acceptance">
+                          Nghiệm thu cấp Dự án
+                        </SelectItem>
+                        <SelectItem value="settlement">Quyết toán</SelectItem>
+                        <SelectItem value="proofreading_completed">
+                          Hiệu đính (hoàn thành)
+                        </SelectItem>
+                        <SelectItem value="editing_completed">
+                          Biên tập (hoàn thành)
+                        </SelectItem>
+                        <SelectItem value="design_completed">
+                          Thiết kế (hoàn thành)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Bộ cột
+                    </Label>
+                    <ToggleGroup
+                      type="single"
+                      value={(() => {
+                        const allFalse =
+                          !tcColumnVis.contractNumber &&
+                          !tcColumnVis.translators &&
+                          !tcColumnVis.overviewValue &&
+                          !tcColumnVis.translationValue &&
+                          !tcColumnVis.contractValue &&
+                          !tcColumnVis.settlementValue &&
+                          !tcColumnVis.outstanding;
+                        const allTrue =
+                          tcColumnVis.contractNumber &&
+                          tcColumnVis.translators &&
+                          tcColumnVis.overviewValue &&
+                          tcColumnVis.translationValue &&
+                          tcColumnVis.contractValue &&
+                          tcColumnVis.settlementValue &&
+                          tcColumnVis.outstanding;
+                        if (allFalse) return "basic";
+                        if (allTrue) return "finance";
+                        return "estimate";
+                      })()}
+                      onValueChange={(v) => {
+                        if (!v) return;
+                        if (v === "basic") {
+                          setTcColumnVis({
+                            contractNumber: false,
+                            translators: false,
+                            overviewValue: false,
+                            translationValue: false,
+                            contractValue: false,
+                            settlementValue: false,
+                            outstanding: false,
+                          });
+                        } else if (v === "finance") {
+                          setTcColumnVis({
+                            contractNumber: true,
+                            translators: true,
+                            overviewValue: true,
+                            translationValue: true,
+                            contractValue: true,
+                            settlementValue: true,
+                            outstanding: true,
+                          });
+                        } else if (v === "estimate") {
+                          setTcColumnVis({
+                            contractNumber: false,
+                            translators: false,
+                            overviewValue: false,
+                            translationValue: false,
+                            contractValue: false,
+                            settlementValue: false,
+                            outstanding: false,
+                          });
+                        }
+                      }}
+                      className="border rounded-md bg-background h-9">
+                      <ToggleGroupItem
+                        value="basic"
+                        aria-label="Cơ bản"
+                        className="text-xs h-8 px-3">
+                        Cơ bản
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="finance"
+                        aria-label="Tài chính"
+                        className="text-xs h-8 px-3">
+                        Tài chính
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="estimate"
+                        aria-label="Ước tính"
+                        className="text-xs h-8 px-3">
+                        Ước tính
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                  <div className="flex-1" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="shrink-0">
+                        Hiển thị cột
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>Cột hợp đồng</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuCheckboxItem
+                        checked={tcColumnVis.contractNumber}
+                        onCheckedChange={(v) =>
+                          setTcColumnVis((s) => ({ ...s, contractNumber: !!v }))
+                        }>
+                        Số hợp đồng
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={tcColumnVis.translators}
+                        onCheckedChange={(v) =>
+                          setTcColumnVis((s) => ({ ...s, translators: !!v }))
+                        }>
+                        Dịch giả
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuLabel>Cột tài chính</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuCheckboxItem
+                        checked={tcColumnVis.overviewValue}
+                        onCheckedChange={(v) =>
+                          setTcColumnVis((s) => ({ ...s, overviewValue: !!v }))
+                        }>
+                        Kinh phí tổng quan
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={tcColumnVis.translationValue}
+                        onCheckedChange={(v) =>
+                          setTcColumnVis((s) => ({ ...s, translationValue: !!v }))
+                        }>
+                        Kinh phí dịch thuật
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={tcColumnVis.contractValue}
+                        onCheckedChange={(v) =>
+                          setTcColumnVis((s) => ({ ...s, contractValue: !!v }))
+                        }>
+                        Giá trị HĐ
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={tcColumnVis.settlementValue}
+                        onCheckedChange={(v) =>
+                          setTcColumnVis((s) => ({ ...s, settlementValue: !!v }))
+                        }>
+                        Giá trị quyết toán
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={tcColumnVis.outstanding}
+                        onCheckedChange={(v) =>
+                          setTcColumnVis((s) => ({ ...s, outstanding: !!v }))
+                        }>
+                        Công nợ
+                      </DropdownMenuCheckboxItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </div>
             {worksLoading ? (
@@ -3406,9 +3154,13 @@ export default function ThuKyHopPhanPage() {
             ) : (
               <>
                 {worksViewMode === "table" ? (
-                  <Table
-                    className="border-collapse"
-                    containerClassName="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
+                  <div className="w-full overflow-x-auto scrollbar-thin">
+                    <div className="sm:hidden px-4 py-2 bg-muted/40 border-b text-xs text-muted-foreground flex items-center gap-1.5">
+                      <span>👉</span> <span>Vuốt ngang bảng để xem tất cả {worksTableColSpan} cột chi tiết</span>
+                    </div>
+                    <Table
+                      className="border-collapse min-w-[1250px]"
+                      containerClassName="relative w-full overflow-auto max-h-[calc(100vh-300px)]">
                     <TableHeader className="sticky top-0 z-20">
                       <TableRow className="border-b transition-colors hover:bg-muted/50 bg-muted/95 backdrop-blur-sm">
                         <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] min-w-[80px] sticky left-0 z-30 bg-muted/95 backdrop-blur-sm border-r border-border/50 shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
@@ -3727,6 +3479,113 @@ export default function ThuKyHopPhanPage() {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
+                ) : worksViewMode === "compact" ? (
+                  <div className="p-3 sm:p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {paginatedWorks.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-8 col-span-full">
+                        Chưa có tác phẩm nào.
+                      </div>
+                    ) : (
+                      paginatedWorks.map((w) => {
+                        const stepProps = getPipelineStepperPropsForWork(w, workPipelineCtx);
+                        const completedCount = [
+                          stepProps.tcSigned,
+                          stepProps.hasProgressCheck,
+                          stepProps.hasExpertReview,
+                          stepProps.hasProjectAcceptance,
+                          stepProps.hasSettlement,
+                          stepProps.proofreadingCompleted,
+                          stepProps.editingCompleted,
+                          stepProps.designCompleted,
+                        ].filter(Boolean).length;
+                        const progressPercent = Math.round((completedCount / 8) * 100);
+
+                        const stepLabels = [
+                          "Ký hợp đồng",
+                          "Kiểm tra tiến độ",
+                          "Thẩm định chuyên gia",
+                          "Nghiệm thu dự án",
+                          "Quyết toán",
+                          "Hiệu đính xong",
+                          "Biên tập xong",
+                          "Thiết kế xong",
+                        ];
+                        const currentStepName = completedCount === 8
+                          ? "Hoàn thành 8/8"
+                          : `B${completedCount + 1}: ${stepLabels[completedCount] || "Chưa bắt đầu"}`;
+
+                        return (
+                          <div
+                            key={w.id}
+                            className="group relative border border-border/70 rounded-xl p-3 sm:p-3.5 bg-card hover:bg-muted/40 hover:border-primary/40 transition-all flex flex-col gap-2.5 cursor-pointer shadow-xs active:scale-[0.99]"
+                            onClick={() => setWorkDialog({ open: true, work: w })}
+                            role="button"
+                            tabIndex={0}>
+                            {/* Row 1: Stage Badge + Component + Document Code */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] sm:text-xs font-semibold bg-primary/10 text-primary border-primary/25 px-2 py-0.5">
+                                  {formatStageDisplay(w.stage)}
+                                </Badge>
+                                <span className="text-[11px] text-muted-foreground truncate max-w-[130px]">
+                                  {getComponentName(w.componentId)}
+                                </span>
+                              </div>
+                              {w.documentCode && (
+                                <span className="font-mono text-[10px] sm:text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded shrink-0">
+                                  {w.documentCode}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Row 2: Title (VI & Hannom) */}
+                            <div className="min-w-0">
+                              <div className="font-semibold text-sm text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                                {w.titleVi ?? "—"}
+                              </div>
+                              {w.titleHannom && (
+                                <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5 font-serif">
+                                  {w.titleHannom}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Row 3: Pipeline 8 Progress Bar (Monday.com Slim Stepper) */}
+                            <div className="space-y-1.5 pt-0.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-muted-foreground font-medium flex items-center gap-1.5 truncate">
+                                  <span className={`inline-block w-2 h-2 rounded-full ${completedCount === 8 ? "bg-status-success" : completedCount > 0 ? "bg-status-info" : "bg-muted-foreground/40"}`} />
+                                  <span className="truncate">{currentStepName}</span>
+                                </span>
+                                <span className="font-bold text-primary shrink-0 ml-2">{completedCount}/8 ({progressPercent}%)</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-muted/80 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-300 ${completedCount === 8 ? "bg-status-success" : "bg-primary"}`}
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Row 4: Key stats (Word/Page count + Translator) */}
+                            <div className="flex items-center justify-between text-xs pt-2 border-t border-border/50 text-muted-foreground gap-2">
+                              <div className="flex items-center gap-1.5 text-[11px] font-medium shrink-0">
+                                <span>{formatNumberAccounting(w.baseWordCount)} chữ</span>
+                                <span>•</span>
+                                <span>{formatNumberAccounting(w.basePageCount)} trang</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-[11px] text-foreground font-medium truncate max-w-[140px]">
+                                <span className="truncate">{getWorkTranslators(w.id) || "Chưa phân công"}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 ) : (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {paginatedWorks.length === 0 ? (
@@ -5984,2849 +5843,5 @@ export default function ThuKyHopPhanPage() {
       {/* Works Import Dialog */}
       <WorksImport open={worksImportOpen} onOpenChange={setWorksImportOpen} />
     </div>
-  );
-}
-
-// --- Contract stages (giai đoạn hợp đồng) subsection ---
-async function fetchStages(
-  translationContractId: string | null,
-  proofreadingContractId: string | null,
-): Promise<ContractStage[]> {
-  if (translationContractId) {
-    const res = await fetch(
-      buildUrl(api.contractStages.listByTranslationContract.path, {
-        contractId: translationContractId,
-      }),
-      { credentials: "include" },
-    );
-    if (!res.ok) return [];
-    return res.json();
-  }
-  if (proofreadingContractId) {
-    const res = await fetch(
-      buildUrl(api.contractStages.listByProofreadingContract.path, {
-        contractId: proofreadingContractId,
-      }),
-      { credentials: "include" },
-    );
-    if (!res.ok) return [];
-    return res.json();
-  }
-  return [];
-}
-
-function ContractStagesSection({
-  translationContractId = null,
-  proofreadingContractId = null,
-  queryClient,
-  readOnly = false,
-}: {
-  translationContractId?: string | null;
-  proofreadingContractId?: string | null;
-  queryClient: ReturnType<typeof useQueryClient>;
-  readOnly?: boolean;
-}) {
-  const { toast } = useToast();
-  const contractId = translationContractId ?? proofreadingContractId ?? "";
-  const { data: stages = [], isLoading } = useQuery({
-    queryKey: ["contract-stages", contractId],
-    queryFn: () =>
-      fetchStages(
-        translationContractId ?? null,
-        proofreadingContractId ?? null,
-      ),
-    enabled: !!contractId,
-    retry: false,
-  });
-
-  const [adding, setAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    stageCode: "",
-    stageOrder: "1",
-    startDate: "",
-    endDate: "",
-    actualCompletionDate: "",
-    note: "",
-  });
-
-  const resetForm = () => {
-    setForm({
-      stageCode: "",
-      stageOrder: "1",
-      startDate: "",
-      endDate: "",
-      actualCompletionDate: "",
-      note: "",
-    });
-    setAdding(false);
-    setEditingId(null);
-  };
-
-  const createMutation = useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
-      const body = {
-        ...data,
-        translationContractId: translationContractId || null,
-        proofreadingContractId: proofreadingContractId || null,
-      };
-      const res = await fetch(api.contractStages.create.path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error("Thêm giai đoạn thất bại");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["contract-stages", contractId],
-      });
-      resetForm();
-      toast({ title: "Đã thêm giai đoạn" });
-    },
-    onError: (e) =>
-      toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: Record<string, unknown>;
-    }) => {
-      const res = await fetch(
-        buildUrl(api.contractStages.update.path, { id }),
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(data),
-        },
-      );
-      if (!res.ok) throw new Error("Cập nhật thất bại");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["contract-stages", contractId],
-      });
-      resetForm();
-      toast({ title: "Đã cập nhật giai đoạn" });
-    },
-    onError: (e) =>
-      toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(
-        buildUrl(api.contractStages.delete.path, { id }),
-        { method: "DELETE", credentials: "include" },
-      );
-      if (!res.ok) throw new Error("Xóa thất bại");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["contract-stages", contractId],
-      });
-      toast({ title: "Đã xóa giai đoạn" });
-    },
-    onError: (e) =>
-      toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
-  });
-
-  const fillForm = (s: ContractStage) => {
-    setForm({
-      stageCode: parseStageNumber(s.stageCode),
-      stageOrder: String(s.stageOrder ?? 1),
-      startDate: s.startDate ? (s.startDate as string).slice(0, 10) : "",
-      endDate: s.endDate ? (s.endDate as string).slice(0, 10) : "",
-      actualCompletionDate: s.actualCompletionDate
-        ? (s.actualCompletionDate as string).slice(0, 10)
-        : "",
-      note: s.note ?? "",
-    });
-    setEditingId(s.id);
-  };
-
-  const handleAddSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const code =
-      (form.stageCode && String(form.stageCode).replace(/\D/g, "")) || null;
-    createMutation.mutate({
-      stageCode: code ?? "",
-      stageOrder: form.stageOrder ? parseInt(form.stageOrder, 10) : 1,
-      startDate: form.startDate || null,
-      endDate: form.endDate || null,
-      actualCompletionDate: form.actualCompletionDate || null,
-      note: form.note || null,
-    });
-  };
-
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingId) return;
-    const code =
-      (form.stageCode && String(form.stageCode).replace(/\D/g, "")) || null;
-    updateMutation.mutate({
-      id: editingId,
-      data: {
-        stageCode: code ?? "",
-        stageOrder: form.stageOrder ? parseInt(form.stageOrder, 10) : 1,
-        startDate: form.startDate || null,
-        endDate: form.endDate || null,
-        actualCompletionDate: form.actualCompletionDate || null,
-        note: form.note || null,
-      },
-    });
-  };
-
-  return (
-    <div className="space-y-2 rounded-md border p-3 bg-muted/30">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">Giai đoạn hợp đồng</Label>
-        {!readOnly && !adding && !editingId && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setAdding(true)}>
-            <Plus className="w-4 h-4 mr-1" />
-            Thêm giai đoạn
-          </Button>
-        )}
-      </div>
-      {isLoading ? (
-        <div className="flex items-center gap-2 py-2 text-muted-foreground text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" /> Đang tải...
-        </div>
-      ) : (
-        <>
-          {stages.length > 0 && (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mã GĐ</TableHead>
-                    <TableHead className="w-16">Thứ tự</TableHead>
-                    <TableHead>Bắt đầu</TableHead>
-                    <TableHead>Kết thúc</TableHead>
-                    <TableHead>HT thực tế</TableHead>
-                    <TableHead className="max-w-[100px]">Ghi chú</TableHead>
-                    <TableHead className="w-[80px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stages.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-medium">
-                        {formatStageDisplay(s.stageCode)}
-                      </TableCell>
-                      <TableCell>{s.stageOrder ?? "—"}</TableCell>
-                      <TableCell>
-                        {formatDateDDMMYYYY(s.startDate) || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {formatDateDDMMYYYY(s.endDate) || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {formatDateDDMMYYYY(s.actualCompletionDate) || "—"}
-                      </TableCell>
-                      <TableCell
-                        className="max-w-[100px] truncate"
-                        title={s.note ?? undefined}>
-                        {s.note ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        {readOnly || editingId === s.id ? null : (
-                          <>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => fillForm(s)}>
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => deleteMutation.mutate(s.id)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          {!readOnly && (adding || editingId) && (
-            <form
-              onSubmit={editingId ? handleEditSubmit : handleAddSubmit}
-              className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t">
-              <Input
-                type="number"
-                min={1}
-                placeholder="1, 2, 3..."
-                value={form.stageCode}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    stageCode: e.target.value.replace(/\D/g, ""),
-                  }))
-                }
-              />
-              <Input
-                type="number"
-                placeholder="Thứ tự"
-                value={form.stageOrder}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, stageOrder: e.target.value }))
-                }
-              />
-              <DateInput
-                value={form.startDate || null}
-                onChange={(v) => setForm((f) => ({ ...f, startDate: v || "" }))}
-                placeholder="Bắt đầu"
-              />
-              <DateInput
-                value={form.endDate || null}
-                onChange={(v) => setForm((f) => ({ ...f, endDate: v || "" }))}
-                placeholder="Kết thúc"
-              />
-              <DateInput
-                value={form.actualCompletionDate || null}
-                onChange={(v) =>
-                  setForm((f) => ({ ...f, actualCompletionDate: v || "" }))
-                }
-                placeholder="HT thực tế"
-                className="sm:col-span-2"
-              />
-              <Input
-                placeholder="Ghi chú"
-                value={form.note}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, note: e.target.value }))
-                }
-                className="sm:col-span-2"
-              />
-              <div className="col-span-2 flex gap-2">
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={
-                    createMutation.isPending || updateMutation.isPending
-                  }>
-                  {editingId ? "Cập nhật" : "Thêm"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={resetForm}>
-                  Hủy
-                </Button>
-              </div>
-            </form>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-// --- Payments (chi tiền: tạm ứng/quyết toán) subsection ---
-async function fetchPaymentsByTcId(contractId: string): Promise<Payment[]> {
-  const res = await fetch(
-    buildUrl(api.payments.listByTranslationContract.path, { id: contractId }),
-    { credentials: "include" },
-  );
-  if (!res.ok) return [];
-  return res.json() as Promise<Payment[]>;
-}
-
-async function fetchPaymentsByPcId(contractId: string): Promise<Payment[]> {
-  const res = await fetch(
-    buildUrl(api.payments.listByProofreadingContract.path, { id: contractId }),
-    { credentials: "include" },
-  );
-  if (!res.ok) return [];
-  return res.json() as Promise<Payment[]>;
-}
-
-function PaymentsSection({
-  translationContractId,
-  proofreadingContractId,
-  contractValue,
-  translationValue,
-  settlementValue,
-  queryClient,
-  readOnly = false,
-}: {
-  translationContractId?: string;
-  proofreadingContractId?: string;
-  contractValue: number | null;
-  translationValue: number | null;
-  settlementValue: number | null;
-  queryClient: ReturnType<typeof useQueryClient>;
-  readOnly?: boolean;
-}) {
-  const { toast } = useToast();
-  const isPc = !!proofreadingContractId;
-  const contractId = isPc
-    ? (proofreadingContractId as string)
-    : (translationContractId as string);
-  const { data: payments = [], isLoading } = useQuery<Payment[]>({
-    queryKey: ["payments", contractId],
-    queryFn: () =>
-      isPc ? fetchPaymentsByPcId(contractId) : fetchPaymentsByTcId(contractId),
-    enabled: !!contractId,
-  });
-  const { data: summary } = useQuery({
-    queryKey: ["finance-summary", contractId],
-    queryFn: () =>
-      isPc
-        ? fetchFinanceSummaryPc(contractId)
-        : fetchFinanceSummary(contractId),
-    enabled: !!contractId,
-    staleTime: 60_000,
-  });
-  const [expandedPaymentIds, setExpandedPaymentIds] = useState<Set<string>>(
-    new Set(),
-  );
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(
-        `${isPc ? "pc" : "tc"}PaymentDetails:${contractId}`,
-      );
-      if (raw) {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr)) setExpandedPaymentIds(new Set(arr));
-      }
-    } catch {}
-  }, [contractId, isPc]);
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        `${isPc ? "pc" : "tc"}PaymentDetails:${contractId}`,
-        JSON.stringify(Array.from(expandedPaymentIds)),
-      );
-    } catch {}
-  }, [expandedPaymentIds, contractId, isPc]);
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({
-    paymentType: "advance",
-    voucherNo: "",
-    paymentDate: "",
-    amount: "",
-    note: "",
-  });
-  const [advanceIncludeOverview, setAdvanceIncludeOverview] = useState(true);
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(
-        `${isPc ? "pc" : "tc"}AdvanceIncludeOverview:${contractId}`,
-      );
-      if (raw) setAdvanceIncludeOverview(!!JSON.parse(raw));
-    } catch {}
-  }, [contractId, isPc]);
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        `${isPc ? "pc" : "tc"}AdvanceIncludeOverview:${contractId}`,
-        JSON.stringify(advanceIncludeOverview),
-      );
-    } catch {}
-  }, [advanceIncludeOverview, contractId, isPc]);
-  const [advanceRate, setAdvanceRate] = useState<string>("");
-  const computedAdvanceAmount = useMemo(() => {
-    if (form.paymentType !== "advance") return null;
-    const r = advanceRate.trim() === "" ? NaN : parseFloat(advanceRate) / 100;
-    const base = isPc
-      ? (contractValue ?? null)
-      : advanceIncludeOverview
-        ? (contractValue ?? null)
-        : (translationValue ?? null);
-    if (Number.isNaN(r) || base == null) return null;
-    return base * r;
-  }, [
-    form.paymentType,
-    advanceRate,
-    advanceIncludeOverview,
-    contractValue,
-    translationValue,
-    isPc,
-  ]);
-  const computedSettlementAmount = useMemo(() => {
-    if (form.paymentType !== "settlement") return null;
-    const adv = summary?.totalAdvance ?? null;
-    if (isPc) {
-      const base = contractValue ?? null;
-      if (base == null || adv == null) return null;
-      return Math.max(base - adv, 0);
-    } else {
-      const sv = settlementValue ?? null;
-      if (sv == null || adv == null) return null;
-      return Math.max(sv - adv, 0);
-    }
-  }, [
-    form.paymentType,
-    settlementValue,
-    summary?.totalAdvance,
-    contractValue,
-    isPc,
-  ]);
-  const settlementClamped = useMemo(() => {
-    if (form.paymentType !== "settlement") return false;
-    const adv = summary?.totalAdvance ?? null;
-    if (isPc) {
-      const base = contractValue ?? null;
-      if (base == null || adv == null) return false;
-      return adv > base;
-    } else {
-      const sv = settlementValue ?? null;
-      if (sv == null || adv == null) return false;
-      return adv > sv;
-    }
-  }, [
-    form.paymentType,
-    settlementValue,
-    summary?.totalAdvance,
-    contractValue,
-    isPc,
-  ]);
-  const formAmountNumber = useMemo(() => {
-    if (form.paymentType === "advance") return computedAdvanceAmount ?? null;
-    if (form.paymentType === "settlement")
-      return computedSettlementAmount ?? null;
-    const v = form.amount.trim() === "" ? NaN : parseFloat(form.amount);
-    return Number.isNaN(v) ? null : v;
-  }, [
-    form.paymentType,
-    form.amount,
-    computedAdvanceAmount,
-    computedSettlementAmount,
-  ]);
-  const formMgmtFee = useMemo(() => {
-    if (formAmountNumber == null) return null;
-    return formAmountNumber * 0.05;
-  }, [formAmountNumber]);
-  const formPit = useMemo(() => {
-    if (formAmountNumber == null) return null;
-    const m = formAmountNumber * 0.05;
-    return (formAmountNumber - m) * 0.1;
-  }, [formAmountNumber]);
-  const formNet = useMemo(() => {
-    if (formAmountNumber == null) return null;
-    const m = formAmountNumber * 0.05;
-    const t = (formAmountNumber - m) * 0.1;
-    return formAmountNumber - m - t;
-  }, [formAmountNumber]);
-  const reset = () => {
-    setForm({
-      paymentType: "advance",
-      voucherNo: "",
-      paymentDate: "",
-      amount: "",
-      note: "",
-    });
-    setAdvanceRate("");
-    setAdding(false);
-  };
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const amountStr =
-        form.paymentType === "advance" && computedAdvanceAmount != null
-          ? String(computedAdvanceAmount)
-          : form.paymentType === "settlement" &&
-              computedSettlementAmount != null
-            ? String(computedSettlementAmount)
-            : form.amount
-              ? String(Number(form.amount))
-              : null;
-      const body = {
-        contractId: contractId ?? null,
-        paymentType: form.paymentType || null,
-        voucherNo: form.voucherNo || null,
-        paymentDate: form.paymentDate || null,
-        amount: amountStr,
-        note: form.note || null,
-      };
-      const res = await fetch(api.payments.create.path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error("Thêm chi tiền thất bại");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["payments", contractId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["finance-summary", contractId],
-      });
-      reset();
-      toast({ title: "Đã thêm chi tiền" });
-    },
-    onError: (e) =>
-      toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
-  });
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(buildUrl(api.payments.delete.path, { id }), {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Xóa thất bại");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["payments", contractId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["finance-summary", contractId],
-      });
-      toast({ title: "Đã xóa chi tiền" });
-    },
-    onError: (e) =>
-      toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
-  });
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({
-    voucherNo: "",
-    paymentDate: "",
-    amount: "",
-    note: "",
-  });
-  const updateMutation = useMutation({
-    mutationFn: async () => {
-      if (!editingId) throw new Error("Không có khoản để cập nhật");
-      const body = {
-        voucherNo: editForm.voucherNo || null,
-        paymentDate: editForm.paymentDate || null,
-        amount: editForm.amount ? String(Number(editForm.amount)) : undefined,
-        note: editForm.note || null,
-      };
-      const res = await fetch(
-        buildUrl(api.payments.update.path, { id: editingId }),
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(body),
-        },
-      );
-      if (!res.ok) throw new Error("Cập nhật chi tiền thất bại");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["payments", contractId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["finance-summary", contractId],
-      });
-      setEditingId(null);
-      toast({ title: "Đã cập nhật chi tiền" });
-    },
-    onError: (e) =>
-      toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
-  });
-  return (
-    <div className="space-y-2 rounded-md border p-3 bg-muted/30">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">
-          Thanh toán (tạm ứng/quyết toán)
-        </Label>
-        <div className="flex items-center gap-3">
-          {!isPc && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={advanceIncludeOverview}
-                onCheckedChange={(checked) =>
-                  setAdvanceIncludeOverview(!!checked)
-                }
-                disabled={readOnly}
-              />
-              <span className="text-sm">Tạm ứng bao gồm bài tổng quan</span>
-            </div>
-          )}
-          {!readOnly && !adding && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setAdding(true)}>
-              <Plus className="w-4 h-4 mr-1" />
-              Thêm chi tiền
-            </Button>
-          )}
-        </div>
-      </div>
-      {summary && (
-        <div className="text-sm text-muted-foreground">
-          Tổng đã chi:{" "}
-          <span className="font-medium">
-            {formatNumberAccounting(summary.totalPaid)}
-          </span>{" "}
-          • Tạm ứng:{" "}
-          <span className="font-medium">
-            {formatNumberAccounting(summary.totalAdvance)}
-          </span>{" "}
-          • Công nợ:{" "}
-          <span className="font-medium">
-            {formatNumberAccounting(summary.outstanding)}
-          </span>
-        </div>
-      )}
-      {isLoading ? (
-        <div className="flex items-center gap-2 py-2 text-muted-foreground text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" /> Đang tải...
-        </div>
-      ) : (
-        <>
-          {payments.length > 0 && (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Loại</TableHead>
-                    <TableHead>Số chứng từ</TableHead>
-                    <TableHead>Ngày</TableHead>
-                    <TableHead className="text-right">Số tiền</TableHead>
-                    <TableHead className="max-w-[100px]">Ghi chú</TableHead>
-                    {!readOnly && <TableHead className="w-[80px]"></TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payments.map((p) => (
-                    <Fragment key={p.id}>
-                      <TableRow key={p.id}>
-                        <TableCell>{p.paymentType ?? "—"}</TableCell>
-                        <TableCell>{p.voucherNo ?? "—"}</TableCell>
-                        <TableCell>
-                          {formatDateDDMMYYYY(p.paymentDate) || "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div>{formatNumberAccounting(p.amount)}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {numberToVietnameseWords(String(p.amount))}
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="px-0 underline text-primary"
-                            onClick={() =>
-                              setExpandedPaymentIds((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(p.id)) next.delete(p.id);
-                                else next.add(p.id);
-                                return next;
-                              })
-                            }>
-                            {expandedPaymentIds.has(p.id)
-                              ? "Ẩn chi tiết"
-                              : "Chi tiết"}
-                          </Button>
-                          {expandedPaymentIds.has(p.id) && (
-                            <div className="mt-1 p-1 border rounded bg-muted/10 space-y-0.5">
-                              <div className="text-xs">
-                                Phí quản lý:{" "}
-                                <span className="font-medium">
-                                  {formatNumberAccounting(
-                                    Number(p.amount) * 0.05,
-                                  )}
-                                </span>{" "}
-                                (5%)
-                              </div>
-                              <div className="text-xs">
-                                Thuế TNCN:{" "}
-                                <span className="font-medium">
-                                  {formatNumberAccounting(
-                                    (Number(p.amount) -
-                                      Number(p.amount) * 0.05) *
-                                      0.1,
-                                  )}
-                                </span>{" "}
-                                (10% sau khi trừ phí quản lý)
-                              </div>
-                              <div className="text-xs">
-                                Giá trị thực nhận:{" "}
-                                <span className="font-medium">
-                                  {formatNumberAccounting(
-                                    Number(p.amount) -
-                                      Number(p.amount) * 0.05 -
-                                      (Number(p.amount) -
-                                        Number(p.amount) * 0.05) *
-                                        0.1,
-                                  )}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell
-                          className="max-w-[240px] truncate"
-                          title={p.note ?? undefined}>
-                          {p.note ?? "—"}
-                        </TableCell>
-                        {!readOnly && (
-                          <TableCell>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => {
-                                setEditingId(p.id);
-                                setEditForm({
-                                  voucherNo: p.voucherNo ?? "",
-                                  paymentDate: p.paymentDate
-                                    ? typeof p.paymentDate === "string"
-                                      ? p.paymentDate
-                                      : (p.paymentDate as Date)
-                                          .toISOString()
-                                          .slice(0, 10)
-                                    : "",
-                                  amount:
-                                    (p.paymentType || "").toLowerCase() ===
-                                    "other"
-                                      ? String(p.amount ?? "")
-                                      : "",
-                                  note: p.note ?? "",
-                                });
-                              }}>
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => deleteMutation.mutate(p.id)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                      {editingId === p.id && (
-                        <TableRow>
-                          <TableCell colSpan={6}>
-                            <div
-                              className="mt-2 p-2 border rounded bg-muted/10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                }
-                              }}>
-                              <div className="grid gap-1">
-                                <Label>Số chứng từ</Label>
-                                <Input
-                                  value={editForm.voucherNo}
-                                  onChange={(e) =>
-                                    setEditForm((f) => ({
-                                      ...f,
-                                      voucherNo: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="VD: PT-001"
-                                />
-                              </div>
-                              <div className="grid gap-1">
-                                <Label>Ngày</Label>
-                                <DateInput
-                                  value={editForm.paymentDate || null}
-                                  onChange={(v) =>
-                                    setEditForm((f) => ({
-                                      ...f,
-                                      paymentDate: v || "",
-                                    }))
-                                  }
-                                />
-                              </div>
-                              <div className="grid gap-1">
-                                <Label>Số tiền</Label>
-                                <NumberInput
-                                  value={
-                                    (p.paymentType || "").toLowerCase() ===
-                                    "other"
-                                      ? editForm.amount
-                                      : String(p.amount)
-                                  }
-                                  onChange={(v) =>
-                                    (p.paymentType || "").toLowerCase() ===
-                                    "other"
-                                      ? setEditForm((f) => ({
-                                          ...f,
-                                          amount: v,
-                                        }))
-                                      : undefined
-                                  }
-                                  decimals={2}
-                                  showFormatted={true}
-                                  placeholder="0"
-                                  className={
-                                    (p.paymentType || "").toLowerCase() ===
-                                    "other"
-                                      ? undefined
-                                      : "bg-muted"
-                                  }
-                                  readOnly={
-                                    (p.paymentType || "").toLowerCase() !==
-                                    "other"
-                                  }
-                                />
-                              </div>
-                              <div className="grid gap-1">
-                                <Label>Ghi chú</Label>
-                                <Input
-                                  value={editForm.note}
-                                  onChange={(e) =>
-                                    setEditForm((f) => ({
-                                      ...f,
-                                      note: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Ghi chú"
-                                />
-                              </div>
-                              <div className="flex items-center gap-2 mt-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={updateMutation.isPending}
-                                  onClick={() => updateMutation.mutate()}>
-                                  {updateMutation.isPending && (
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  )}
-                                  Cập nhật
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setEditingId(null)}>
-                                  Hủy
-                                </Button>
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          {adding && !readOnly && (
-            <div
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end mt-2"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }
-              }}>
-              <div className="grid gap-1">
-                <Label>Loại</Label>
-                <Select
-                  value={form.paymentType}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, paymentType: v }))
-                  }>
-                  <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="Chọn" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="advance">advance</SelectItem>
-                    <SelectItem value="settlement">settlement</SelectItem>
-                    <SelectItem value="other">other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {form.paymentType === "advance" && (
-                <div className="grid gap-1">
-                  <Label>Tỷ lệ tạm ứng (%)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={advanceRate}
-                    onChange={(e) => setAdvanceRate(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-              )}
-              <div className="grid gap-1">
-                <Label>Số chứng từ</Label>
-                <Input
-                  value={form.voucherNo}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, voucherNo: e.target.value }))
-                  }
-                  placeholder="VD: PT-001"
-                />
-              </div>
-              <div className="grid gap-1">
-                <Label>Ngày</Label>
-                <DateInput
-                  value={form.paymentDate || null}
-                  onChange={(v) =>
-                    setForm((f) => ({ ...f, paymentDate: v || "" }))
-                  }
-                />
-              </div>
-              <div className="grid gap-1">
-                <Label>Số tiền</Label>
-                <NumberInput
-                  value={
-                    form.paymentType === "advance"
-                      ? computedAdvanceAmount != null
-                        ? String(computedAdvanceAmount)
-                        : ""
-                      : form.paymentType === "settlement"
-                        ? computedSettlementAmount != null
-                          ? String(computedSettlementAmount)
-                          : ""
-                        : form.amount
-                  }
-                  onChange={(v) =>
-                    form.paymentType === "advance"
-                      ? undefined
-                      : form.paymentType === "settlement"
-                        ? undefined
-                        : setForm((f) => ({ ...f, amount: v }))
-                  }
-                  decimals={2}
-                  showFormatted={true}
-                  placeholder="0"
-                  className={
-                    form.paymentType === "advance" ||
-                    form.paymentType === "settlement"
-                      ? "bg-muted"
-                      : undefined
-                  }
-                  readOnly={
-                    form.paymentType === "advance" ||
-                    form.paymentType === "settlement"
-                  }
-                />
-                {form.paymentType === "settlement" && settlementClamped && (
-                  <p className="text-xs text-destructive mt-1">
-                    Tổng tạm ứng vượt Giá trị quyết toán; số tiền quyết toán
-                    được đưa về 0.
-                  </p>
-                )}
-                {formAmountNumber != null && (
-                  <>
-                    <p className="text-xs text-muted-foreground">
-                      {numberToVietnameseWords(String(formAmountNumber))}
-                    </p>
-                    <div className="mt-1 p-2 border rounded bg-muted/10 space-y-1">
-                      <div className="text-xs">
-                        Phí quản lý:{" "}
-                        <span className="font-medium">
-                          {formatNumberAccounting(formMgmtFee ?? 0)}
-                        </span>{" "}
-                        (5%)
-                      </div>
-                      <div className="text-xs">
-                        Thuế TNCN:{" "}
-                        <span className="font-medium">
-                          {formatNumberAccounting(formPit ?? 0)}
-                        </span>{" "}
-                        (10% sau khi trừ phí quản lý)
-                      </div>
-                      <div className="text-xs">
-                        Giá trị thực nhận:{" "}
-                        <span className="font-medium">
-                          {formatNumberAccounting(formNet ?? 0)}
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="grid gap-1">
-                <Label>Ghi chú</Label>
-                <Input
-                  value={form.note}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, note: e.target.value }))
-                  }
-                  placeholder="Ghi chú"
-                />
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={createMutation.isPending}
-                  onClick={() => createMutation.mutate()}>
-                  {createMutation.isPending && (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  )}
-                  Thêm
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={reset}>
-                  Hủy
-                </Button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-function WorkForm({
-  work,
-  componentsList,
-  onSubmit,
-  onDelete,
-  isPending,
-  isDeleting,
-}: {
-  work: Work | null;
-  componentsList: Component[];
-  onSubmit: (data: Record<string, unknown>) => void;
-  onDelete?: () => void;
-  isPending: boolean;
-  isDeleting?: boolean;
-}) {
-  const [componentId, setComponentId] = useState(work?.componentId ?? "");
-  const [titleVi, setTitleVi] = useState(work?.titleVi ?? "");
-  const [titleHannom, setTitleHannom] = useState(work?.titleHannom ?? "");
-  const [stage, setStage] = useState(() => parseStageNumber(work?.stage));
-  const [documentCode, setDocumentCode] = useState(work?.documentCode ?? "");
-  const [baseWordCount, setBaseWordCount] = useState(
-    work?.baseWordCount != null ? String(work.baseWordCount) : "",
-  );
-  const [basePageCount, setBasePageCount] = useState(
-    work?.basePageCount != null ? String(work.basePageCount) : "",
-  );
-  const [estimateFactor, setEstimateFactor] = useState(
-    work?.estimateFactor != null ? String(work.estimateFactor) : "",
-  );
-  const [estimateWordCount, setEstimateWordCount] = useState(
-    work?.estimateWordCount != null ? String(work.estimateWordCount) : "",
-  );
-  const [estimatePageCount, setEstimatePageCount] = useState(
-    work?.estimatePageCount != null ? String(work.estimatePageCount) : "",
-  );
-  const [note, setNote] = useState(work?.note ?? "");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({
-      componentId: componentId || null,
-      titleVi: titleVi || null,
-      titleHannom: titleHannom || null,
-      stage: (stage && String(stage).replace(/\D/g, "")) || null,
-      documentCode: documentCode || null,
-      baseWordCount: baseWordCount ? parseInt(baseWordCount, 10) : null,
-      basePageCount: basePageCount ? parseInt(basePageCount, 10) : null,
-      estimateFactor:
-        estimateFactor != null && estimateFactor !== ""
-          ? String(estimateFactor)
-          : null,
-      estimateWordCount: estimateWordCount
-        ? parseInt(estimateWordCount, 10)
-        : null,
-      estimatePageCount: estimatePageCount
-        ? parseInt(estimatePageCount, 10)
-        : null,
-      note: note || null,
-    });
-  };
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-      <div className="grid gap-2">
-        <Label>Hợp phần</Label>
-        <select
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={componentId}
-          onChange={(e) => setComponentId(e.target.value)}>
-          <option value="">— Chọn hợp phần —</option>
-          {componentsList.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="grid gap-2">
-          <Label>Tiêu đề (tiếng Việt)</Label>
-          <Input
-            value={titleVi}
-            onChange={(e) => setTitleVi(e.target.value)}
-            placeholder="VD: Phật tạng toàn dịch"
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>Tiêu đề Hán Nôm</Label>
-          <Input
-            value={titleHannom}
-            onChange={(e) => setTitleHannom(e.target.value)}
-            placeholder="Hán Nôm"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="grid gap-2">
-          <Label>Giai đoạn</Label>
-          <Input
-            type="number"
-            min={1}
-            value={stage}
-            onChange={(e) => setStage(e.target.value.replace(/\D/g, ""))}
-            placeholder="1, 2, 3..."
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>Mã tài liệu</Label>
-          <Input
-            value={documentCode}
-            onChange={(e) => setDocumentCode(e.target.value)}
-            placeholder="Mã tài liệu"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="grid gap-2">
-          <Label>Số chữ gốc</Label>
-          <NumberInput
-            value={baseWordCount}
-            onChange={(v) => {
-              setBaseWordCount(v);
-              const n = v ? parseInt(v, 10) : NaN;
-              setBasePageCount(!isNaN(n) ? String(charsToPages(n)) : "");
-              const f = estimateFactor ? parseFloat(estimateFactor) : NaN;
-              if (!isNaN(n) && !isNaN(f)) {
-                setEstimateWordCount(String(Math.round(n * f)));
-                setEstimatePageCount(String(charsToPages(Math.round(n * f))));
-              }
-            }}
-            decimals={0}
-            placeholder="0"
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>
-            Số trang gốc{" "}
-            <span className="text-muted-foreground font-normal">
-              (350 chữ/trang)
-            </span>
-          </Label>
-          <NumberInput
-            value={basePageCount}
-            onChange={setBasePageCount}
-            decimals={0}
-            placeholder="0"
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>Hệ số ước tính</Label>
-          <Input
-            type="number"
-            step="0.0001"
-            value={estimateFactor}
-            onChange={(e) => {
-              const v = e.target.value;
-              setEstimateFactor(v);
-              const base = baseWordCount ? parseInt(baseWordCount, 10) : NaN;
-              const f = v ? parseFloat(v) : NaN;
-              if (!isNaN(base) && !isNaN(f)) {
-                const est = Math.round(base * f);
-                setEstimateWordCount(String(est));
-                setEstimatePageCount(String(charsToPages(est)));
-              }
-            }}
-            placeholder="0"
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>
-            Số chữ ước tính{" "}
-            <span className="text-muted-foreground font-normal">
-              (số chữ gốc × hệ số)
-            </span>
-          </Label>
-          <NumberInput
-            value={estimateWordCount}
-            onChange={(v) => {
-              setEstimateWordCount(v);
-              const n = v ? parseInt(v, 10) : NaN;
-              setEstimatePageCount(!isNaN(n) ? String(charsToPages(n)) : "");
-            }}
-            decimals={0}
-            placeholder="0"
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>
-            Số trang ước tính{" "}
-            <span className="text-muted-foreground font-normal">
-              (350 chữ/trang)
-            </span>
-          </Label>
-          <NumberInput
-            value={estimatePageCount}
-            onChange={setEstimatePageCount}
-            decimals={0}
-            placeholder="0"
-          />
-        </div>
-      </div>
-      <div className="grid gap-2">
-        <Label>Ghi chú</Label>
-        <Input
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Ghi chú"
-        />
-      </div>
-      <DialogFooter className="flex justify-between">
-        {work && onDelete && (
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onDelete}
-            disabled={isPending || isDeleting}>
-            {isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            <Trash2 className="w-4 h-4 mr-2" />
-            Xóa
-          </Button>
-        )}
-        <Button
-          type="submit"
-          disabled={isPending || isDeleting}
-          className={work && onDelete ? "ml-auto" : ""}>
-          {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          {work ? "Cập nhật" : "Thêm"}
-        </Button>
-      </DialogFooter>
-    </form>
-  );
-}
-
-function TranslationContractForm({
-  contract,
-  works,
-  tasks,
-  proofreadingContracts,
-  translationContracts,
-  componentsList,
-  queryClient,
-  onSubmit,
-  isPending,
-  readOnly = false,
-}: {
-  contract: TranslationContract | null;
-  works: Work[];
-  tasks: TaskWithAssignmentDetails[];
-  proofreadingContracts: ProofreadingContract[];
-  translationContracts: TranslationContract[];
-  componentsList: Component[];
-  queryClient: ReturnType<typeof useQueryClient>;
-  onSubmit: (data: Record<string, unknown>) => void;
-  isPending: boolean;
-  readOnly?: boolean;
-}) {
-  const [contractNumber, setContractNumber] = useState(
-    contract?.contractNumber ?? "",
-  );
-  const [componentId, setComponentId] = useState(contract?.componentId ?? "");
-  const [workId, setWorkId] = useState(contract?.workId ?? "");
-  const [unitPrice, setUnitPrice] = useState(
-    contract?.unitPrice != null ? String(contract.unitPrice) : "",
-  );
-  const [overviewValue, setOverviewValue] = useState(
-    contract?.overviewValue != null ? String(contract.overviewValue) : "",
-  );
-  const [translationValue, setTranslationValue] = useState(
-    contract?.translationValue != null ? String(contract.translationValue) : "",
-  );
-  const [contractValue, setContractValue] = useState(
-    contract?.contractValue != null ? String(contract.contractValue) : "",
-  );
-  const [startDate, setStartDate] = useState(
-    contract?.startDate ? (contract.startDate as string).slice(0, 10) : "",
-  );
-  const [endDate, setEndDate] = useState(
-    contract?.endDate ? (contract.endDate as string).slice(0, 10) : "",
-  );
-  const [extensionStartDate, setExtensionStartDate] = useState(
-    contract?.extensionStartDate
-      ? (contract.extensionStartDate as string).slice(0, 10)
-      : "",
-  );
-  const [extensionEndDate, setExtensionEndDate] = useState(
-    contract?.extensionEndDate
-      ? (contract.extensionEndDate as string).slice(0, 10)
-      : "",
-  );
-  const [actualCompletionDate, setActualCompletionDate] = useState(
-    contract?.actualCompletionDate
-      ? (contract.actualCompletionDate as string).slice(0, 10)
-      : "",
-  );
-  const [actualWordCount, setActualWordCount] = useState(
-    contract?.actualWordCount != null ? String(contract.actualWordCount) : "",
-  );
-  const [actualPageCount, setActualPageCount] = useState(
-    contract?.actualPageCount != null ? String(contract.actualPageCount) : "",
-  );
-  const [completionRate, setCompletionRate] = useState(
-    contract?.completionRate != null
-      ? String(Number(contract.completionRate) * 100)
-      : "",
-  );
-  const [settlementValue, setSettlementValue] = useState(
-    contract?.settlementValue != null ? String(contract.settlementValue) : "",
-  );
-  const [advanceRate, setAdvanceRate] = useState<string>("");
-  const [advanceIncludeOverview, setAdvanceIncludeOverview] = useState(true);
-  useEffect(() => {
-    try {
-      const rawRate = window.localStorage.getItem("tcAdvanceRate");
-      if (rawRate != null) setAdvanceRate(rawRate);
-      const rawInc = window.localStorage.getItem("tcAdvanceIncludeOverview");
-      if (rawInc) {
-        const parsed = JSON.parse(rawInc);
-        setAdvanceIncludeOverview(!!parsed);
-      }
-    } catch {}
-  }, []);
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("tcAdvanceRate", advanceRate);
-      window.localStorage.setItem(
-        "tcAdvanceIncludeOverview",
-        JSON.stringify(advanceIncludeOverview),
-      );
-    } catch {}
-  }, [advanceRate, advanceIncludeOverview]);
-  const [note, setNote] = useState(contract?.note ?? "");
-  const [status, setStatus] = useState(contract?.status ?? "Active");
-  const [lastManualStatus, setLastManualStatus] = useState(
-    contract?.status && contract.status !== "Completed"
-      ? contract.status
-      : "Active",
-  );
-  const [translatorUsers, setTranslatorUsers] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [translatorPickerName, setTranslatorPickerName] = useState("");
-  const [translatorPickerUserId, setTranslatorPickerUserId] = useState<
-    string | null
-  >(null);
-
-  const { data: users = [] } = useUsers();
-  const duplicateTranslationContract = useMemo(() => {
-    const normalizedNumber = normalizeSearch(contractNumber.trim());
-    if (!componentId || !workId || !normalizedNumber) return null;
-    return (
-      translationContracts.find((c) => {
-        if (contract?.id && c.id === contract.id) return false;
-        if (c.componentId !== componentId) return false;
-        if (c.workId !== workId) return false;
-        const number = normalizeSearch(String(c.contractNumber ?? ""));
-        return number === normalizedNumber;
-      }) ?? null
-    );
-  }, [componentId, workId, contractNumber, translationContracts, contract?.id]);
-
-  // Load translation contract members when editing
-  const { data: contractMembers = [] } = useQuery({
-    queryKey: ["translation-contract-members", contract?.id],
-    queryFn: async () => {
-      if (!contract?.id) return [];
-      const res = await fetch(
-        buildUrl(api.translationContractMembers.listByContract.path, {
-          contractId: contract.id,
-        }),
-        { credentials: "include" },
-      );
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!contract?.id,
-  });
-
-  useEffect(() => {
-    if (!contract?.id) return;
-
-    if (contractMembers.length === 0) {
-      setTranslatorUsers([]);
-      return;
-    }
-    const mapped = contractMembers
-      .map((member: { userId?: string | null }) => {
-        if (!member?.userId) return null;
-        const user = users.find((u) => u.id === member.userId);
-        return {
-          id: member.userId,
-          name: user?.displayName ?? member.userId,
-        };
-      })
-      .filter(Boolean) as Array<{ id: string; name: string }>;
-    const unique = Array.from(new Map(mapped.map((u) => [u.id, u])).values());
-    setTranslatorUsers(unique);
-  }, [contract?.id, contractMembers, users]);
-
-  const handleAddTranslator = (name: string, id: string | null) => {
-    if (!id) {
-      setTranslatorPickerName("");
-      setTranslatorPickerUserId(null);
-      return;
-    }
-    setTranslatorUsers((prev) =>
-      prev.some((u) => u.id === id)
-        ? prev
-        : [...prev, { id, name: name || id }],
-    );
-    setTranslatorPickerName("");
-    setTranslatorPickerUserId(null);
-  };
-
-  const handleRemoveTranslator = (id: string) => {
-    setTranslatorUsers((prev) => prev.filter((u) => u.id !== id));
-  };
-  const [cancelledAt, setCancelledAt] = useState(
-    contract?.cancelledAt ? (contract.cancelledAt as string).slice(0, 10) : "",
-  );
-  const [progressCheckDate, setProgressCheckDate] = useState(
-    contract?.progressCheckDate
-      ? (contract.progressCheckDate as string).slice(0, 10)
-      : "",
-  );
-  const [expertReviewDate, setExpertReviewDate] = useState(
-    contract?.expertReviewDate
-      ? (contract.expertReviewDate as string).slice(0, 10)
-      : "",
-  );
-  const [projectAcceptanceDate, setProjectAcceptanceDate] = useState(
-    contract?.projectAcceptanceDate
-      ? (contract.projectAcceptanceDate as string).slice(0, 10)
-      : "",
-  );
-  const [proofreadingInProgress, setProofreadingInProgress] = useState(
-    !!contract?.proofreadingInProgress,
-  );
-  const [editingInProgress, setEditingInProgress] = useState(
-    !!contract?.editingInProgress,
-  );
-  const [printTransferDate, setPrintTransferDate] = useState(
-    contract?.printTransferDate
-      ? (contract.printTransferDate as string).slice(0, 10)
-      : "",
-  );
-  const [publishedDate, setPublishedDate] = useState(
-    contract?.publishedDate
-      ? (contract.publishedDate as string).slice(0, 10)
-      : "",
-  );
-  useEffect(() => {
-    if (actualCompletionDate.trim() !== "") {
-      if (status !== "Completed") setStatus("Completed");
-      return;
-    }
-    if (status === "Completed") {
-      setStatus(lastManualStatus);
-    }
-  }, [actualCompletionDate, lastManualStatus, status]);
-  const contractDateError = useMemo(() => {
-    const start = parseDateOnly(startDate);
-    const end = parseDateOnly(endDate);
-    const actual = parseDateOnly(actualCompletionDate);
-    if (start && end && end.getTime() < start.getTime()) {
-      return "Ngày kết thúc hợp đồng không được nhỏ hơn ngày bắt đầu.";
-    }
-    if (start && actual && actual.getTime() < start.getTime()) {
-      return "Ngày hoàn thành thực tế không được nhỏ hơn ngày bắt đầu.";
-    }
-    return null;
-  }, [startDate, endDate, actualCompletionDate]);
-  const today = () => new Date().toISOString().slice(0, 10);
-  const autoEditingCompletedDate = useMemo(() => {
-    if (!workId) return "";
-    const bienTapTasks = tasks.filter(
-      (t) => t.group === "Biên tập" && t.relatedWorkId === workId,
-    );
-    const completedDates = bienTapTasks
-      .filter((t) => {
-        const wf = t.workflow;
-        let roundType = "";
-        if (typeof wf === "string") {
-          try {
-            const parsed = JSON.parse(wf) as {
-              rounds?: Array<{ roundType?: string | null }>;
-            };
-            roundType = parsed?.rounds?.[0]?.roundType ?? "";
-          } catch {
-            roundType = "";
-          }
-        } else if (typeof wf === "object" && wf) {
-          const parsed = wf as {
-            rounds?: Array<{ roundType?: string | null }>;
-          };
-          roundType = parsed?.rounds?.[0]?.roundType ?? "";
-        }
-        return roundType?.toLowerCase().includes("bông chuyển in");
-      })
-      .map((t) => {
-        const v = t.actualCompletedAt;
-        if (!v) return "";
-        const date = typeof v === "string" ? new Date(v) : v;
-        if (!date || Number.isNaN(date.getTime())) return "";
-        return date.toISOString().slice(0, 10);
-      })
-      .filter(Boolean);
-    if (completedDates.length === 0) return "";
-    return completedDates.sort().slice(-1)[0];
-  }, [tasks, workId]);
-
-  const autoProofreadingCompletedDate = useMemo(() => {
-    if (!contract?.id && !workId) return "";
-    const matches = proofreadingContracts.filter((c) =>
-      contract?.id
-        ? c.translationContractId === contract.id
-        : c.workId === workId,
-    );
-    const dates = matches
-      .map((c) => c.actualCompletionDate)
-      .map((v) => {
-        if (!v) return "";
-        const date = typeof v === "string" ? new Date(v) : v;
-        if (!date || Number.isNaN(date.getTime())) return "";
-        return date.toISOString().slice(0, 10);
-      })
-      .filter(Boolean);
-    if (dates.length === 0) return "";
-    return dates.sort().slice(-1)[0];
-  }, [proofreadingContracts, contract?.id, workId]);
-
-  // Kinh phí dịch thuật = đơn giá × số trang dự tính
-  useEffect(() => {
-    const selectedWork = works.find((w) => w.id === workId);
-    const estimatePageCount =
-      selectedWork?.estimatePageCount != null
-        ? Number(selectedWork.estimatePageCount)
-        : 0;
-    const price = unitPrice.trim() === "" ? NaN : parseFloat(unitPrice);
-    if (Number.isNaN(price) || estimatePageCount === 0) {
-      setTranslationValue("");
-      return;
-    }
-    setTranslationValue((estimatePageCount * price).toFixed(2));
-  }, [workId, unitPrice, works]);
-
-  // Giá trị hợp đồng = Kinh phí dịch thuật + Kinh phí viết bài tổng quan
-  useEffect(() => {
-    if (translationValue.trim() === "" && overviewValue.trim() === "") {
-      setContractValue("");
-      return;
-    }
-    const trans =
-      translationValue.trim() === "" ? 0 : parseFloat(translationValue);
-    const over = overviewValue.trim() === "" ? 0 : parseFloat(overviewValue);
-    const total =
-      (Number.isNaN(trans) ? 0 : trans) + (Number.isNaN(over) ? 0 : over);
-    setContractValue(total.toFixed(2));
-  }, [translationValue, overviewValue]);
-
-  // Khi bản dịch đã hoàn thành (có ngày hoàn thành thực tế): tự tính Tỷ lệ hoàn thành và Giá trị quyết toán
-  // Tỷ lệ hoàn thành = actual_page_count / estimate_page_count (works) * 100%
-  // Giá trị quyết toán = (actual_page_count * unit_price) + overview_value
-  useEffect(() => {
-    if (actualCompletionDate.trim() === "") return;
-    const selectedWork = works.find((w) => w.id === workId);
-    const estimatePageCount =
-      selectedWork?.estimatePageCount != null
-        ? Number(selectedWork.estimatePageCount)
-        : 0;
-    const actualPages =
-      actualPageCount.trim() === "" ? NaN : parseInt(actualPageCount, 10);
-    const price = unitPrice.trim() === "" ? NaN : parseFloat(unitPrice);
-    const over = overviewValue.trim() === "" ? 0 : parseFloat(overviewValue);
-    if (Number.isNaN(actualPages)) return;
-    if (estimatePageCount > 0) {
-      const rate = (actualPages / estimatePageCount) * 100;
-      setCompletionRate(rate.toFixed(2));
-    }
-    if (!Number.isNaN(price)) {
-      const settlement = actualPages * price + (Number.isNaN(over) ? 0 : over);
-      setSettlementValue(settlement.toFixed(2));
-    }
-  }, [
-    actualCompletionDate,
-    actualPageCount,
-    workId,
-    unitPrice,
-    overviewValue,
-    works,
-  ]);
-  const contractMgmtFee = useMemo(() => {
-    const v = contractValue.trim() === "" ? NaN : parseFloat(contractValue);
-    if (Number.isNaN(v)) return null;
-    return v * 0.05;
-  }, [contractValue]);
-  const contractPit = useMemo(() => {
-    const v = contractValue.trim() === "" ? NaN : parseFloat(contractValue);
-    if (Number.isNaN(v)) return null;
-    const m = v * 0.05;
-    return (v - m) * 0.1;
-  }, [contractValue]);
-  const contractNet = useMemo(() => {
-    const v = contractValue.trim() === "" ? NaN : parseFloat(contractValue);
-    if (Number.isNaN(v)) return null;
-    const m = v * 0.05;
-    const t = (v - m) * 0.1;
-    return v - m - t;
-  }, [contractValue]);
-  const settlementMgmtFee = useMemo(() => {
-    const v = settlementValue.trim() === "" ? NaN : parseFloat(settlementValue);
-    if (Number.isNaN(v)) return null;
-    return v * 0.05;
-  }, [settlementValue]);
-  const settlementPit = useMemo(() => {
-    const v = settlementValue.trim() === "" ? NaN : parseFloat(settlementValue);
-    if (Number.isNaN(v)) return null;
-    const m = v * 0.05;
-    return (v - m) * 0.1;
-  }, [settlementValue]);
-  const settlementNet = useMemo(() => {
-    const v = settlementValue.trim() === "" ? NaN : parseFloat(settlementValue);
-    if (Number.isNaN(v)) return null;
-    const m = v * 0.05;
-    const t = (v - m) * 0.1;
-    return v - m - t;
-  }, [settlementValue]);
-  const computedAdvance = useMemo(() => {
-    const rateStr = advanceRate.trim();
-    const r = rateStr === "" ? NaN : parseFloat(rateStr) / 100;
-    const base = advanceIncludeOverview
-      ? contractValue.trim() === ""
-        ? NaN
-        : parseFloat(contractValue)
-      : translationValue.trim() === ""
-        ? NaN
-        : parseFloat(translationValue);
-    if (Number.isNaN(r) || Number.isNaN(base)) return null;
-    return base * r;
-  }, [advanceRate, advanceIncludeOverview, contractValue, translationValue]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (readOnly) return;
-    const computedStatus =
-      actualCompletionDate.trim() !== "" ? "Completed" : status;
-    if (duplicateTranslationContract) return;
-    if (contractDateError) return;
-
-    // Gửi số dưới dạng chuỗi để API/Zod (drizzle-zod numeric) không báo 400
-    const num = (v: string | null) =>
-      v != null && v !== "" ? String(Number(v)) : null;
-
-    // Gọi onSubmit với data hợp đồng
-    // translatorUserIds đã được xử lý trong TranslatorPicker
-    onSubmit({
-      contractNumber: contractNumber || null,
-      componentId: componentId || null,
-      workId: workId || null,
-      unitPrice: unitPrice ? num(unitPrice) : null,
-      overviewValue: overviewValue ? num(overviewValue) : null,
-      translationValue: translationValue ? num(translationValue) : null,
-      contractValue: contractValue ? num(contractValue) : null,
-      startDate: startDate || null,
-      endDate: endDate || null,
-      extensionStartDate: extensionStartDate || null,
-      extensionEndDate: extensionEndDate || null,
-      actualCompletionDate: actualCompletionDate || null,
-      actualWordCount: actualWordCount ? parseInt(actualWordCount, 10) : null,
-      actualPageCount: actualPageCount ? parseInt(actualPageCount, 10) : null,
-      completionRate: completionRate
-        ? num(String(Number(completionRate) / 100))
-        : null,
-      settlementValue: settlementValue ? num(settlementValue) : null,
-      status: computedStatus || null,
-      cancelledAt: computedStatus === "Cancel" ? cancelledAt || null : null,
-      progressCheckDate: progressCheckDate || null,
-      expertReviewDate: expertReviewDate || null,
-      projectAcceptanceDate: projectAcceptanceDate || null,
-      proofreadingInProgress,
-      proofreadingCompleted: !!autoProofreadingCompletedDate,
-      editingInProgress,
-      editingCompleted: !!autoEditingCompletedDate,
-      printTransferDate: printTransferDate || null,
-      publishedDate: publishedDate || null,
-      note: note || null,
-      _translatorUserIds: translatorUsers.map((u) => u.id), // Dùng prefix _ để không gửi vào API translation contract
-    });
-  };
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-6 overflow-y-auto pr-2 flex-1 min-h-0 max-h-[80vh]">
-      {/* Thông tin cơ bản */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">
-          Thông tin cơ bản
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-          <div className="grid gap-2">
-            <Label>Số hợp đồng</Label>
-            <Input
-              value={contractNumber}
-              onChange={(e) => setContractNumber(e.target.value)}
-              placeholder="Số HĐ"
-              disabled={readOnly}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Hợp phần</Label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={componentId}
-              onChange={(e) => setComponentId(e.target.value)}
-              disabled={readOnly}>
-              <option value="">— Chọn hợp phần —</option>
-              {componentsList.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <WorkPicker
-            label="Tác phẩm"
-            works={works}
-            components={componentsList}
-            value={workId || null}
-            onChange={(id) => setWorkId(id ?? "")}
-            disabled={readOnly}
-            placeholder="Tìm theo tiêu đề, mã tài liệu, hợp phần, giai đoạn..."
-            componentFilterId={componentId || null}
-            className="self-start"
-          />
-          <div className="grid gap-2">
-            <TranslatorPicker
-              label="Dịch giả"
-              value={translatorPickerName}
-              userId={translatorPickerUserId}
-              onChange={handleAddTranslator}
-              disabled={readOnly}
-              placeholder="Tìm theo tên hoặc email..."
-              className="self-start"
-            />
-            {translatorUsers.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {translatorUsers.map((u) => (
-                  <Badge
-                    key={u.id}
-                    variant="secondary"
-                    className="flex items-center gap-1">
-                    <span className="truncate max-w-[160px]">{u.name}</span>
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTranslator(u.id)}
-                        className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                        aria-label="Xóa">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </Badge>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Chưa chọn dịch giả.
-              </p>
-            )}
-          </div>
-        </div>
-        {!readOnly && duplicateTranslationContract && (
-          <Alert variant="destructive">
-            <AlertTitle>Trùng hợp đồng dịch thuật</AlertTitle>
-            <AlertDescription>
-              Tác phẩm đã có hợp đồng với số HĐ này trong cùng hợp phần. Vui
-              lòng kiểm tra lại số hợp đồng hoặc tác phẩm.
-            </AlertDescription>
-          </Alert>
-        )}
-        {!readOnly && contractDateError && (
-          <Alert variant="destructive">
-            <AlertTitle>Ngày hợp đồng không hợp lệ</AlertTitle>
-            <AlertDescription>{contractDateError}</AlertDescription>
-          </Alert>
-        )}
-      </div>
-
-      {/* Giá trị hợp đồng */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">
-          Giá trị hợp đồng
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
-          <div className="grid gap-2">
-            <Label>Đơn giá (VNĐ/trang)</Label>
-            <NumberInput
-              value={unitPrice}
-              onChange={setUnitPrice}
-              decimals={2}
-              showFormatted={true}
-              placeholder="0"
-              disabled={readOnly}
-            />
-            {unitPrice.trim() !== "" &&
-              !Number.isNaN(parseFloat(unitPrice)) && (
-                <p className="text-xs text-muted-foreground">
-                  {numberToVietnameseWords(unitPrice)}
-                </p>
-              )}
-          </div>
-          <div className="grid gap-2">
-            <Label>Kinh phí viết bài tổng quan (VNĐ)</Label>
-            <NumberInput
-              value={overviewValue}
-              onChange={setOverviewValue}
-              decimals={2}
-              showFormatted={true}
-              placeholder="0"
-              disabled={readOnly}
-            />
-            {overviewValue.trim() !== "" &&
-              !Number.isNaN(parseFloat(overviewValue)) && (
-                <p className="text-xs text-muted-foreground">
-                  {numberToVietnameseWords(overviewValue)}
-                </p>
-              )}
-          </div>
-          <div className="grid gap-2">
-            <Label>
-              Kinh phí dịch thuật (VNĐ){" "}
-              <span className="text-muted-foreground font-normal text-xs">
-                (đơn giá × số trang dự tính)
-              </span>
-            </Label>
-            <NumberInput
-              value={translationValue}
-              onChange={setTranslationValue}
-              decimals={2}
-              showFormatted={true}
-              placeholder="0"
-              className="bg-muted"
-              readOnly
-              disabled={readOnly}
-            />
-            {translationValue.trim() !== "" &&
-              !Number.isNaN(parseFloat(translationValue)) && (
-                <p className="text-xs text-muted-foreground">
-                  {numberToVietnameseWords(translationValue)}
-                </p>
-              )}
-          </div>
-          <div className="grid gap-2">
-            <Label>
-              Giá trị hợp đồng (VNĐ){" "}
-              <span className="text-muted-foreground font-normal text-xs">
-                (kinh phí dịch thuật + kinh phí tổng quan)
-              </span>
-            </Label>
-            <NumberInput
-              value={contractValue}
-              onChange={setContractValue}
-              decimals={2}
-              showFormatted={true}
-              placeholder="0"
-              className="bg-muted"
-              readOnly
-              disabled={readOnly}
-            />
-            {contractValue.trim() !== "" &&
-              !Number.isNaN(parseFloat(contractValue)) && (
-                <p className="text-xs text-muted-foreground">
-                  {numberToVietnameseWords(contractValue)}
-                </p>
-              )}
-          </div>
-        </div>
-        <div className="p-3 border rounded-md bg-muted/10 space-y-1">
-          <div className="text-xs text-muted-foreground">
-            Các khoản khấu trừ áp dụng cho Giá trị HĐ:
-          </div>
-          <div className="text-xs">
-            Phí quản lý:{" "}
-            <span className="font-medium">
-              {contractMgmtFee != null
-                ? formatNumberAccounting(contractMgmtFee)
-                : "—"}
-            </span>{" "}
-            (5%)
-          </div>
-          <div className="text-xs">
-            Thuế TNCN:{" "}
-            <span className="font-medium">
-              {contractPit != null ? formatNumberAccounting(contractPit) : "—"}
-            </span>{" "}
-            (10% sau khi trừ phí quản lý)
-          </div>
-          <div className="text-xs">
-            Giá trị thực nhận:{" "}
-            <span className="font-medium">
-              {contractNet != null ? formatNumberAccounting(contractNet) : "—"}
-            </span>
-          </div>
-          <div className="h-px my-1 bg-muted" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
-            <div className="grid gap-1">
-              <Label>Tỷ lệ tạm ứng (%)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={advanceRate}
-                onChange={(e) => setAdvanceRate(e.target.value)}
-                placeholder="0"
-                disabled={readOnly}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={advanceIncludeOverview}
-                onCheckedChange={(checked) =>
-                  setAdvanceIncludeOverview(!!checked)
-                }
-                disabled={readOnly}
-              />
-              <span className="text-sm">Bao gồm bài tổng quan</span>
-            </div>
-            <div className="sm:col-span-2 text-xs">
-              Giá trị tạm ứng ước tính:{" "}
-              <span className="font-medium">
-                {computedAdvance != null
-                  ? formatNumberAccounting(computedAdvance)
-                  : "—"}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Thời gian */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">Thời gian</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-          <div className="grid gap-2">
-            <Label>Ngày bắt đầu</Label>
-            <DateInput
-              value={startDate || null}
-              onChange={(v) => setStartDate(v || "")}
-              disabled={readOnly}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Ngày kết thúc</Label>
-            <DateInput
-              value={endDate || null}
-              onChange={(v) => setEndDate(v || "")}
-              disabled={readOnly}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Hoàn thành thực tế</Label>
-            <DateInput
-              value={actualCompletionDate || null}
-              onChange={(v) => setActualCompletionDate(v || "")}
-              disabled={readOnly}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Gia hạn từ</Label>
-            <DateInput
-              value={extensionStartDate || null}
-              onChange={(v) => setExtensionStartDate(v || "")}
-              disabled={readOnly}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Gia hạn đến</Label>
-            <DateInput
-              value={extensionEndDate || null}
-              onChange={(v) => setExtensionEndDate(v || "")}
-              disabled={readOnly}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Thực tế và quyết toán */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">
-          Thực tế và quyết toán
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
-          <div className="grid gap-2">
-            <Label>Số chữ thực tế</Label>
-            <NumberInput
-              value={actualWordCount}
-              onChange={(v) => {
-                setActualWordCount(v);
-                const n = v ? parseInt(v, 10) : NaN;
-                setActualPageCount(!isNaN(n) ? String(charsToPages(n)) : "");
-              }}
-              decimals={0}
-              placeholder="0"
-              disabled={readOnly}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>
-              Số trang thực tế{" "}
-              <span className="text-muted-foreground font-normal text-xs">
-                (350 chữ/trang)
-              </span>
-            </Label>
-            <NumberInput
-              value={actualPageCount}
-              onChange={setActualPageCount}
-              decimals={0}
-              placeholder="0"
-              disabled={readOnly}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Tỷ lệ hoàn thành (%)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={completionRate}
-              onChange={(e) => setCompletionRate(e.target.value)}
-              placeholder="0"
-              disabled={readOnly}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Giá trị quyết toán (VNĐ)</Label>
-            <NumberInput
-              value={settlementValue}
-              onChange={setSettlementValue}
-              decimals={2}
-              showFormatted={true}
-              placeholder="0"
-              disabled={readOnly}
-            />
-            {settlementValue.trim() !== "" &&
-              !Number.isNaN(parseFloat(settlementValue)) && (
-                <p className="text-xs text-muted-foreground">
-                  {numberToVietnameseWords(settlementValue)}
-                </p>
-              )}
-            <div className="mt-2 p-2 border rounded bg-muted/10 space-y-1">
-              <div className="text-xs">
-                Phí quản lý:{" "}
-                <span className="font-medium">
-                  {settlementMgmtFee != null
-                    ? formatNumberAccounting(settlementMgmtFee)
-                    : "—"}
-                </span>{" "}
-                (5%)
-              </div>
-              <div className="text-xs">
-                Thuế TNCN:{" "}
-                <span className="font-medium">
-                  {settlementPit != null
-                    ? formatNumberAccounting(settlementPit)
-                    : "—"}
-                </span>{" "}
-                (10% sau khi trừ phí quản lý)
-              </div>
-              <div className="text-xs">
-                Giá trị thực nhận:{" "}
-                <span className="font-medium">
-                  {settlementNet != null
-                    ? formatNumberAccounting(settlementNet)
-                    : "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tiến độ hợp đồng */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">
-          Tiến độ hợp đồng
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-          <div className="grid gap-2">
-            <Label>Trạng thái</Label>
-            <Select
-              value={status}
-              onValueChange={(value) => {
-                setStatus(value);
-                if (value !== "Completed") setLastManualStatus(value);
-              }}
-              disabled={readOnly || actualCompletionDate.trim() !== ""}>
-              <SelectTrigger className="bg-background">
-                <SelectValue placeholder="Chọn trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Inactive">Inactive</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-                <SelectItem value="Cancel">Cancel</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {status === "Cancel" && (
-            <div className="grid gap-2">
-              <Label>Ngày hủy hợp đồng</Label>
-              <DateInput
-                value={cancelledAt || null}
-                onChange={(v) => setCancelledAt(v || "")}
-                disabled={readOnly}
-              />
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-          <div className="space-y-3 p-4 border rounded-lg bg-muted/20">
-            <Label className="text-sm font-semibold">
-              Theo dõi kiểm tra tiến độ
-            </Label>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={!!progressCheckDate}
-                  onCheckedChange={(checked) => {
-                    if (checked)
-                      setProgressCheckDate((prev) => prev || today());
-                    else setProgressCheckDate("");
-                  }}
-                  disabled={readOnly}
-                />
-                <span className="text-sm">Đã kiểm tra tiến độ</span>
-              </div>
-              <DateInput
-                value={progressCheckDate || null}
-                onChange={(v) => setProgressCheckDate(v || "")}
-                disabled={readOnly || !progressCheckDate}
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={!!expertReviewDate}
-                  onCheckedChange={(checked) => {
-                    if (checked) setExpertReviewDate((prev) => prev || today());
-                    else setExpertReviewDate("");
-                  }}
-                  disabled={readOnly}
-                />
-                <span className="text-sm">Đã thẩm định cấp chuyên gia</span>
-              </div>
-              <DateInput
-                value={expertReviewDate || null}
-                onChange={(v) => setExpertReviewDate(v || "")}
-                disabled={readOnly || !expertReviewDate}
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={!!projectAcceptanceDate}
-                  onCheckedChange={(checked) => {
-                    if (checked)
-                      setProjectAcceptanceDate((prev) => prev || today());
-                    else setProjectAcceptanceDate("");
-                  }}
-                  disabled={readOnly}
-                />
-                <span className="text-sm">Đã nghiệm thu cấp Dự án</span>
-              </div>
-              <DateInput
-                value={projectAcceptanceDate || null}
-                onChange={(v) => setProjectAcceptanceDate(v || "")}
-                disabled={readOnly || !projectAcceptanceDate}
-              />
-            </div>
-          </div>
-          <div className="space-y-3 p-4 border rounded-lg bg-muted/20">
-            <Label className="text-sm font-semibold">
-              Biên tập & Hiệu đính
-            </Label>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={proofreadingInProgress}
-                  onCheckedChange={(checked) =>
-                    setProofreadingInProgress(!!checked)
-                  }
-                  disabled={readOnly}
-                />
-                <span className="text-sm">Đang hiệu đính</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox checked={!!autoProofreadingCompletedDate} disabled />
-                <span className="text-sm">Hoàn thành hiệu đính</span>
-              </div>
-              <DateInput
-                value={autoProofreadingCompletedDate || null}
-                onChange={() => undefined}
-                disabled
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={editingInProgress}
-                  onCheckedChange={(checked) => setEditingInProgress(!!checked)}
-                  disabled={readOnly}
-                />
-                <span className="text-sm">Đang biên tập</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox checked={!!autoEditingCompletedDate} disabled />
-                <span className="text-sm">Hoàn thành biên tập</span>
-              </div>
-              <DateInput
-                value={autoEditingCompletedDate || null}
-                onChange={() => undefined}
-                disabled
-              />
-            </div>
-          </div>
-          <div className="space-y-3 p-4 border rounded-lg bg-muted/20">
-            <Label className="text-sm font-semibold">Xuất bản</Label>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={!!printTransferDate}
-                  onCheckedChange={(checked) => {
-                    if (checked)
-                      setPrintTransferDate((prev) => prev || today());
-                    else setPrintTransferDate("");
-                  }}
-                  disabled={readOnly}
-                />
-                <span className="text-sm">Chuyển in</span>
-              </div>
-              <DateInput
-                value={printTransferDate || null}
-                onChange={(v) => setPrintTransferDate(v || "")}
-                disabled={readOnly || !printTransferDate}
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={!!publishedDate}
-                  onCheckedChange={(checked) => {
-                    if (checked) setPublishedDate((prev) => prev || today());
-                    else setPublishedDate("");
-                  }}
-                  disabled={readOnly}
-                />
-                <span className="text-sm">Đã xuất bản</span>
-              </div>
-              <DateInput
-                value={publishedDate || null}
-                onChange={(v) => setPublishedDate(v || "")}
-                disabled={readOnly || !publishedDate}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Ghi chú */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">Ghi chú</h3>
-        <div className="grid gap-2">
-          <Input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Ghi chú"
-            disabled={readOnly}
-          />
-        </div>
-      </div>
-      {contract && (
-        <ContractStagesSection
-          translationContractId={contract.id}
-          queryClient={queryClient}
-          readOnly={readOnly}
-        />
-      )}
-      {contract && (
-        <PaymentsSection
-          translationContractId={contract.id}
-          contractValue={
-            contractValue.trim() === "" ? null : parseFloat(contractValue)
-          }
-          translationValue={
-            translationValue.trim() === "" ? null : parseFloat(translationValue)
-          }
-          settlementValue={
-            settlementValue.trim() === "" ? null : parseFloat(settlementValue)
-          }
-          queryClient={queryClient}
-          readOnly={readOnly}
-        />
-      )}
-      {!readOnly && (
-        <DialogFooter>
-          <Button
-            type="submit"
-            disabled={
-              isPending || !!duplicateTranslationContract || !!contractDateError
-            }>
-            {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {contract ? "Cập nhật" : "Thêm"}
-          </Button>
-        </DialogFooter>
-      )}
-    </form>
-  );
-}
-
-function ProofreadingContractForm({
-  contract,
-  works,
-  translationContracts,
-  translationContractMembers,
-  componentsList,
-  queryClient,
-  onSubmit,
-  isPending,
-  readOnly = false,
-}: {
-  contract: ProofreadingContract | null;
-  works: Work[];
-  translationContracts: TranslationContract[];
-  translationContractMembers: Array<{
-    translationContractId: string;
-    userId: string;
-  }>;
-  componentsList: Component[];
-  queryClient: ReturnType<typeof useQueryClient>;
-  onSubmit: (data: Record<string, unknown>) => void;
-  isPending: boolean;
-  readOnly?: boolean;
-}) {
-  const [contractNumber, setContractNumber] = useState(
-    contract?.contractNumber ?? "",
-  );
-  const [componentId, setComponentId] = useState(contract?.componentId ?? "");
-  const [workId, setWorkId] = useState(contract?.workId ?? "");
-  const [translationContractId, setTranslationContractId] = useState(
-    contract?.translationContractId ?? "",
-  );
-  const [proofreaderName, setProofreaderName] = useState("");
-  const [proofreaderUserId, setProofreaderUserId] = useState<string | null>(
-    null,
-  );
-  const [selfProofreading, setSelfProofreading] = useState(false);
-  const [hasUserTouchedProofreader, setHasUserTouchedProofreader] =
-    useState(false);
-
-  const filteredTranslationContracts = useMemo(() => {
-    let list = translationContracts;
-    if (componentId) {
-      list = list.filter((c) => c.componentId === componentId);
-    }
-    if (workId) {
-      list = list.filter((c) => c.workId === workId);
-    }
-    return list;
-  }, [translationContracts, componentId, workId]);
-
-  useEffect(() => {
-    if (!translationContractId) return;
-    const exists = filteredTranslationContracts.some(
-      (c) => c.id === translationContractId,
-    );
-    if (!exists) setTranslationContractId("");
-  }, [filteredTranslationContracts, translationContractId]);
-
-  const { data: users = [] } = useUsers();
-  const translatorForSelectedContract = useMemo(() => {
-    if (!translationContractId) return null;
-    const member = translationContractMembers.find(
-      (m) => m.translationContractId === translationContractId && m.userId,
-    );
-    if (!member?.userId) return null;
-    const user = users.find((u) => u.id === member.userId);
-    return { id: member.userId, name: user?.displayName ?? member.userId };
-  }, [translationContractId, translationContractMembers, users]);
-
-  // Load proofreading contract members when editing
-  const { data: contractMembers = [] } = useQuery({
-    queryKey: ["proofreading-contract-members", contract?.id],
-    queryFn: async () => {
-      if (!contract?.id) return [];
-      const res = await fetch(
-        buildUrl(api.proofreadingContractMembers.listByContract.path, {
-          contractId: contract.id,
-        }),
-        { credentials: "include" },
-      );
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!contract?.id,
-  });
-
-  // Set proofreader when contract members are loaded
-  useEffect(() => {
-    if (hasUserTouchedProofreader || selfProofreading) return;
-    if (contractMembers.length > 0 && contractMembers[0]?.userId) {
-      const member = contractMembers[0];
-      setProofreaderUserId(member.userId);
-      const user = users.find((u) => u.id === member.userId);
-      if (user) {
-        setProofreaderName(user.displayName);
-      }
-    }
-  }, [contractMembers, users, hasUserTouchedProofreader, selfProofreading]);
-
-  useEffect(() => {
-    if (!selfProofreading) return;
-    if (!translationContractId || !translatorForSelectedContract) {
-      setProofreaderName("");
-      setProofreaderUserId(null);
-      return;
-    }
-    setProofreaderName(translatorForSelectedContract.name);
-    setProofreaderUserId(translatorForSelectedContract.id);
-  }, [selfProofreading, translationContractId, translatorForSelectedContract]);
-
-  const handleSelfProofreadingChange = (checked: boolean) => {
-    const next = !!checked;
-    setSelfProofreading(next);
-    setHasUserTouchedProofreader(true);
-    if (!next) {
-      setProofreaderName("");
-      setProofreaderUserId(null);
-    }
-  };
-
-  const [pageCount, setPageCount] = useState(
-    contract?.pageCount != null ? String(contract.pageCount) : "",
-  );
-  const [rateRatio, setRateRatio] = useState(
-    contract?.rateRatio != null ? String(Number(contract.rateRatio) * 100) : "",
-  );
-  const [contractValue, setContractValue] = useState(
-    contract?.contractValue != null ? String(contract.contractValue) : "",
-  );
-  const [startDate, setStartDate] = useState(
-    contract?.startDate ? (contract.startDate as string).slice(0, 10) : "",
-  );
-  const [endDate, setEndDate] = useState(
-    contract?.endDate ? (contract.endDate as string).slice(0, 10) : "",
-  );
-  const [actualCompletionDate, setActualCompletionDate] = useState(
-    contract?.actualCompletionDate
-      ? (contract.actualCompletionDate as string).slice(0, 10)
-      : "",
-  );
-  const [note, setNote] = useState(contract?.note ?? "");
-
-  const selectedTranslationContract = useMemo(
-    () =>
-      translationContracts.find((c) => c.id === translationContractId) ?? null,
-    [translationContracts, translationContractId],
-  );
-  const selectedWork = useMemo(
-    () => works.find((w) => w.id === workId) ?? null,
-    [works, workId],
-  );
-
-  useEffect(() => {
-    if (!selectedTranslationContract) return;
-    if (selectedTranslationContract.componentId) {
-      setComponentId(selectedTranslationContract.componentId);
-    }
-    if (selectedTranslationContract.workId) {
-      setWorkId(selectedTranslationContract.workId);
-    }
-    if (selectedTranslationContract.actualPageCount != null) {
-      setPageCount(String(selectedTranslationContract.actualPageCount));
-    } else {
-      setPageCount("");
-    }
-  }, [selectedTranslationContract]);
-
-  useEffect(() => {
-    if (!selectedTranslationContract) return;
-    const base = selectedTranslationContract.settlementValue;
-    const settlement =
-      base == null
-        ? NaN
-        : typeof base === "string"
-          ? parseFloat(base)
-          : Number(base);
-    const ratio = rateRatio.trim() === "" ? NaN : parseFloat(rateRatio) / 100;
-    if (Number.isNaN(settlement) || Number.isNaN(ratio)) {
-      setContractValue("");
-      return;
-    }
-    setContractValue((settlement * ratio).toFixed(2));
-  }, [selectedTranslationContract, rateRatio]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (readOnly) return;
-    onSubmit({
-      contractNumber: contractNumber || null,
-      componentId: componentId || null,
-      workId: workId || null,
-      translationContractId: translationContractId || null,
-      pageCount: pageCount ? parseInt(pageCount, 10) : null,
-      rateRatio: rateRatio ? parseFloat(rateRatio) / 100 : null,
-      contractValue: contractValue ? parseFloat(contractValue) : null,
-      startDate: startDate || null,
-      endDate: endDate || null,
-      actualCompletionDate: actualCompletionDate || null,
-      note: note || null,
-      _proofreaderUserId: proofreaderUserId, // Dùng prefix _ để không gửi vào API proofreading contract
-    });
-  };
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-4 overflow-y-auto pr-2 flex-1 min-h-0">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="grid gap-2 min-w-0">
-          <Label>Số hợp đồng</Label>
-          <Input
-            value={contractNumber}
-            onChange={(e) => setContractNumber(e.target.value)}
-            placeholder="Số HĐ"
-            disabled={readOnly}
-          />
-        </div>
-        <div className="grid gap-2 min-w-0">
-          <Label>Hợp phần</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={componentId}
-            onChange={(e) => setComponentId(e.target.value)}
-            disabled={readOnly}>
-            <option value="">Chọn hợp phần</option>
-            {componentsList.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-2 min-w-0">
-          <WorkPicker
-            label="Tác phẩm"
-            works={works}
-            components={componentsList}
-            value={workId || null}
-            onChange={(id) => setWorkId(id ?? "")}
-            disabled={readOnly}
-            placeholder="Tìm theo tiêu đề, mã tài liệu, hợp phần, giai đoạn..."
-            componentFilterId={componentId || null}
-            className="self-start"
-          />
-          {selectedWork?.stage && (
-            <p className="text-xs text-muted-foreground">
-              Giai đoạn: {formatStageDisplay(selectedWork.stage)}
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="grid gap-2 md:col-span-2 min-w-0">
-          <TranslationContractPicker
-            label="Hợp đồng dịch thuật (liên kết)"
-            contracts={filteredTranslationContracts}
-            works={works}
-            components={componentsList}
-            value={translationContractId || null}
-            onChange={(id) => setTranslationContractId(id ?? "")}
-            disabled={readOnly}
-            placeholder="Tìm theo số HĐ, tác phẩm, mã tài liệu, hợp phần..."
-            className="self-start"
-          />
-        </div>
-        <div className="grid gap-2 md:col-span-3 min-w-0">
-          <TranslatorPicker
-            label="Người hiệu đính"
-            value={proofreaderName}
-            userId={proofreaderUserId}
-            onChange={(name, id) => {
-              setProofreaderName(name);
-              setProofreaderUserId(id);
-              setHasUserTouchedProofreader(true);
-              setSelfProofreading(false);
-            }}
-            disabled={readOnly || selfProofreading}
-            placeholder="Tìm theo tên hoặc email..."
-          />
-          {!readOnly && (
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="self-proofreading-checkbox"
-                checked={selfProofreading}
-                onCheckedChange={handleSelfProofreadingChange}
-                disabled={!translatorForSelectedContract}
-              />
-              <label
-                htmlFor="self-proofreading-checkbox"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Dịch giả tự hiệu đính
-              </label>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-8 gap-4">
-        <div className="grid gap-2 md:col-span-2 min-w-0">
-          <Label>Số trang</Label>
-          <NumberInput
-            value={pageCount}
-            onChange={setPageCount}
-            decimals={0}
-            placeholder="0"
-            disabled={readOnly || !!selectedTranslationContract}
-          />
-          {selectedTranslationContract && (
-            <p className="text-xs text-muted-foreground">
-              Lấy từ số trang hoàn thành thực tế của Hợp đồng dịch thuật.
-            </p>
-          )}
-        </div>
-        <div className="grid gap-2 md:col-span-2 min-w-0">
-          <Label>Tỷ lệ (%)</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={rateRatio}
-            onChange={(e) => setRateRatio(e.target.value)}
-            placeholder="0"
-            disabled={readOnly}
-          />
-        </div>
-        <div className="grid gap-2 md:col-span-4 min-w-0">
-          <Label>Giá trị hợp đồng hiệu đính (VNĐ)</Label>
-          <NumberInput
-            value={contractValue}
-            onChange={setContractValue}
-            decimals={2}
-            showFormatted={true}
-            placeholder="0"
-            disabled={readOnly || !!selectedTranslationContract}
-          />
-          {contractValue.trim() !== "" &&
-            !Number.isNaN(parseFloat(contractValue)) && (
-              <p className="text-xs text-muted-foreground">
-                {numberToVietnameseWords(contractValue)}
-              </p>
-            )}
-          {selectedTranslationContract && (
-            <p className="text-xs text-muted-foreground">
-              Tính theo tỷ lệ (%) và giá trị quyết toán Hợp đồng dịch thuật.
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="grid gap-2">
-          <Label>Ngày bắt đầu</Label>
-          <DateInput
-            value={startDate || null}
-            onChange={(v) => setStartDate(v || "")}
-            disabled={readOnly}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>Ngày kết thúc</Label>
-          <DateInput
-            value={endDate || null}
-            onChange={(v) => setEndDate(v || "")}
-            disabled={readOnly}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>Hoàn thành thực tế</Label>
-          <DateInput
-            value={actualCompletionDate || null}
-            onChange={(v) => setActualCompletionDate(v || "")}
-            disabled={readOnly}
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-4">
-        <div className="grid gap-2 min-w-0">
-          <Label>Ghi chú</Label>
-          <Input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Ghi chú"
-            disabled={readOnly}
-          />
-        </div>
-      </div>
-      {contract && (
-        <ContractStagesSection
-          proofreadingContractId={contract.id}
-          queryClient={queryClient}
-          readOnly={readOnly}
-        />
-      )}
-      {contract && (
-        <PaymentsSection
-          proofreadingContractId={contract.id}
-          contractValue={
-            contractValue.trim() === "" ? null : parseFloat(contractValue)
-          }
-          translationValue={null}
-          settlementValue={null}
-          queryClient={queryClient}
-          readOnly={readOnly}
-        />
-      )}
-      {!readOnly && (
-        <DialogFooter>
-          <Button type="submit" disabled={isPending}>
-            {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {contract ? "Cập nhật" : "Thêm"}
-          </Button>
-        </DialogFooter>
-      )}
-    </form>
   );
 }

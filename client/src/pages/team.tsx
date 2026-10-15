@@ -18,10 +18,11 @@ import { Button } from "@/components/ui/button";
 import { useTasks } from "@/hooks/use-tasks";
 import { useUsers } from "@/hooks/use-works-and-components";
 import { useI18n } from "@/hooks/use-i18n";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { CardGridSkeleton } from "@/components/ui/skeletons";
 import { api } from "@shared/routes";
-import { useRefreshTasks } from "@/hooks/use-tasks";
+import { useRefreshTasks, UserRole } from "@/hooks/use-tasks";
+import { useAuth } from "@/hooks/use-auth";
 import { GroupPageHero } from "@/components/group-page-hero";
 import { MemberHeatmap12m } from "@/components/member-heatmap-12m";
 import { GroupTabsFilter } from "@/components/group-tabs-filter";
@@ -83,6 +84,7 @@ function taskIsOverdue(task: { status?: unknown; actualCompletedAt?: unknown; co
 }
 
 export default function Team() {
+  const { user, role } = useAuth();
   const { language } = useI18n();
   const { data: tasks, isLoading } = useTasks();
   const { data: users } = useUsers();
@@ -440,6 +442,15 @@ export default function Team() {
   type GroupTabKey = "all" | string;
   const [activeGroupTab, setActiveGroupTab] = useState<GroupTabKey>("all");
 
+  useEffect(() => {
+    if (role === UserRole.EMPLOYEE && user?.groups && user.groups.length > 0) {
+      const myGroupId = user.groups[0]?.id;
+      if (myGroupId && userGroups.some((g) => String(g.id) === String(myGroupId))) {
+        setActiveGroupTab(String(myGroupId));
+      }
+    }
+  }, [role, user?.groups, userGroups]);
+
   const filteredTeamStats = useMemo(() => {
     if (activeGroupTab === "all") return teamStats;
     const noGroupKey = "__nogroup__";
@@ -484,8 +495,8 @@ export default function Team() {
         countBadge={{
           label:
             language === "vi"
-              ? `${teamStats.length} thành viên`
-              : `${teamStats.length} members`,
+              ? `${filteredTeamStats.length} thành viên`
+              : `${filteredTeamStats.length} members`,
           tone: "default",
         }}
       />

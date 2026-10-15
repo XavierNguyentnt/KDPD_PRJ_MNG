@@ -624,11 +624,12 @@ export function TaskTable({
                 )}
 
                 {hasActions && (
-                  <div className="mt-3 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  <div className="mt-3 flex items-center gap-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
                     {actions?.onView && (
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="touch-target"
                         onClick={() => actions.onView?.(task)}
                         title={language === "vi" ? "Xem" : "View"}
                       >
@@ -639,6 +640,7 @@ export function TaskTable({
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="touch-target"
                         onClick={() => actions.onDuplicate?.(task)}
                         title={language === "vi" ? "Tạo bản sao công việc" : "Duplicate task"}
                       >
@@ -649,6 +651,7 @@ export function TaskTable({
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="touch-target"
                         onClick={() => actions.onEdit?.(task)}
                         title={language === "vi" ? "Sửa" : "Edit"}
                       >
@@ -659,7 +662,7 @@ export function TaskTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="text-destructive hover:text-destructive"
+                        className="touch-target text-destructive hover:text-destructive"
                         onClick={() => actions.onDelete?.(task)}
                         title={language === "vi" ? "Xoá" : "Delete"}
                       >

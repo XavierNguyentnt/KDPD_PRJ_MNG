@@ -107,9 +107,27 @@ export default defineConfig({
         hoistTransitiveImports: false,
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            if (/node_modules\/xlsx\b/.test(id)) return "vendor-xlsx";
-            if (/node_modules\/@tanstack\/react-query\b/.test(id))
+            if (/node_modules\/(react|react-dom|wouter)\b/.test(id)) {
+              return "vendor-react";
+            }
+            if (/node_modules\/xlsx\b/.test(id)) {
+              return "vendor-xlsx";
+            }
+            if (/node_modules\/recharts\b|node_modules\/d3-/.test(id)) {
+              return "vendor-charts";
+            }
+            if (/node_modules\/@dnd-kit\b/.test(id)) {
+              return "vendor-dnd";
+            }
+            if (/node_modules\/@radix-ui\b/.test(id)) {
+              return "vendor-radix";
+            }
+            if (/node_modules\/@tanstack\/react-query\b/.test(id)) {
               return "vendor-tanstack";
+            }
+            if (/node_modules\/lucide-react\b/.test(id)) {
+              return "vendor-icons";
+            }
           }
         },
       },

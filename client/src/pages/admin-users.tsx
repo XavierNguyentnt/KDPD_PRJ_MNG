@@ -1,3 +1,4 @@
+import { UserTableSkeleton } from "@/components/ui/skeletons";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -883,12 +884,7 @@ export default function AdminUsersPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading && (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <Loader2 className="w-6 h-6 animate-spin mr-2" />
-              Đang tải...
-            </div>
-          )}
+          {isLoading && <UserTableSkeleton rows={6} />}
           {error && (
             <p className="text-destructive py-4">{(error as Error).message}</p>
           )}

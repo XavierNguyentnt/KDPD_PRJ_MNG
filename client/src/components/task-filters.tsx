@@ -129,7 +129,12 @@ export function applyTaskFilters<
   }
 
   if (filters.status && filters.status !== "all") {
-    if (filters.status === "Not Finished") {
+    if (filters.status === "Completed") {
+      list = list.filter(
+        (t) =>
+          t.status === "Completed" || (t as any).actualCompletedAt != null,
+      );
+    } else if (filters.status === "Not Finished") {
       list = list.filter(
         (t) =>
           !(t.status === "Completed" || (t as any).actualCompletedAt != null),

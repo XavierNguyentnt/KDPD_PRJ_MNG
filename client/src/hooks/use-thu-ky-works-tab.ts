@@ -206,7 +206,9 @@ export function useThuKyWorksTab(params: UseThuKyWorksTabParams) {
   };
 
   const [worksPage, setWorksPage] = useState(1);
-  const [worksViewMode, setWorksViewMode] = useState<"table" | "card">("table");
+  const [worksViewMode, setWorksViewMode] = useState<"compact" | "table" | "card">(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "compact" : "table"
+  );
   const [worksSearch, setWorksSearch] = useState("");
   const [worksComponentFilter, setWorksComponentFilter] =
     useState<string>("all");
