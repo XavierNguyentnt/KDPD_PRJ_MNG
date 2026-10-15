@@ -150,9 +150,9 @@ Tách modal thành 4 tab con:
 
 | STT | Hạng mục công việc | File liên quan | Mức độ ưu tiên | Trạng thái |
 |:---:|---|---|:---:|:---:|
-| 1 | Sửa side-effect điều hướng trong Guarded Routes | [client/src/App.tsx](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/client/src/App.tsx) | **P0** (Khẩn cấp) | ⏳ Sẵn sàng |
-| 2 | Gia cố bảo mật endpoint fix password dev | [server/routes.ts](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/server/routes.ts) | **P0** (Khẩn cấp) | ⏳ Sẵn sàng |
-| 3 | Tách module `server/routes.ts` thành thư mục `server/routes/` | [server/routes.ts](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/server/routes.ts) | **P1** (Cao) | ⏳ Sẵn sàng |
+| 1 | Sửa side-effect điều hướng trong Guarded Routes | [client/src/App.tsx](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/client/src/App.tsx) | **P0** (Khẩn cấp) | ✅ Hoàn thành |
+| 2 | Gia cố bảo mật endpoint fix password dev | [server/routes.ts](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/server/routes.ts) | **P0** (Khẩn cấp) | ✅ Hoàn thành |
+| 3 | Tách module `server/routes.ts` thành thư mục `server/routes/` | [server/routes.ts](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/server/routes.ts) | **P1** (Cao) | ✅ Hoàn thành |
 | 4 | Phân rã trang `thu-ky-hop-phan.tsx` thành các sub-components | [client/src/pages/thu-ky-hop-phan.tsx](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/client/src/pages/thu-ky-hop-phan.tsx) | **P1** (Cao) | ⏳ Sẵn sàng |
 | 5 | Phân rã modal `task-dialog.tsx` theo tab | [client/src/components/task-dialog.tsx](file:///d:/Vincent/DEV/KDPD_PRJ_MNG/client/src/components/task-dialog.tsx) | **P2** (Trung bình) | ⏳ Sẵn sàng |
 | 6 | Thêm Skeleton loading đồng bộ toàn bộ trang | `client/src/components/ui/skeletons.tsx` | **P2** (Trung bình) | ⏳ Sẵn sàng |

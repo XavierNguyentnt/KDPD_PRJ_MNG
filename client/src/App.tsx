@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -97,19 +97,16 @@ function GuardedGroupPage({
   Component: React.ComponentType<any>;
 }) {
   const { user, role } = useAuth();
-  const [_, navigate] = useLocation();
   const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
   const allowed = isAdminManager || hasGroup(user, group);
   if (!allowed) {
-    navigate("/");
-    return null;
+    return <Redirect to="/" replace />;
   }
   return <Component />;
 }
 
 function GuardedThietKePage() {
   const { user, role } = useAuth();
-  const [_, navigate] = useLocation();
   const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
   const allowed =
     isAdminManager ||
@@ -119,46 +116,38 @@ function GuardedThietKePage() {
       ["thiet_ke", "thietke", "thiet-ke", "thiet k e", "thiet ke", "thietk e"],
     );
   if (!allowed) {
-    navigate("/");
-    return null;
+    return <Redirect to="/" replace />;
   }
   return <ThietKePage />;
 }
 
 function GuardedCNTTPage() {
   const { user, role } = useAuth();
-  const [_, navigate] = useLocation();
   const isAdminManager = role === UserRole.ADMIN || role === UserRole.MANAGER;
   const allowed =
     isAdminManager ||
     hasRoleOrGroup(user, ["technical", "kythuatvien"], ["it", "kythuat"]);
   if (!allowed) {
-    navigate("/");
-    return null;
+    return <Redirect to="/" replace />;
   }
   return <CNTTPage />;
 }
 
 function GuardedAdminDashboardPage() {
   const { role } = useAuth();
-  const [_, navigate] = useLocation();
   const allowed = role === UserRole.ADMIN;
   if (!allowed) {
-    navigate("/");
-    return null;
+    return <Redirect to="/" replace />;
   }
   return <AdminDashboardPage />;
 }
 
 function RedirectLegacyAdminUsersPage() {
   const { role } = useAuth();
-  const [_, navigate] = useLocation();
   if (role === UserRole.ADMIN) {
-    navigate("/admin");
-    return null;
+    return <Redirect to="/admin" replace />;
   }
-  navigate("/");
-  return null;
+  return <Redirect to="/" replace />;
 }
 
 function Router() {
