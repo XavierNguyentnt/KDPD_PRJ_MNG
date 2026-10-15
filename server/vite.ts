@@ -9,9 +9,10 @@ import { nanoid } from "nanoid";
 const viteLogger = createLogger();
 
 export async function setupVite(server: Server, app: Express) {
+  const port = parseInt(process.env.PORT || "5000", 10);
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server, path: "/vite-hmr" },
+    hmr: { server, path: "/vite-hmr", clientPort: port },
     allowedHosts: true as const,
   };
 
@@ -33,6 +34,11 @@ export async function setupVite(server: Server, app: Express) {
 
   app.use("/{*path}", async (req, res, next) => {
     const url = req.originalUrl;
+
+    // Do not serve index.html for assets with file extensions or API endpoints
+    if (path.extname(req.path) || req.path.startsWith("/api/")) {
+      return next();
+    }
 
     try {
       const clientTemplate = path.resolve(

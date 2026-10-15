@@ -38,3 +38,6 @@ zeta-courage-*.json
 !package-lock.json
 !tsconfig.json
 !components.json
+
+# Vite PWA dev artifacts
+client/dev-dist

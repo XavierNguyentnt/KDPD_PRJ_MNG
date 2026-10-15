@@ -1,0 +1,63 @@
+{
+  "name": "Kinh điển phương Đông — Quản lý dự án",
+  "short_name": "KDPD",
+  "description": "Hệ thống Quản lý dự án Văn phòng Dự án Kinh điển phương Đông — Quản lý công việc, biên tập, thiết kế, CNTT, thư ký hợp phần, hợp đồng dịch thuật và hiệu đính sách kinh điển.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f0e0",
+  "theme_color": "#8b6f3f",
+  "lang": "vi",
+  "scope": "/",
+  "id": "/?pwa=1",
+  "dir": "ltr",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity", "education", "books"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Công việc chung",
+      "short_name": "CV chung",
+      "description": "Truy cập nhanh trang Công việc chung",
+      "url": "/cv-chung",
+      "icons": [
+        {
+          "src": "/pwa-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Tổng quan hệ thống",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/pwa-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

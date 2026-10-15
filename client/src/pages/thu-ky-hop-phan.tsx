@@ -139,13 +139,8 @@ import {
 import { TaskTableSkeleton, CardGridSkeleton, FullPageSkeleton } from "@/components/ui/skeletons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { WorksImport } from "@/components/works-import";
-const Pipeline8StepperLazy = lazy(
-  () =>
-    import("@/components/pipeline-8-stepper").then((m) => ({
-      default: m.Pipeline8Stepper,
-    })),
-);
-import { getPipelineStepperPropsForWork } from "@/components/pipeline-8-stepper";
+import { Pipeline8Stepper, getPipelineStepperPropsForWork } from "@/components/pipeline-8-stepper";
+const Pipeline8StepperLazy = Pipeline8Stepper;
 import { DateInput } from "@/components/ui/date-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { WorkPicker } from "@/components/work-picker";

@@ -56,9 +56,11 @@ try {
   setCatchHandler(async ({ request }) => {
     if (request && request.mode === "navigate") {
       try {
-        return caches.match("/index.html") as Promise<Response>;
+        const cached = await caches.match("/index.html");
+        if (cached) return cached;
+        return new Response("Offline", { status: 503, statusText: "Offline" });
       } catch {
-        return Response.error();
+        return new Response("Offline", { status: 503, statusText: "Offline" });
       }
     }
     return Response.error();
@@ -74,6 +76,7 @@ registerRoute(
       const u = new URL(request.url);
       if (!u) return false;
       if (u.origin !== location.origin) return false;
+      if (u.pathname === "/" || u.pathname === "") return false;
       if (u.pathname.startsWith("/api/")) return false;
       if (u.pathname.startsWith("/__")) return false;
       if (request.mode === "navigate") return false;

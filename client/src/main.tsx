@@ -3,14 +3,36 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import "./index.css";
 
-const updateSW = registerSW({
-  immediate: true,
-  onRegisteredSW(_url, registration) {
-    if (registration) {
-      setupPush(registration).catch(() => {});
-    }
-  },
-});
+// In development, automatically unregister any existing Service Worker and clean caches
+if (import.meta.env.DEV) {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister().then((success) => {
+          if (success) console.log("[PWA] Cleaned up dev Service Worker:", registration.scope);
+        });
+      }
+    });
+  }
+  if ("caches" in window) {
+    caches.keys().then((keys) => {
+      for (const key of keys) {
+        if (key.startsWith("kdpd-") || key.includes("workbox")) {
+          caches.delete(key);
+        }
+      }
+    });
+  }
+} else {
+  registerSW({
+    immediate: true,
+    onRegisteredSW(_url, registration) {
+      if (registration) {
+        setupPush(registration).catch(() => {});
+      }
+    },
+  });
+}
 
 createRoot(document.getElementById("root")!).render(<App />);
 
