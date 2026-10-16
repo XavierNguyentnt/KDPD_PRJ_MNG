@@ -18,6 +18,7 @@ const CNTTPage = lazy(() => import("@/pages/cntt"));
 const Team = lazy(() => import("@/pages/team"));
 const AdminDashboardPage = lazy(() => import("@/pages/admin-dashboard"));
 const ThuKyHopPhanPage = lazy(() => import("@/pages/thu-ky-hop-phan"));
+const ReportsPage = lazy(() => import("@/pages/reports"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function normalize(text: string) {
@@ -175,6 +176,7 @@ function Router() {
           <Route path="/thu-ky-hop-phan" component={ThuKyHopPhanPage} />
           <Route path="/thu-ky-hop-phan/:sub" component={ThuKyHopPhanPage} />
           <Route path="/team" component={Team} />
+          <Route path="/reports" component={ReportsPage} />
           <Route path="/admin" component={GuardedAdminDashboardPage} />
           <Route path="/admin/users" component={RedirectLegacyAdminUsersPage} />
           <Route component={NotFound} />

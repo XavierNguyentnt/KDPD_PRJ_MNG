@@ -749,3 +749,30 @@ export type UserWithRolesAndGroups = User & {
   /** Chi tiết (roleId, componentId) từ user_roles; componentId null = vai trò toàn cục. */
   roleAssignments?: UserRoleAssignment[];
 };
+
+// -----------------------------------------------------------------------------
+// Report Snapshots (Báo cáo đã chốt sổ kỳ lịch sử)
+// -----------------------------------------------------------------------------
+export const reportSnapshots = pgTable("report_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scope: text("scope").notNull(), // 'personal' | 'department' | 'organization'
+  targetId: text("target_id"), // userId | groupCode | 'all'
+  periodType: text("period_type").notNull(), // 'week' | 'month' | 'quarter' | 'year' | 'custom'
+  periodValue: text("period_value").notNull(), // '2026-10', '2026-Q4', '2026'...
+  periodLabel: text("period_label").notNull(), // "Tháng 10/2026"...
+  summaryData: jsonb("summary_data").notNull(), // Toàn bộ object reportData đã kết xuất
+  aiInsights: jsonb("ai_insights"), // Bản nhận định AI (nếu có)
+  generatedBy: uuid("generated_by").references(() => users.id, { onDelete: "set null" }),
+  isLocked: boolean("is_locked").notNull().default(true), // Mặc định khóa bất biến
+  notes: text("notes"), // Ghi chú của người chốt sổ
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertReportSnapshotSchema = createInsertSchema(reportSnapshots);
+export const selectReportSnapshotSchema = createSelectSchema(reportSnapshots);
+
+export type ReportSnapshot = typeof reportSnapshots.$inferSelect;
+export type InsertReportSnapshot = z.infer<typeof insertReportSnapshotSchema>;
+
+export * from "./report-types";

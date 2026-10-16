@@ -42,6 +42,11 @@ import {
   payments,
   insertPaymentSchema,
   type TaskWithAssignmentDetails,
+  type PersonalReportData,
+  type DepartmentReportData,
+  type OrganizationReportData,
+  type ReportAIInsightsData,
+  type ReportSnapshot,
 } from "./schema";
 
 export const errorSchemas = {
@@ -1232,6 +1237,92 @@ export const api = {
           outstanding: z.number(),
         }),
         404: errorSchemas.notFound,
+      },
+    },
+  },
+  reports: {
+    personal: {
+      method: "GET" as const,
+      path: "/api/reports/personal",
+      responses: {
+        200: z.custom<PersonalReportData>(),
+        400: errorSchemas.validation,
+        401: errorSchemas.internal,
+      },
+    },
+    department: {
+      method: "GET" as const,
+      path: "/api/reports/department/:groupCode",
+      responses: {
+        200: z.custom<DepartmentReportData>(),
+        400: errorSchemas.validation,
+        401: errorSchemas.internal,
+        404: errorSchemas.notFound,
+      },
+    },
+    organization: {
+      method: "GET" as const,
+      path: "/api/reports/organization",
+      responses: {
+        200: z.custom<OrganizationReportData>(),
+        400: errorSchemas.validation,
+        401: errorSchemas.internal,
+        403: errorSchemas.internal,
+      },
+    },
+    aiInsights: {
+      method: "POST" as const,
+      path: "/api/reports/ai-insights",
+      input: z.object({
+        scope: z.enum(["personal", "department", "organization"]),
+        targetId: z.string().optional(),
+        reportData: z.record(z.any()),
+      }),
+      responses: {
+        200: z.custom<ReportAIInsightsData>(),
+        400: errorSchemas.validation,
+        401: errorSchemas.internal,
+        500: errorSchemas.internal,
+      },
+    },
+    createSnapshot: {
+      method: "POST" as const,
+      path: "/api/reports/snapshots",
+      input: z.object({
+        scope: z.enum(["personal", "department", "organization"]),
+        targetId: z.string().optional(),
+        periodType: z.string(),
+        periodValue: z.string(),
+        periodLabel: z.string(),
+        summaryData: z.record(z.any()),
+        aiInsights: z.record(z.any()).optional().nullable(),
+        notes: z.string().optional().nullable(),
+      }),
+      responses: {
+        201: z.custom<ReportSnapshot>(),
+        400: errorSchemas.validation,
+        401: errorSchemas.internal,
+        403: errorSchemas.internal,
+        500: errorSchemas.internal,
+      },
+    },
+    listSnapshots: {
+      method: "GET" as const,
+      path: "/api/reports/snapshots",
+      responses: {
+        200: z.array(z.custom<ReportSnapshot>()),
+        401: errorSchemas.internal,
+        500: errorSchemas.internal,
+      },
+    },
+    getSnapshot: {
+      method: "GET" as const,
+      path: "/api/reports/snapshots/:id",
+      responses: {
+        200: z.custom<ReportSnapshot>(),
+        401: errorSchemas.internal,
+        404: errorSchemas.notFound,
+        500: errorSchemas.internal,
       },
     },
   },

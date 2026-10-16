@@ -70,4 +70,27 @@ export async function ensureDbExtensions(): Promise<void> {
       error,
     );
   }
+
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS report_snapshots (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        scope text NOT NULL,
+        target_id text,
+        period_type text NOT NULL,
+        period_value text NOT NULL,
+        period_label text NOT NULL,
+        summary_data jsonb NOT NULL,
+        ai_insights jsonb,
+        generated_by uuid REFERENCES users(id) ON DELETE SET NULL,
+        is_locked boolean NOT NULL DEFAULT true,
+        notes text,
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        updated_at timestamp with time zone NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_report_snapshots_lookup ON report_snapshots(scope, target_id, period_value);
+    `);
+  } catch (error) {
+    console.warn("Failed to ensure report_snapshots table (optional):", error);
+  }
 }

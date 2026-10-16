@@ -141,6 +141,9 @@ async function main() {
   await registerRoutes(httpServer, app);
   startNotificationsJob();
   startBackupScheduler();
+  const { initReportScheduler } = await import("./services/report-scheduler");
+  const { pool: dbPool } = await import("./db");
+  initReportScheduler(dbPool);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

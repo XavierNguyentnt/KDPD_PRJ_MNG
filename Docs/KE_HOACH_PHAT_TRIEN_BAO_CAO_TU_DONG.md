@@ -317,35 +317,35 @@ flowchart LR
 
 ---
 
-### GIAI ĐOẠN 1: BACKEND CORE & DATA AGGREGATION ENGINE (Ưu tiên P0)
-- [ ] **1.1.** Xây dựng service tổng hợp dữ liệu `server/services/report-generator.ts` với các câu lệnh SQL tối ưu cho 3 cấp độ (Cá nhân, Nhóm, Toàn tổ chức).
-- [ ] **1.2.** Xây dựng API Route `server/routes/reports.routes.ts`:
+### GIAI ĐOẠN 1: BACKEND CORE & DATA AGGREGATION ENGINE (Ưu tiên P0) [ĐÃ HOÀN THÀNH 100%]
+- [x] **1.1.** Xây dựng service tổng hợp dữ liệu `server/services/report-generator.ts` với các câu lệnh SQL tối ưu cho 3 cấp độ (Cá nhân, Nhóm, Toàn tổ chức).
+- [x] **1.2.** Xây dựng API Route `server/routes/reports.routes.ts`:
   - `GET /api/reports/personal`
   - `GET /api/reports/department/:groupCode`
   - `GET /api/reports/organization`
-- [ ] **1.3.** Tích hợp kiểm tra quyền RBAC và phân tầng dữ liệu cho từng đối tượng người dùng.
-- [ ] **1.4.** Bổ sung hợp đồng dữ liệu trong [shared/routes.ts](file:///e:/Vincent/DEV/KDPD_PRJ_MNG/shared/routes.ts).
+- [x] **1.3.** Tích hợp kiểm tra quyền RBAC và phân tầng dữ liệu cho từng đối tượng người dùng.
+- [x] **1.4.** Bổ sung hợp đồng dữ liệu trong [shared/routes.ts](file:///e:/Vincent/DEV/KDPD_PRJ_MNG/shared/routes.ts).
 
-### GIAI ĐOẠN 2: GIAO DIỆN REPORTS HUB & BIỂU ĐỒ TRỰC QUAN (Ưu tiên P0)
-- [ ] **2.1.** Tạo trang trung tâm `client/src/pages/reports.tsx` và thêm route `/reports` vào [client/src/App.tsx](file:///e:/Vincent/DEV/KDPD_PRJ_MNG/client/src/App.tsx) và thanh Menu tại [client/src/components/layout.tsx](file:///e:/Vincent/DEV/KDPD_PRJ_MNG/client/src/components/layout.tsx).
-- [ ] **2.2.** Tích hợp bộ chọn kỳ chuẩn `PeriodSelector` dựa trên nền tảng sẵn có trong `utils.ts`.
-- [ ] **2.3.** Phát triển 4 thẻ Scorecard và biểu đồ tương tác Recharts (Tiến độ, Trạng thái, Phân bổ tải trọng).
-- [ ] **2.4.** Xây dựng Bảng dữ liệu chi tiết có phân trang và bộ lọc nhanh.
+### GIAI ĐOẠN 2: GIAO DIỆN REPORTS HUB & BIỂU ĐỒ TRỰC QUAN (Ưu tiên P0) [ĐÃ HOÀN THÀNH 100%]
+- [x] **2.1.** Tạo trang trung tâm `client/src/pages/reports.tsx` và thêm route `/reports` vào [client/src/App.tsx](file:///e:/Vincent/DEV/KDPD_PRJ_MNG/client/src/App.tsx) và thanh Menu tại [client/src/components/layout.tsx](file:///e:/Vincent/DEV/KDPD_PRJ_MNG/client/src/components/layout.tsx).
+- [x] **2.2.** Tích hợp bộ chọn kỳ chuẩn `PeriodSelector` dựa trên nền tảng sẵn có trong `utils.ts`.
+- [x] **2.3.** Phát triển 4 thẻ Scorecard và biểu đồ tương tác Recharts (Tiến độ, Trạng thái, Phân bổ tải trọng).
+- [x] **2.4.** Xây dựng Bảng dữ liệu chi tiết có phân trang và bộ lọc nhanh.
 
-### GIAI ĐOẠN 3: ENGINE XUẤT EXCEL & IN ẤN PDF A4 CHUẨN MẪU (Ưu tiên P1)
-- [ ] **3.1.** Phát triển `client/src/lib/report-excel-exporter.ts` hỗ trợ xuất file Excel đa sheet chuyên nghiệp.
-- [ ] **3.2.** Thiết kế mẫu in A4 chuẩn thể thức văn bản hành chính Việt Nam với `@media print`.
-- [ ] **3.3.** Kiểm thử định dạng hiển thị số kế toán và ngày tháng thống nhất toàn hệ thống.
+### GIAI ĐOẠN 3: ENGINE XUẤT EXCEL & IN ẤN PDF A4 CHUẨN MẪU (Ưu tiên P1) [ĐÃ HOÀN THÀNH 100%]
+- [x] **3.1.** Phát triển `client/src/lib/report-excel-exporter.ts` hỗ trợ xuất file Excel đa sheet chuyên nghiệp.
+- [x] **3.2.** Thiết kế mẫu in A4 chuẩn thể thức văn bản hành chính Việt Nam với `@media print`.
+- [x] **3.3.** Kiểm thử định dạng hiển thị số kế toán và ngày tháng thống nhất toàn hệ thống.
 
-### GIAI ĐOẠN 4: TÍCH HỢP TRÍ TUỆ NHÂN TẠO GEMINI AI INSIGHTS (Ưu tiên P1)
-- [ ] **4.1.** Tạo service `server/services/report-ai-insights.ts` kết nối với Gemini API.
-- [ ] **4.2.** Thiết kế bộ Prompt chuyên biệt để phân tích báo cáo và phát hiện nút thắt cổ chai.
-- [ ] **4.3.** Hiển thị nhận định AI trực tiếp trên giao diện và nhúng vào bản xuất Excel/PDF.
+### GIAI ĐOẠN 4: TÍCH HỢP TRÍ TUỆ NHÂN TẠO GEMINI AI INSIGHTS (Ưu tiên P1) [ĐÃ HOÀN THÀNH 100%]
+- [x] **4.1.** Tạo service `server/services/report-ai-insights.ts` kết nối với Gemini API.
+- [x] **4.2.** Thiết kế bộ Prompt chuyên biệt để phân tích báo cáo và phát hiện nút thắt cổ chai.
+- [x] **4.3.** Hiển thị nhận định AI trực tiếp trên giao diện và nhúng vào bản xuất Excel/PDF.
 
-### GIAI ĐOẠN 5: CHỐT SỔ SNAPSHOT & LỊCH TRÌNH TỰ ĐỘNG HÓA (Ưu tiên P2)
-- [ ] **5.1.** Bổ sung bảng `report_snapshots` vào `shared/schema.ts` và chạy migration đồng bộ database.
-- [ ] **5.2.** Xây dựng tính năng "Chốt sổ kỳ báo cáo" và xem lại lịch sử các báo cáo đã lưu.
-- [ ] **5.3.** Thiết lập background job nhắc nhở và tự động kết xuất báo cáo cuối tuần/cuối tháng qua hệ thống thông báo.
+### GIAI ĐOẠN 5: CHỐT SỔ SNAPSHOT & LỊCH TRÌNH TỰ ĐỘNG HÓA (Ưu tiên P2) [ĐÃ HOÀN THÀNH 100%]
+- [x] **5.1.** Bổ sung bảng `report_snapshots` vào `shared/schema.ts` và chạy migration đồng bộ database.
+- [x] **5.2.** Xây dựng tính năng "Chốt sổ kỳ báo cáo" và xem lại lịch sử các báo cáo đã lưu.
+- [x] **5.3.** Thiết lập background job nhắc nhở và tự động kết xuất báo cáo cuối tuần/cuối tháng qua hệ thống thông báo.
 
 ---
 

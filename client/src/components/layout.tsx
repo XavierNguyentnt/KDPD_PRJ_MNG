@@ -16,6 +16,7 @@ import {
   Moon,
   Shield,
   FileText,
+  FileSpreadsheet,
   Menu,
   X,
   Clipboard,
@@ -422,6 +423,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       ? [{ href: "/thu-ky-hop-phan", label: "Thư ký hợp phần", icon: FileText }]
       : []),
     { href: "/team", label: language === "vi" ? "Nhóm" : "Team", icon: Users },
+    {
+      href: "/reports",
+      label: language === "vi" ? "Báo cáo" : "Reports",
+      icon: FileSpreadsheet,
+    },
     ...(role === UserRole.ADMIN
       ? [
           {

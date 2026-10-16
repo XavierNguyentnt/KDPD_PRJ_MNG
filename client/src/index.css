@@ -332,5 +332,106 @@ select[class*="dropdown"]:focus {
   .touch-scroll-x::-webkit-scrollbar {
     display: none;
   }
+}
 
+/* =============================================================================
+   CHẾ ĐỘ IN ẤN KHỔ GIẤY A4 (PRINT-READY A4 SPECIFICATION)
+   Tuân thủ chuẩn thể thức văn bản hành chính Việt Nam (Nghị định 30/2020/NĐ-CP)
+   ============================================================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm 15mm 12mm;
+  }
+
+  /* Reset toàn bộ layout trang phục vụ in ấn sạch sẽ */
+  html, body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ẩn toàn bộ hệ thống menu, thanh công cụ, sidebar, header web, và các nút thao tác */
+  header:not(.print\\:block),
+  aside,
+  nav,
+  footer:not(.print\\:block),
+  .print\\:hidden,
+  [data-print-hidden="true"],
+  button:not(.print\\:inline-block),
+  input,
+  .wouter-active,
+  .toaster {
+    display: none !important;
+  }
+
+  /* Cho phép container chính mở rộng trọn vẹn 100% diện tích trang in */
+  main,
+  .main-content,
+  #root,
+  .max-w-7xl {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Định dạng thẻ nội dung khi in: viền mảnh, nền trắng, không đổ bóng */
+  .card,
+  [class*="bg-card"],
+  .rounded-xl,
+  .rounded-lg {
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 4px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Tối ưu hóa bảng kê chi tiết khi in: rõ nét, kẻ ô đầy đủ, không cuộn */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 8.5pt !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  th {
+    background-color: #f3f4f6 !important;
+    color: #111827 !important;
+    border: 1px solid #9ca3af !important;
+    padding: 5px 6px !important;
+    font-weight: 600 !important;
+  }
+
+  td {
+    border: 1px solid #d1d5db !important;
+    padding: 4px 6px !important;
+  }
+
+  /* Hiển thị toàn bộ dữ liệu bị tràn thanh cuộn */
+  .overflow-x-auto,
+  .overflow-hidden,
+  .overflow-y-auto {
+    overflow: visible !important;
+  }
+
+  /* Giữ đường link hiển thị rõ tên thay vì URL dài */
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
 }
